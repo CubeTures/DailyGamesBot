@@ -1,0 +1,43 @@
+[project]
+name = "word-game-bot"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "mitmproxy==11.1.3",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Long lines here are embedded HTML template markup, not code.
+"proxy/gen_launcher.py" = ["E501"]
+
+[tool.ruff.format]
+# Defaults already match Black's style (quotes, indent, line endings, ...).
+
+[tool.pyright]
+include = ["proxy"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+# mitmproxy's Headers class (`class Headers(multidict.MultiDict):  # type: ignore`)
+# is itself only partially typed upstream, so every access through it reports
+# as Unknown under strict mode. These three "Unknown propagated from a
+# third-party type" rules are pure noise for that boundary; every other
+# strict check (missing annotations, optional access, etc.) stays enforced.
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pyright>=1.1.414",
+    "ruff>=0.16.7",
+]

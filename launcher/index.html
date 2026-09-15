@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>word-game-bot launcher</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 2rem; }
+  h1 { margin-top: 0; }
+  .grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .card { display: block; width: 220px; padding: 1.25rem; border-radius: 8px;
+           background: #222; color: inherit; text-decoration: none; border: 1px solid #333; }
+  .card:hover { border-color: #666; }
+  .card h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+  .card p { margin: 0; color: #888; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+  <h1>word-game-bot</h1>
+  <div class="grid">
+    <a class="card" href="http://localhost:8081/games/wordle/index.html" target="_blank" rel="noopener">
+      <h2>Wordle</h2>
+      <p>localhost:8081</p>
+    </a>
+    <a class="card" href="http://localhost:8082/" target="_blank" rel="noopener">
+      <h2>Fermi</h2>
+      <p>localhost:8082</p>
+    </a>
+    <a class="card" href="http://localhost:8083/" target="_blank" rel="noopener">
+      <h2>Minutecryptic</h2>
+      <p>localhost:8083</p>
+    </a>
+    <a class="card" href="http://localhost:8084/" target="_blank" rel="noopener">
+      <h2>Krillion</h2>
+      <p>localhost:8084</p>
+    </a>
+  </div>
+</body>
+</html>
