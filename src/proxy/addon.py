@@ -1,6 +1,6 @@
 """Shared mitmproxy addon for all reverse-proxied game listeners.
 
-Load with: mitmdump -s proxy/addon.py --mode reverse:<origin>@<port> ...
+Load with: mitmdump -s src/proxy/addon.py --mode reverse:<origin>@<port> ...
 
 For each configured local port this:
   * strips headers that would otherwise block loading/framing the game
@@ -20,7 +20,7 @@ from typing import cast
 from mitmproxy import ctx, http
 from mitmproxy.addonmanager import Loader
 
-from proxy.config import GAMES
+from src.proxy.config import GAMES
 
 _COOKIE_DOMAIN_RE = re.compile(rb";\s*Domain=[^;]*", re.IGNORECASE)
 _COOKIE_SECURE_RE = re.compile(rb";\s*Secure", re.IGNORECASE)
@@ -32,7 +32,7 @@ _HookFn = Callable[[http.HTTPFlow], None]
 _hook_modules: dict[int, ModuleType] = {}
 _origin_rewrites: dict[int, list[tuple[bytes, bytes]]] = {}
 for port, (name, origin) in GAMES.items():
-    _hook_modules[port] = importlib.import_module(f"proxy.hooks.{name}")
+    _hook_modules[port] = importlib.import_module(f"src.proxy.hooks.{name}")
     real = origin.encode()
     local = f"http://localhost:{port}".encode()
     # also cover escaped-slash forms seen inside embedded JSON config blobs,
@@ -125,4 +125,4 @@ def response(flow: http.HTTPFlow) -> None:
 
 
 def load(_loader: Loader) -> None:
-    ctx.log.info(f"word-game-bot addon loaded for ports: {sorted(GAMES)}")
+    ctx.log.info(f"Daily Games Bot addon loaded for ports: {sorted(GAMES)}")

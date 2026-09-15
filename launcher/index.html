@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>word-game-bot launcher</title>
+<title>Daily Games Bot launcher</title>
 <style>
   body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 2rem; }
   h1 { margin-top: 0; }
@@ -12,11 +12,27 @@
   .card:hover { border-color: #666; }
   .card h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
   .card p { margin: 0; color: #888; font-size: 0.85rem; }
+  .warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #111;
+    color: #eee;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.25rem;
+  }
 </style>
 </head>
 <body>
-  <h1>word-game-bot</h1>
-  <div class="grid">
+  <div class="warning" id="warning">
+    Run /play on the Daily Games Bot to get your link to play some games!
+  </div>
+  <h1>Daily Games Bot</h1>
+  <div class="grid" id="grid">
     <a class="card" href="http://localhost:8081/games/wordle/index.html" target="_blank" rel="noopener">
       <h2>Wordle</h2>
       <p>localhost:8081</p>
@@ -34,5 +50,25 @@
       <p>localhost:8084</p>
     </a>
   </div>
+<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var discordId = params.get("discord_id");
+    if (discordId) {
+      localStorage.setItem("discord_id", discordId);
+      params.delete("discord_id");
+      var query = params.toString();
+      var newUrl =
+        window.location.pathname + (query ? "?" + query : "") + window.location.hash;
+      window.history.replaceState({}, "", newUrl);
+    } else {
+      discordId = localStorage.getItem("discord_id");
+    }
+
+    if (!discordId) {
+      document.getElementById("warning").style.display = "flex";
+    }
+  })();
+</script>
 </body>
 </html>
