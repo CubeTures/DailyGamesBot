@@ -1,4 +1,4 @@
-:bee: {{ player }} played **Minute Cryptic** #{{ puzzle_number }}
+:bee: {{ player }} played **Minute Cryptic**{{ " #%s" % puzzle_number if puzzle_number }}
 {% if won %}
 {%- if score is not none %}
 {%- if score < 0 %}{{ -score }} under par

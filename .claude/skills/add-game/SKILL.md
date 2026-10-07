@@ -15,7 +15,7 @@ plus the result fields (`fields.js`) and turns them into an announcement
 Read `games/README.md` first. It is the format reference: the files in a
 game's directory, trigger types, the expression helpers, the standard field
 names, and the announcement house style. The runtime that executes the config
-is `src/proxy/capture.js`. Use `games/wordle/` and `games/minutecryptic/` as
+is `src/proxy/capture/runtime.js`. Use `games/wordle/` and `games/minutecryptic/` as
 the models for a finished game: commented `vars.js`, a short `when`, and an
 announcement that reads like the game's share screen.
 
@@ -38,7 +38,7 @@ Playwright tools are the `mcp__plugin_playwright_playwright__*` MCP tools.
 
 - **Existing game** (argument is a name in `games/`): read the files in `games/<name>/` and skip to step 2.
 - **New game** (argument is a URL):
-  - Run `uv run python3 -m src.proxy.config` to see the existing games and the next free port.
+  - Run `uv run python3 -m src.games` to see the existing games and the next free port.
   - Split the URL into `origin` (scheme + host) and `landing_path` (path + query).
   - Derive `name` from the host, e.g. `www.minutecryptic.com` becomes `minutecryptic`. It must be lowercase `[a-z0-9_]`.
   - Write `games/<name>/config.toml` starting with a `#:schema ../schema.json` line, then `name`, `title`, `description`, `icon`, `origin`, `port` and `landing_path`, and no triggers yet. Use the game's own spelling for `title` (`Minute Cryptic`, not `Minutecryptic`).
@@ -192,7 +192,7 @@ Write the game's announcement following the house style in "Announcement" in
 - Then the result in the game's own terms (score vs. par, time, guesses), and an emoji grid or bar if the game's share screen has one. Mirror that share screen.
 - Every outcome reads correctly: win, loss or give-up, and missing optional fields (`{% if x is not none %}`).
 - Never spell out the answer.
-- Emoji as Discord shortcodes (`:green_square:`), only ones in the `shortcodes` map in `src/proxy/launcher.html.j2`. If you need another, add it to that map (the shortcode and its emoji) so the launcher renders it too.
+- Emoji as Discord shortcodes (`:green_square:`), only ones in the `SHORTCODES` map in `src/launcher/templates/discord-markdown.js`. If you need another, add it to that map (the shortcode and its emoji) so the launcher renders it too.
 - Only the markdown the launcher renders: `**bold**`, `*italic*`, `__underline__`, `~~strike~~`, `` `code` ``.
 
 Preview it for every outcome with the field values from the runs:
@@ -204,7 +204,7 @@ uv run python3 -m src.announce <name> '<fields JSON from a run>'
 ### Validate
 
 ```sh
-uv run python3 -m src.proxy.config
+uv run python3 -m src.games
 uv run python3 -m src.proxy.capture <name> > $SCRATCH/capture.js && node --check $SCRATCH/capture.js
 ```
 
@@ -264,7 +264,7 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
 - Stop the proxy (step 8) and call `browser_close`.
 - Delete `$SCRATCH/add-game.db` and `.playwright-mcp/add-game/`.
 - Run `uv run ruff check src && uv run pyright` if you touched Python.
-- Run `uv run python3 -m src.proxy.config` once more, then `git status`. The changes should be exactly the files in the table at the top (plus `src/proxy/launcher.html.j2` if you added a shortcode). Keep `launcher/index.html`: it is tracked and should list the new game.
+- Run `uv run python3 -m src.games` once more, then `git status`. The changes should be exactly the files in the table at the top (plus `src/launcher/templates/discord-markdown.js` if you added a shortcode). Keep `launcher/index.html`: it is tracked and should list the new game.
 - Report to the user:
   - which signal(s) you chose and why
   - the fields captured, with the values seen in verification for each outcome (win and lose)

@@ -5,7 +5,7 @@ a directory (the `add-game` Claude skill writes it for you). Validate them
 all, and regenerate `schema.json`, with:
 
 ```sh
-uv run python3 -m src.proxy.config
+uv run python3 -m src.games
 ```
 
 | file              | holds                                                        |
@@ -22,7 +22,7 @@ first letter. Anything else in the directory is an error, so a misnamed file
 doesn't get silently ignored.
 
 `config.toml`'s format is defined by the Pydantic models in
-`src/proxy/config.py`, and `schema.json` (a JSON Schema) is generated from
+`src/games/models.py`, and `schema.json` (a JSON Schema) is generated from
 them; don't edit it by hand. Start the file with `#:schema ../schema.json` and
 a TOML language server (Even Better TOML / taplo, or tombi) will autocomplete
 keys and flag mistakes as you type. The command above also checks what the
@@ -193,8 +193,8 @@ which renders as:
 - Never spell out the answer; others in the channel may not have played yet.
 - Write emoji as Discord shortcodes (`:green_square:`), not as the characters
   themselves, so they look the same in Discord and on the launcher. The
-  launcher only knows the shortcodes in the `shortcodes` map in
-  `src/proxy/launcher.html.j2`; any other shows as typed, so add it there
+  launcher only knows the shortcodes in the `SHORTCODES` map in
+  `src/launcher/templates/discord-markdown.js`; any other shows as typed, so add it there
   when a template needs it.
 - Stick to the markdown the launcher renders too: `**bold**`, `*italic*`,
   `__underline__`, `~~strike~~` and `` `code` ``.
@@ -225,7 +225,7 @@ uv run python3 -m src.announce wordle '{"won": true, "rows": [":green_square::gr
 
 ## How capture works
 
-The proxy injects `/__dgb/capture.js` (built from `src/proxy/capture.js` and
+The proxy injects `/__dgb/capture.js` (built from `src/proxy/capture/runtime.js` and
 the game's directory) at the top of every HTML page of a game that has
 triggers. When a trigger fires it POSTs to `/__dgb/result` on the same local
 origin; the proxy answers that itself and saves a row in SQLite

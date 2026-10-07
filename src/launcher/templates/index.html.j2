@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Games</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+<style>
+{% include "style.css" %}
+</style>
+</head>
+<body>
+  <div class="warning" id="warning">
+    <div class="warning-card">
+      <div class="emoji" aria-hidden="true">🎲</div>
+      <h2>Get your link first</h2>
+      <p>Run <code>/play</code> in Discord to get your personal link, so your scores count.</p>
+    </div>
+  </div>
+  <main>
+    <header>
+      <p class="date" id="date"></p>
+      <h1>Daily Games</h1>
+      <p class="tagline">Play today's puzzles; your results post to Discord automatically.</p>
+    </header>
+
+    <section>
+      <div class="section-head"><h2>Games</h2></div>
+      <div class="games">
+{%- for game in games %}
+        <a class="card" data-game="{{ game.name }}" href="{{ game.url }}" target="_blank" rel="noopener">
+          <div class="card-top">
+            {%- if game.icon %}
+            <img class="icon" src="{{ game.icon }}" alt="">
+            {%- else %}
+            <div class="icon mono" aria-hidden="true">{{ game.title[0] }}</div>
+            {%- endif %}
+            <h3>{{ game.title }}</h3>
+          </div>
+          {%- if game.description %}
+          <p class="desc">{{ game.description }}</p>
+          {%- endif %}
+          <div class="card-foot">
+            <span class="status">Not played</span>
+            <span class="play">Play</span>
+          </div>
+        </a>
+{%- endfor %}
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head scores-head">
+        <h2 id="scores-title">Today's scores</h2>
+        <span class="note" id="updated"></span>
+        <div class="day-nav">
+          <button type="button" id="day-prev" aria-label="Previous day">‹</button>
+          <input type="date" id="day-pick" aria-label="Show scores for day">
+          <button type="button" id="day-next" aria-label="Next day">›</button>
+          <button type="button" id="day-today">Today</button>
+        </div>
+      </div>
+      <div class="boards" id="boards"><p class="empty">Loading…</p></div>
+    </section>
+
+    <footer class="site-foot">
+      Want to add more games? Make a pull request at
+      <a href="https://github.com/CubeTures/DailyGamesBot" target="_blank" rel="noopener">github.com/CubeTures/DailyGamesBot</a>
+    </footer>
+  </main>
+  <dialog id="announcement" aria-labelledby="announcement-title">
+    <div class="dialog-head">
+      <h3 id="announcement-title"></h3>
+      <button class="close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body">
+      <div class="message"></div>
+    </div>
+  </dialog>
+<script id="game-titles" type="application/json">{{ game_titles | tojson }}</script>
+<script>
+{% include "discord-markdown.js" %}
+{% include "app.js" %}
+</script>
+</body>
+</html>

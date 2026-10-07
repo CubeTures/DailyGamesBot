@@ -19,7 +19,7 @@ repos:
       # models; a stale schema shows up as a modified file and fails the commit.
       - id: game-configs
         name: game configs
-        entry: uv run python3 -m src.proxy.config
+        entry: uv run python3 -m src.games
         language: system
-        files: ^(games/|src/proxy/config\.py$)
+        files: ^(games/|src/games/)
         pass_filenames: false
