@@ -55,11 +55,22 @@ type = "page"                        # page | network | event
 when = "finished"                    # a JS expression; vars.js is in scope
 ```
 
-`vars.js`:
+`vars.js` (trimmed; the real one documents what NYT stores in comments):
 
 ```js
-const st = ls("games-state-wordleV2/ANON")?.states?.[0];
-const finished = st?.data.status === "WIN";
+// The daily state object NYT rewrites after every guess.
+const st = (() => {
+  const key = Object.keys(localStorage).find(k => k.startsWith("games-state-wordleV2/"));
+  return ls(key)?.states?.find(s => s.printDate && s.data && !s.data.isPlayingArchive);
+})();
+
+// Tile colours are only on the board: one emoji row per fully flipped row.
+const rows = /* ... built from [role="group"] rows and each tile's data-state ... */;
+
+// Won or out of rows, and every used row has flipped (so `rows` is complete).
+const finished = !!st
+  && (st.data.status === "WIN" || (st.data.status !== "IN_PROGRESS" && st.data.currentRowIndex >= 6))
+  && rows.length === st.data.currentRowIndex;
 ```
 
 `fields.js`:
@@ -69,6 +80,9 @@ export default {
   puzzle_id: st.printDate,           // REQUIRED
   won: st.data.status === "WIN",
   attempts: st.data.currentRowIndex,
+  score: st.data.status === "WIN" ? st.data.currentRowIndex : null, // null = X/6
+  max_score: 6,
+  rows: rows,
 };
 ```
 
@@ -85,6 +99,15 @@ happens to the result.
   gets stored in the database and handed to the announcement template. It
   only runs once `when` is true, so it can assume whatever `when` checked
   (e.g. that `st` exists).
+
+`when` should only turn true once every field is final. A result is saved
+once, the first time a trigger fires, so a field read a moment too early
+stays wrong. Wordle's `finished` waits for the board's last row to flip for
+exactly this reason.
+
+Comment `vars.js` with what the game stores and what each value means, and
+comment any field in `fields.js` whose meaning isn't obvious (a score's sign,
+a formula). That's what the next fix needs.
 
 Every trigger in the game shares both files, so keep fields consistent
 across triggers (a network fallback can read `res` where a page trigger
@@ -141,14 +164,41 @@ When a result is saved, the bot posts it to the channel in
 that message, so each game can show its result its own way. The same text is
 shown on the launcher when you click a result on today's scoreboard.
 
+Wordle's:
+
 ```jinja
-{{ player }} — **Wordle {{ "{:,}".format(puzzle_number) }}** {{ score if won else "X" }}/6
-{% if won %}
-{% for guess in guesses %}
-{{ guess | tiles(guesses[-1]) }}
+:bee: {{ player }} played **Wordle**
+{% for row in rows %}
+{{ row }}
 {% endfor %}
-{% endif %}
 ```
+
+which renders as:
+
+```
+:bee: @player played **Wordle**
+:white_large_square::yellow_square::white_large_square::white_large_square::white_large_square:
+:green_square::green_square::green_square::green_square::green_square:
+```
+
+### House style
+
+- Open with `:bee: {{ player }} played **<title>**`, then the result in the
+  game's own terms (par, time, guesses), then a grid or row of emoji if the
+  game's share screen has one. See `minutecryptic/announcement.j2` for a
+  game with a score and a hint bar.
+- Cover every outcome: a loss or give-up should read as one, not as a
+  missing score.
+- Never spell out the answer; others in the channel may not have played yet.
+- Write emoji as Discord shortcodes (`:green_square:`), not as the characters
+  themselves, so they look the same in Discord and on the launcher. The
+  launcher only knows the shortcodes in the `shortcodes` map in
+  `src/proxy/launcher.html.j2`; any other shows as typed, so add it there
+  when a template needs it.
+- Stick to the markdown the launcher renders too: `**bold**`, `*italic*`,
+  `__underline__`, `~~strike~~` and `` `code` ``.
+
+### Template reference
 
 In scope:
 
@@ -158,16 +208,18 @@ In scope:
 - `player`: a mention of the player (rendered as their name, no ping)
 - `game`: the game's `title`; `puzzle_id`; `fields`: all fields as a dict
 - filters: `duration` (seconds as `1:05` / `1:02:03`) and
-  `tiles(answer)` (a guess as a Wordle-style 🟩🟨⬛ row)
+  `tiles(answer)` (a guess scored against the answer as a 🟩🟨⬛ row; this
+  uses the answer, so only reach for it when the game reports one)
 
 Blocks trim their own line, so put `{% ... %}` tags on lines of their own and
 use `{%-` to join onto the previous line. Without `announcement.j2`, a generic
 message is built from the standard fields. If a template fails at render time
-the generic one is used and the error is logged. The command above checks the
-template's syntax; to see what it renders, give it some fields:
+the generic one is used and the error is logged. Messages are cut at
+Discord's 2000-character limit. The command above checks the template's
+syntax; to see what it renders, give it some fields:
 
 ```sh
-uv run python3 -m src.announce wordle '{"puzzle_number": 1935, "won": true, "score": 3, "guesses": ["crane", "plate", "grape"]}'
+uv run python3 -m src.announce wordle '{"won": true, "rows": [":green_square::green_square::green_square::green_square::green_square:"]}'
 ```
 
 ## How capture works
