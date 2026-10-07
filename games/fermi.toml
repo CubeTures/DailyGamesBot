@@ -1,0 +1,7 @@
+name = "fermi"
+title = "Fermi"
+origin = "https://fermi.gg"
+port = 8082
+landing_path = "/"
+
+# No capture triggers yet: run the add-game skill to discover them.

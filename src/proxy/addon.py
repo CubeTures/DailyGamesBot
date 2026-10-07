@@ -7,8 +7,10 @@ For each configured local port this:
     from a localhost origin (X-Frame-Options, CSP, HSTS)
   * rewrites Set-Cookie so cookies bind to localhost instead of the
     upstream domain, and work over plain HTTP
-  * dispatches to the matching proxy/hooks/<game>.py module, so bot/solver
-    logic can be added later without touching this file
+  * injects the result-capture script into pages of games that have
+    capture triggers, and answers its /__dgb/ requests (proxy/capture.py)
+  * dispatches to the matching proxy/hooks/<game>.py module, if any, so
+    bot/solver logic can be added later without touching this file
 """
 
 import importlib
@@ -20,7 +22,8 @@ from typing import cast
 from mitmproxy import ctx, http
 from mitmproxy.addonmanager import Loader
 
-from src.proxy.config import GAMES
+from src.proxy import capture
+from src.proxy.config import GAME_CONFIGS, GAMES
 
 _COOKIE_DOMAIN_RE = re.compile(rb";\s*Domain=[^;]*", re.IGNORECASE)
 _COOKIE_SECURE_RE = re.compile(rb";\s*Secure", re.IGNORECASE)
@@ -29,10 +32,15 @@ _TEXT_CONTENT_TYPES = ("html", "javascript", "json", "css", "text/")
 
 _HookFn = Callable[[http.HTTPFlow], None]
 
-_hook_modules: dict[int, ModuleType] = {}
+_hook_modules: dict[int, ModuleType | None] = {}
 _origin_rewrites: dict[int, list[tuple[bytes, bytes]]] = {}
 for port, (name, origin) in GAMES.items():
-    _hook_modules[port] = importlib.import_module(f"src.proxy.hooks.{name}")
+    try:
+        _hook_modules[port] = importlib.import_module(f"src.proxy.hooks.{name}")
+    except ModuleNotFoundError as e:
+        if e.name != f"src.proxy.hooks.{name}":
+            raise
+        _hook_modules[port] = None
     real = origin.encode()
     local = f"http://localhost:{port}".encode()
     # also cover escaped-slash forms seen inside embedded JSON config blobs,
@@ -68,6 +76,10 @@ def request(flow: http.HTTPFlow) -> None:
     if game is None:
         return
 
+    if capture.handle_request(flow, GAME_CONFIGS[port]):
+        return
+    capture.strip_discord_cookie(flow)
+
     # Force a full response instead of a bodyless 304: the client's cache
     # validators were earned against whatever it loaded last through this
     # proxy, and a 304 here can leave the page with no body to render.
@@ -81,7 +93,7 @@ def request(flow: http.HTTPFlow) -> None:
 
 def response(flow: http.HTTPFlow) -> None:
     port, game = _game_for(flow)
-    if game is None:
+    if game is None or flow.request.path.startswith(capture.PREFIX):
         return
     assert flow.response is not None
 
@@ -118,6 +130,8 @@ def response(flow: http.HTTPFlow) -> None:
                     changed = True
             if changed:
                 flow.response.content = content
+
+    capture.inject(flow, GAME_CONFIGS[port])
 
     hook_response = _hook_fn(port, "response")
     if hook_response is not None:

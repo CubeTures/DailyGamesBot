@@ -1,0 +1,7 @@
+name = "krillion"
+title = "Krillion"
+origin = "https://krillion.io"
+port = 8084
+landing_path = "/"
+
+# No capture triggers yet: run the add-game skill to discover them.

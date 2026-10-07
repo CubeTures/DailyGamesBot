@@ -35,10 +35,38 @@ http://localhost:8090 for the launcher, which links to each game:
 | 8083 | Minute Cryptic| www.minutecryptic.com           |
 | 8084 | Krillion      | krillion.io                     |
 
-Each game gets its own local port, reverse-proxied 1:1 to its real origin
-(`src/proxy/config.py`). The addon (`src/proxy/addon.py`) strips
+Each game gets its own local port, reverse-proxied 1:1 to its real origin.
+Games are configured one TOML file per game in `games/` (format in
+`games/README.md`; validate with `uv run python3 -m src.proxy.config`). The addon (`src/proxy/addon.py`) strips
 `X-Frame-Options`/CSP/HSTS and rewrites cookies so the game works from a
 `localhost` origin over plain HTTP.
+
+To run just the proxy and launcher, without the Discord bot (no token
+needed):
+
+```sh
+uv run python3 -m src.proxy
+```
+
+## Adding a game and capturing results
+
+Each game's TOML can declare `[[triggers]]`: JS expressions saying when the
+player has finished and which result fields to pull out (puzzle id, score,
+win/loss...). The proxy injects a small script into the game's pages that
+evaluates them and reports results back to the proxy, which saves them to
+SQLite at `data/results.db` (`src/results.py`), keyed on the player's Discord
+ID from their `/play` link.
+
+To add a game, or work out the triggers for one, run the Claude Code skill:
+
+```
+/add-game https://example.com/daily-puzzle
+```
+
+It opens the game through the proxy in a Playwright browser with an event
+recorder, asks you to play it, then inspects what the page did. That covers
+storage, network calls, analytics events and the final screen. From that it
+writes the triggers and verifies them end to end.
 
 ## Development
 
@@ -61,9 +89,9 @@ reports the same diagnostics as the pre-commit hook and the CLI.
 
 ## Adding bot/solver logic
 
-Each game has a stub module under `src/proxy/hooks/` (e.g.
+A game can have a module under `src/proxy/hooks/` named after it (e.g.
 `src/proxy/hooks/wordle.py`) with optional `request(flow)` / `response(flow)`
-functions. `flow` is a standard `mitmproxy.http.HTTPFlow` — inspect or modify
+functions; games without one are simply proxied. `flow` is a standard `mitmproxy.http.HTTPFlow` — inspect or modify
 `flow.request` / `flow.response` there to build solvers without touching the
 core proxy.
 

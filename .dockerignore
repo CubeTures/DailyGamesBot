@@ -7,3 +7,5 @@ __pycache__
 .env
 .pre-commit-config.yaml
 README.md
+data
+.playwright-mcp

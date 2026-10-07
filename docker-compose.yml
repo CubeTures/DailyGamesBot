@@ -9,3 +9,5 @@ services:
       - "8082:8082"
       - "8083:8083"
       - "8084:8084"
+    volumes:
+      - ./data:/app/data
