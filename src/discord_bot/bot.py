@@ -1,5 +1,6 @@
 """The Discord bot: /play hands out launcher links, and finished games are
-announced in the channel named by DISCORD_RESULTS_CHANNEL_ID (if set).
+announced in the channel named by DISCORD_RESULTS_CHANNEL_ID (if set),
+pinging the game's role in that channel's server (see roles.py).
 
 The proxy saves results in another process, so the bot polls the results
 store for names to look up and results to post.
@@ -13,6 +14,7 @@ from src import results
 from src.discord_bot import settings
 from src.discord_bot.announcer import announce_pending_results
 from src.discord_bot.player_names import refresh_player_name, refresh_stale_names
+from src.discord_bot.roles import create_game_roles, results_guild, sync_subscriptions
 from src.settings import LAUNCHER_URL
 
 POLL_SECONDS = 15
@@ -30,13 +32,25 @@ def create_client(results_channel_id: int | None) -> discord.Client:
     async def poll_unannounced_results(channel_id: int) -> None:
         await announce_pending_results(client, channel_id)
 
+    @tasks.loop(seconds=POLL_SECONDS)
+    async def poll_subscriptions(channel_id: int) -> None:
+        guild = await results_guild(client, channel_id)
+        if guild is not None:
+            await sync_subscriptions(guild)
+
     @client.event
     async def on_ready() -> None:
         await tree.sync()
         if not poll_stale_names.is_running():
             poll_stale_names.start()
-        if results_channel_id is not None and not poll_unannounced_results.is_running():
-            poll_unannounced_results.start(results_channel_id)
+        if results_channel_id is not None:
+            guild = await results_guild(client, results_channel_id)
+            if guild is not None:
+                await create_game_roles(guild)
+            if not poll_unannounced_results.is_running():
+                poll_unannounced_results.start(results_channel_id)
+            if not poll_subscriptions.is_running():
+                poll_subscriptions.start(results_channel_id)
         print(f"Logged in as {client.user}")
 
     @tree.command(name="play", description="Get your personal link to the games hub")

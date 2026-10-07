@@ -52,7 +52,8 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
 - `src/launcher/`: page generation (`build.py`, `templates/`) and its HTTP
   server with the results API (`server.py`)
 - `src/discord_bot/`: client and `/play` (`bot.py`), result posts
-  (`announcer.py`), username lookups (`player_names.py`)
+  (`announcer.py`), username lookups (`player_names.py`), game roles
+  (`roles.py`)
 - `src/announce.py`: renders a result's `announcement.j2`
 - `src/results.py`: SQLite results store (`data/results.db`, override with
   `DGB_DB_PATH`)
@@ -76,15 +77,25 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
   scoreboard read from `GET /api/results?since=<ISO>[&until=<ISO>]` on the
   launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`;
   days run from the viewer's local midnight. Clicking a result shows the
-  game's `announcement.j2` rendered as HTML.
+  game's `announcement.j2` rendered as HTML. With
+  `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the
+  player's game role via `GET`/`POST /api/subscriptions`. Cards are divs
+  whose title link stretches over the whole card, so the bell can be a
+  button inside it.
 - **Discord bot.** `/play` replies ephemerally with a launcher link tagged
   `?discord_id=...`; the launcher stores it in `localStorage` and a
   `dgb_discord_id` cookie (shared across localhost ports so games can send
   it) and strips it from the URL. The bot records usernames for the
   scoreboard on first `/play` and after each result. With
   `DISCORD_RESULTS_CHANNEL_ID` set, it polls every 15s for unannounced
-  results and posts them using the game's `announcement.j2`; mentions don't
-  ping, and results over 6 hours old when first seen are skipped.
+  results and posts them using the game's `announcement.j2`; player mentions
+  don't ping, and results over 6 hours old when first seen are skipped.
+- **Game roles.** On startup the bot creates a mentionable role named after
+  each game's `title` in the results channel's server (reusing one that
+  already has that name; needs Manage Roles). Announcements ping it. Role
+  picks from the launcher are saved in the `subscriptions` table and the bot
+  polls every 15s to give or take the role. The table is the source of
+  truth: roles changed by hand in Discord aren't reflected on the launcher.
 
 ## Gotchas
 

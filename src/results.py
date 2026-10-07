@@ -1,4 +1,5 @@
-"""SQLite store for captured game results and the players who made them.
+"""SQLite store for captured game results, the players who made them, and
+which games' Discord roles each player wants.
 
 One row per (game, discord_id, puzzle_id); the first capture wins and later
 ones (e.g. the game re-showing its finished state on reload) are ignored.
@@ -7,7 +8,8 @@ Results are saved by the proxy, which runs in mitmdump's process and can't
 reach the Discord bot. So instead of calling the bot, a save marks the
 player's name stale and leaves the result unannounced; the bot polls for both
 (see discord_bot/), looks the name up, posts the result and marks it
-announced.
+announced. Likewise the launcher saves role subscriptions unsynced, and the
+bot gives or takes the role and marks them synced.
 """
 
 import json
@@ -38,6 +40,13 @@ CREATE TABLE IF NOT EXISTS players (
     name        TEXT,
     name_stale  INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS subscriptions (
+    discord_id  TEXT NOT NULL,
+    game        TEXT NOT NULL,
+    subscribed  INTEGER NOT NULL,
+    synced      INTEGER NOT NULL DEFAULT 0,  -- the bot has given/taken the role
+    PRIMARY KEY (discord_id, game)
+);
 """
 
 _SELECT_RESULTS = """
@@ -65,6 +74,13 @@ class StoredResult:
     puzzle_id: str
     data: dict[str, Any]
     captured_at: datetime
+
+
+@dataclass(frozen=True)
+class Subscription:
+    discord_id: str
+    game: str
+    subscribed: bool
 
 
 @contextmanager
@@ -197,3 +213,42 @@ def stale_player_ids() -> list[str]:
             "SELECT discord_id FROM players WHERE name_stale = 1"
         ).fetchall()
     return [discord_id for (discord_id,) in rows]
+
+
+def set_subscription(sub: Subscription) -> None:
+    """Record whether a player wants a game's role, for the bot to apply."""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO subscriptions (discord_id, game, subscribed)"
+            " VALUES (?, ?, ?) ON CONFLICT (discord_id, game)"
+            " DO UPDATE SET subscribed = excluded.subscribed, synced = 0",
+            (sub.discord_id, sub.game, sub.subscribed),
+        )
+
+
+def subscribed_games(discord_id: str) -> list[str]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT game FROM subscriptions WHERE discord_id = ? AND subscribed = 1",
+            (discord_id,),
+        ).fetchall()
+    return [game for (game,) in rows]
+
+
+def unsynced_subscriptions() -> list[Subscription]:
+    """Subscription changes the bot hasn't applied to Discord yet."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT discord_id, game, subscribed FROM subscriptions WHERE synced = 0"
+        ).fetchall()
+    return [Subscription(d, g, bool(s)) for d, g, s in rows]
+
+
+def mark_subscription_synced(sub: Subscription) -> None:
+    """Mark `sub` applied, unless the player has changed it again since."""
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE subscriptions SET synced = 1"
+            " WHERE discord_id = ? AND game = ? AND subscribed = ?",
+            (sub.discord_id, sub.game, sub.subscribed),
+        )

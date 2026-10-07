@@ -27,14 +27,20 @@
       <div class="section-head"><h2>Games</h2></div>
       <div class="games">
 {%- for game in games %}
-        <a class="card" data-game="{{ game.name }}" href="{{ game.url }}" target="_blank" rel="noopener">
+        <div class="card" data-game="{{ game.name }}">
           <div class="card-top">
             {%- if game.icon %}
             <img class="icon" src="{{ game.icon }}" alt="">
             {%- else %}
             <div class="icon mono" aria-hidden="true">{{ game.title[0] }}</div>
             {%- endif %}
-            <h3>{{ game.title }}</h3>
+            <h3><a class="card-link" href="{{ game.url }}" target="_blank" rel="noopener">{{ game.title }}</a></h3>
+            {%- if roles_enabled %}
+            <button type="button" class="ping" aria-pressed="false" hidden
+                    aria-label="Get pinged in Discord when someone finishes {{ game.title }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            </button>
+            {%- endif %}
           </div>
           {%- if game.description %}
           <p class="desc">{{ game.description }}</p>
@@ -43,7 +49,7 @@
             <span class="status">Not played</span>
             <span class="play">Play</span>
           </div>
-        </a>
+        </div>
 {%- endfor %}
       </div>
     </section>

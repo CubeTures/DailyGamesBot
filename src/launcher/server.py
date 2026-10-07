@@ -1,4 +1,5 @@
-"""Serves the launcher page and the results API its scoreboard reads."""
+"""Serves the launcher page, the results API its scoreboard reads, and the
+subscriptions API its role pickers use."""
 
 import json
 from collections.abc import Generator
@@ -7,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 from src import announce, results
@@ -16,6 +17,7 @@ from src.launcher.build import write_launcher
 from src.settings import LAUNCHER_DIR, LAUNCHER_PORT
 
 RESULTS_API_PATH = "/api/results"
+SUBSCRIPTIONS_API_PATH = "/api/subscriptions"
 
 
 def _parse_aware_time(raw: str | None) -> datetime | None:
@@ -44,7 +46,7 @@ def _result_json(result: results.StoredResult) -> dict[str, Any]:
 
 def _results_for_query(query: str) -> list[dict[str, Any]]:
     """GET /api/results?since=<ISO time>[&until=<ISO time>]."""
-    params = {key: values[0] for key, values in parse_qs(query).items()}
+    params = _query_params(query)
     # The page sends the viewer's local midnight(s); fall back to 24h.
     since = _parse_aware_time(params.get("since")) or (
         datetime.now(UTC) - timedelta(days=1)
@@ -53,17 +55,74 @@ def _results_for_query(query: str) -> list[dict[str, Any]]:
     return [_result_json(r) for r in results.captured_between(since, until)]
 
 
+def _query_params(query: str) -> dict[str, str]:
+    return {key: values[0] for key, values in parse_qs(query).items()}
+
+
+def _is_discord_id(value: object) -> bool:
+    return isinstance(value, str) and value.isascii() and value.isdigit()
+
+
+def _subscriptions_for_query(query: str) -> dict[str, Any] | None:
+    """GET /api/subscriptions?discord_id=<id>: the games whose role they want."""
+    discord_id = _query_params(query).get("discord_id")
+    if not _is_discord_id(discord_id):
+        return None
+    return {"games": results.subscribed_games(cast(str, discord_id))}
+
+
+def _parse_subscription(body: bytes) -> results.Subscription | None:
+    """POST /api/subscriptions {"discord_id", "game", "subscribed"}."""
+    try:
+        payload: Any = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    fields = cast(dict[str, Any], payload)
+    discord_id, game, subscribed = (
+        fields.get("discord_id"),
+        fields.get("game"),
+        fields.get("subscribed"),
+    )
+    if (
+        not _is_discord_id(discord_id)
+        or game not in GAMES_BY_NAME
+        or not isinstance(subscribed, bool)
+    ):
+        return None
+    return results.Subscription(cast(str, discord_id), cast(str, game), subscribed)
+
+
 class _LauncherRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         url = urlsplit(self.path)
         if url.path == RESULTS_API_PATH:
             self._send_json(_results_for_query(url.query))
+        elif url.path == SUBSCRIPTIONS_API_PATH:
+            subscriptions = _subscriptions_for_query(url.query)
+            if subscriptions is None:
+                self._send_json({"error": "need a discord_id"}, 400)
+            else:
+                self._send_json(subscriptions)
         else:
             super().do_GET()
 
-    def _send_json(self, body: Any) -> None:
+    def do_POST(self) -> None:
+        if urlsplit(self.path).path != SUBSCRIPTIONS_API_PATH:
+            self._send_json({"error": "not found"}, 404)
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        sub = _parse_subscription(self.rfile.read(length))
+        if sub is None:
+            self._send_json({"error": "need discord_id, game and subscribed"}, 400)
+            return
+        results.set_subscription(sub)
+        self._send_json({"ok": True})
+
+    def _send_json(self, body: Any, status: int = 200) -> None:
         encoded = json.dumps(body).encode()
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(encoded)))

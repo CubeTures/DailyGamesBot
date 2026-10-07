@@ -6,6 +6,7 @@ from typing import Any
 
 import jinja2
 
+from src.discord_bot.settings import results_channel_id
 from src.games.models import ICON_MIME_TYPES, Game
 from src.games.registry import GAMES_BY_PORT
 from src.settings import LAUNCHER_DIR
@@ -43,6 +44,8 @@ def render_launcher() -> str:
     return env.get_template("index.html.j2").render(
         games=[_card(game) for game in games],
         game_titles={game.name: game.title for game in games},
+        # Game roles live in the results channel's server.
+        roles_enabled=results_channel_id() is not None,
     )
 
 

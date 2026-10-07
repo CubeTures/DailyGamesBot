@@ -15,7 +15,8 @@ uv run python3 -m src
 Or with Docker: `docker compose up --build`.
 
 Open http://localhost:8090 for the launcher, or run `/play` in Discord to get
-your personal link so your scores count.
+your personal link so your scores count. On the launcher you can also pick
+which games' Discord roles you want, to get pinged when someone finishes them.
 
 ## Adding games
 

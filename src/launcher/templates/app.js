@@ -309,7 +309,45 @@
     else refreshToday();
   }
 
+  // The bell on each card toggles the game's Discord role; the bot gives or
+  // takes it within a few seconds.
+  function setPinged(button, pinged) {
+    button.setAttribute("aria-pressed", String(pinged));
+    button.title = pinged ? "You get pinged for this game" : "Get pinged when someone finishes this game";
+  }
+
+  function setUpPings() {
+    var buttons = document.querySelectorAll(".card .ping");
+    if (!buttons.length || !discordId) return;
+    buttons.forEach(function (button) {
+      var game = button.closest(".card").dataset.game;
+      button.addEventListener("click", function () {
+        var pinged = button.getAttribute("aria-pressed") !== "true";
+        setPinged(button, pinged);
+        if (pinged) replay(button, "rung");
+        fetch("/api/subscriptions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ discord_id: discordId, game: game, subscribed: pinged }),
+        }).then(function (res) {
+          if (!res.ok) throw new Error(res.statusText);
+        }).catch(function () {
+          setPinged(button, !pinged);
+        });
+      });
+    });
+    fetch("/api/subscriptions?discord_id=" + encodeURIComponent(discordId))
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        buttons.forEach(function (button) {
+          setPinged(button, body.games.indexOf(button.closest(".card").dataset.game) !== -1);
+          button.hidden = false;
+        });
+      }).catch(function () {});
+  }
+
   if (!discordId) document.getElementById("warning").style.display = "flex";
+  setUpPings();
 
   prevButton.addEventListener("click", function () {
     setViewDay(addDays(viewDay || today(), -1));
