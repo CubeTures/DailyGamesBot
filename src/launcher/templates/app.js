@@ -310,8 +310,6 @@
   }
 
   if (!discordId) document.getElementById("warning").style.display = "flex";
-  document.getElementById("date").textContent = new Date().toLocaleDateString(
-    undefined, { weekday: "long", month: "long", day: "numeric" });
 
   prevButton.addEventListener("click", function () {
     setViewDay(addDays(viewDay || today(), -1));

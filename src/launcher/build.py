@@ -34,7 +34,7 @@ def _card(game: Game) -> dict[str, Any]:
 
 
 def render_launcher() -> str:
-    games = [game for _, game in sorted(GAMES_BY_PORT.items())]
+    games = sorted(GAMES_BY_PORT.values(), key=lambda game: game.title.casefold())
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,
