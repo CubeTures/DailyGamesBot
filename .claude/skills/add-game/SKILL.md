@@ -188,7 +188,7 @@ Rules:
 Write the game's announcement following the house style in "Announcement" in
 `games/README.md`:
 
-- First line `:bee: {{ player }} played **<title>**`.
+- First line `:bee: {{ player }} played **<title>** <puzzle>`: the game's puzzle number (`#{{ puzzle_number }}`), or `{{ puzzle_id }}` if it has none.
 - Then the result in the game's own terms (score vs. par, time, guesses), and an emoji grid or bar if the game's share screen has one. Mirror that share screen.
 - Every outcome reads correctly: win, loss or give-up, and missing optional fields (`{% if x is not none %}`).
 - Never spell out the answer.

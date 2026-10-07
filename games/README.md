@@ -167,7 +167,7 @@ shown on the launcher when you click a result on today's scoreboard.
 Wordle's:
 
 ```jinja
-:bee: {{ player }} played **Wordle**
+:bee: {{ player }} played **Wordle** #{{ puzzle_number }}
 {% for row in rows %}
 {{ row }}
 {% endfor %}
@@ -176,14 +176,15 @@ Wordle's:
 which renders as:
 
 ```
-:bee: @player played **Wordle**
+:bee: @player played **Wordle** #1571
 :white_large_square::yellow_square::white_large_square::white_large_square::white_large_square:
 :green_square::green_square::green_square::green_square::green_square:
 ```
 
 ### House style
 
-- Open with `:bee: {{ player }} played **<title>**`, then the result in the
+- Open with `:bee: {{ player }} played **<title>** <puzzle>` (the
+  puzzle number, e.g. `#{{ puzzle_number }}`, or the date if it has none), then the result in the
   game's own terms (par, time, guesses), then a grid or row of emoji if the
   game's share screen has one. See `minutecryptic/announcement.j2` for a
   game with a score and a hint bar.
