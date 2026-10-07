@@ -167,7 +167,7 @@ shown on the launcher when you click a result on today's scoreboard.
 Wordle's:
 
 ```jinja
-:bee: {{ player }} played **Wordle** #{{ puzzle_number }}
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% for row in rows %}
 {{ row }}
 {% endfor %}
@@ -176,14 +176,14 @@ Wordle's:
 which renders as:
 
 ```
-:bee: @player played **Wordle** #1571
+:bee: @player played **@Wordle** #1571
 :white_large_square::yellow_square::white_large_square::white_large_square::white_large_square:
 :green_square::green_square::green_square::green_square::green_square:
 ```
 
 ### House style
 
-- Open with `:bee: {{ player }} played **<title>** <puzzle>` (the
+- Open with `:bee: {{ player }} played **{{ game }}** <puzzle>` (the
   puzzle number, e.g. `#{{ puzzle_number }}`, or the date if it has none), then the result in the
   game's own terms (par, time, guesses), then a grid or row of emoji if the
   game's share screen has one. See `minutecryptic/announcement.j2` for a
@@ -207,7 +207,8 @@ In scope:
   always defined, as `none` if the trigger didn't report them, so
   `{% if score is not none %}` is safe.
 - `player`: a mention of the player (rendered as their name, no ping)
-- `game`: the game's `title`; `puzzle_id`; `fields`: all fields as a dict
+- `game`: a mention of the game's role in Discord (so it pings
+  subscribers), its `title` on the launcher; `puzzle_id`; `fields`: all fields as a dict
 - filters: `duration` (seconds as `1:05` / `1:02:03`) and
   `tiles(answer)` (a guess scored against the answer as a 🟩🟨⬛ row; this
   uses the answer, so only reach for it when the game reports one)

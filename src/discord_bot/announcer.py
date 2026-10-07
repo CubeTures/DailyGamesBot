@@ -38,20 +38,23 @@ def _is_stale(result: results.StoredResult) -> bool:
 async def _message(
     channel: discord.abc.Messageable, game: Game, result: results.StoredResult
 ) -> tuple[str, discord.AllowedMentions]:
-    """The announcement, pinging the game's role but not the players named."""
-    text = announce.render_result(game, result)
-    if not isinstance(channel, discord.abc.GuildChannel):
-        return text, discord.AllowedMentions.none()
-    role = await game_role(channel.guild, game)
+    """The announcement, pinging the game's role but not the players named.
+
+    The role's mention stands in for the game's title; a template that
+    doesn't show the title gets the mention added on a line of its own."""
+    role = None
+    if isinstance(channel, discord.abc.GuildChannel):
+        role = await game_role(channel.guild, game)
     if role is None:
-        return text, discord.AllowedMentions.none()
-    ping = f"\n-# {role.mention}"
-    limit = announce.DISCORD_MAX_LENGTH - len(ping)
-    if len(text) > limit:
-        text = text[: limit - 1] + "…"
-    return text + ping, discord.AllowedMentions(
-        everyone=False, users=False, roles=[role]
-    )
+        return announce.render_result(game, result), discord.AllowedMentions.none()
+    text = announce.render_result(game, result, game_mention=role.mention)
+    if role.mention not in text:
+        ping = f"\n-# {role.mention}"
+        limit = announce.DISCORD_MAX_LENGTH - len(ping)
+        if len(text) > limit:
+            text = text[: limit - 1] + "…"
+        text += ping
+    return text, discord.AllowedMentions(everyone=False, users=False, roles=[role])
 
 
 async def announce_pending_results(client: discord.Client, channel_id: int) -> None:

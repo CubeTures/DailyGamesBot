@@ -1,4 +1,4 @@
-:bee: {{ player }} played **Fermi** #{{ puzzle_number }}
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {{ score_text }}{{ " for top %s%%" % top_percent if top_percent }}
 {% for f in factor_texts %}
 {{ ":arrow_up:" if sides[loop.index0] == "high" else ":arrow_down:" if sides[loop.index0] == "low" else ":dart:" }} {{ f }}

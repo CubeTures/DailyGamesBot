@@ -84,14 +84,23 @@ def _render_first_working(
     return ""
 
 
-def render(game: Game, *, player: str, puzzle_id: str, fields: dict[str, Any]) -> str:
+def render(
+    game: Game,
+    *,
+    player: str,
+    puzzle_id: str,
+    fields: dict[str, Any],
+    game_mention: str | None = None,
+) -> str:
     """The announcement text, falling back to DEFAULT_TEMPLATE if the game's
-    template fails."""
+    template fails. `game_mention` (the game's role mention) stands in for
+    the title as `game` when given."""
+    game_name = game_mention or game.title
     context = {
         **dict.fromkeys(STANDARD_FIELDS),
         **fields,
         # After the fields, so a field can't shadow these.
-        "game": game.title,
+        "game": game_name,
         "player": player,
         "puzzle_id": puzzle_id,
         "fields": fields,
@@ -100,18 +109,21 @@ def render(game: Game, *, player: str, puzzle_id: str, fields: dict[str, Any]) -
         [game.announcement_template] if game.announcement_template is not None else []
     )
     text = _render_first_working([*templates, DEFAULT_TEMPLATE], context, game.title)
-    text = text or f"{player} finished **{game.title}**"
+    text = text or f"{player} finished **{game_name}**"
     if len(text) > DISCORD_MAX_LENGTH:
         text = text[: DISCORD_MAX_LENGTH - 1] + "…"
     return text
 
 
-def render_result(game: Game, result: StoredResult) -> str:
+def render_result(
+    game: Game, result: StoredResult, game_mention: str | None = None
+) -> str:
     return render(
         game,
         player=mention(result.discord_id),
         puzzle_id=result.puzzle_id,
         fields=result.data,
+        game_mention=game_mention,
     )
 
 
