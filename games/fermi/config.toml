@@ -8,4 +8,7 @@ origin = "https://fermi.gg"
 port = 8082
 landing_path = "/"
 
-# No capture triggers yet: run the add-game skill to discover them.
+[[triggers]]
+name = "results-screen"
+type = "page"
+when = "finished"

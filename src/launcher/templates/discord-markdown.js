@@ -13,7 +13,8 @@ var discordMarkdown = (function () {
     stopwatch: "⏱️", clock: "🕐", brain: "🧠", bulb: "💡", skull: "💀",
     game_die: "🎲", puzzle_piece: "🧩", thinking: "🤔", heart: "❤️",
     shrimp: "🦐", fish: "🐟", bubbles: "🫧", squid: "🦑", clown: "🤡",
-    izakaya_lantern: "🏮", star2: "🌟"
+    izakaya_lantern: "🏮", star2: "🌟", arrow_up: "⬆️", arrow_down: "⬇️",
+    dart: "🎯"
   };
 
   var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
