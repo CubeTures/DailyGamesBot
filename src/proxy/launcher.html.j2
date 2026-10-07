@@ -299,6 +299,16 @@
   .warning-card .emoji { font-size: 2.5rem; line-height: 1; }
   .warning-card h2 { margin: 14px 0 8px; font-size: 1.3rem; }
   .warning-card p { margin: 0; color: var(--muted); }
+  .site-foot {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  .site-foot a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .site-foot a:hover { text-decoration: underline; }
   code {
     padding: 1px 6px;
     border-radius: 6px;
@@ -361,6 +371,11 @@
       </div>
       <div class="boards" id="boards"><p class="empty">Loading…</p></div>
     </section>
+
+    <footer class="site-foot">
+      Want to add more games? Make a pull request at
+      <a href="https://github.com/CubeTures/DailyGamesBot" target="_blank" rel="noopener">github.com/CubeTures/DailyGamesBot</a>
+    </footer>
   </main>
   <dialog id="announcement" aria-labelledby="announcement-title">
     <div class="dialog-head">
