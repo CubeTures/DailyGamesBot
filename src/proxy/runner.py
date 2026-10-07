@@ -38,23 +38,31 @@ def _with_announcement(row: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def _aware_time(raw: str) -> datetime | None:
+    """An ISO time with a timezone, or None if it's missing or invalid."""
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
 class LauncherHandler(SimpleHTTPRequestHandler):
-    """Static launcher files, plus GET /api/results?since=<ISO time>."""
+    """Static launcher files, plus
+    GET /api/results?since=<ISO time>[&until=<ISO time>]."""
 
     def do_GET(self) -> None:
         url = urlsplit(self.path)
         if url.path != "/api/results":
             super().do_GET()
             return
-        raw_since = parse_qs(url.query).get("since", [""])[0]
-        try:
-            since = datetime.fromisoformat(raw_since)
-            if since.tzinfo is None:
-                raise ValueError("since needs a timezone")
-        except ValueError:
-            # The page sends the viewer's local midnight; fall back to 24h.
-            since = datetime.now(UTC) - timedelta(days=1)
-        rows = [_with_announcement(r) for r in results.results_since(since)]
+        query = parse_qs(url.query)
+        # The page sends the viewer's local midnight(s); fall back to 24h.
+        since = _aware_time(query.get("since", [""])[0]) or (
+            datetime.now(UTC) - timedelta(days=1)
+        )
+        until = _aware_time(query.get("until", [""])[0])
+        rows = [_with_announcement(r) for r in results.results_since(since, until)]
         body = json.dumps(rows).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

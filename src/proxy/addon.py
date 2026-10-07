@@ -119,7 +119,7 @@ def response(flow: http.HTTPFlow) -> None:
     # data endpoints, fonts, manifests). Those bypass the proxy entirely and
     # get blocked by CORS from a localhost origin, so rewrite them in-place
     # for textual responses.
-    content_type = headers.get("content-type", "")
+    content_type = cast(str, headers.get("content-type", ""))
     if any(t in content_type for t in _TEXT_CONTENT_TYPES):
         content = flow.response.content
         if content:

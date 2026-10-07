@@ -154,14 +154,19 @@ def stale_players() -> list[str]:
     return [discord_id for (discord_id,) in rows]
 
 
-def results_since(since: datetime) -> list[dict[str, Any]]:
-    """Results captured at or after `since`, with each player's name if known."""
+def results_since(
+    since: datetime, until: datetime | None = None
+) -> list[dict[str, Any]]:
+    """Results captured at or after `since` (and before `until`, if given),
+    with each player's name if known."""
+    until_iso = until.astimezone(UTC).isoformat() if until else None
     with connect() as conn:
         rows = conn.execute(
             "SELECT r.game, r.discord_id, p.name, r.puzzle_id, r.data, r.captured_at"
             " FROM results r LEFT JOIN players p USING (discord_id)"
-            " WHERE r.captured_at >= ? ORDER BY r.captured_at",
-            (since.astimezone(UTC).isoformat(),),
+            " WHERE r.captured_at >= ? AND (? IS NULL OR r.captured_at < ?)"
+            " ORDER BY r.captured_at",
+            (since.astimezone(UTC).isoformat(), until_iso, until_iso),
         ).fetchall()
     return [
         {

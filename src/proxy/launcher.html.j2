@@ -73,6 +73,29 @@
   }
   h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   .note { color: var(--muted); font-size: 0.8rem; }
+  .section-head .note { flex: 1; }
+
+  .day-nav { display: flex; align-items: center; gap: 6px; }
+  .day-nav button, .day-nav input {
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+  }
+  .day-nav button { min-width: 32px; padding: 0 10px; cursor: pointer; }
+  .day-nav input { padding: 0 8px; }
+  .day-nav button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
+  .day-nav button:disabled { opacity: 0.4; cursor: default; }
+  .day-nav button:focus-visible, .day-nav input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .day-nav [hidden] { display: none; }
+  @media (max-width: 600px) {
+    .section-head.scores-head { flex-wrap: wrap; }
+    .scores-head .day-nav { width: 100%; }
+    .scores-head .day-nav input { flex: 1; min-width: 0; }
+  }
 
   .games {
     display: grid;
@@ -326,9 +349,15 @@
     </section>
 
     <section>
-      <div class="section-head">
-        <h2>Today's scores</h2>
+      <div class="section-head scores-head">
+        <h2 id="scores-title">Today's scores</h2>
         <span class="note" id="updated"></span>
+        <div class="day-nav">
+          <button type="button" id="day-prev" aria-label="Previous day">‹</button>
+          <input type="date" id="day-pick" aria-label="Show scores for day">
+          <button type="button" id="day-next" aria-label="Next day">›</button>
+          <button type="button" id="day-today">Today</button>
+        </div>
       </div>
       <div class="boards" id="boards"><p class="empty">Loading…</p></div>
     </section>
@@ -488,14 +517,14 @@
       });
     }
 
-    function renderBoards(byGame) {
+    function renderBoards(byGame, emptyText) {
       var boards = document.getElementById("boards");
       boards.textContent = "";
       var names = Object.keys(byGame).sort(function (a, b) {
         return title(a).localeCompare(title(b));
       });
       if (!names.length) {
-        boards.appendChild(el("p", "empty", "Nobody has finished a game yet today. Be the first!"));
+        boards.appendChild(el("p", "empty", emptyText));
         return;
       }
       var playerNames = {};
@@ -538,25 +567,115 @@
       });
     }
 
-    function render(rows) {
+    function groupByGame(rows) {
       var byGame = {};
       rows.forEach(function (r) { (byGame[r.game] = byGame[r.game] || []).push(r); });
+      return byGame;
+    }
+
+    // ---- which day the scoreboard shows ------------------------------------
+    // viewDay is a local midnight, or null to follow today (also across
+    // midnight). Kept in the URL hash as #day=YYYY-MM-DD so it can be linked.
+    function startOfDay(d) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    function addDays(d, n) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    }
+    function dayKey(d) {
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    }
+    function parseDay(key) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || "");
+      return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+    }
+
+    var viewDay = null;
+    var prevBtn = document.getElementById("day-prev");
+    var nextBtn = document.getElementById("day-next");
+    var todayBtn = document.getElementById("day-today");
+    var dayPick = document.getElementById("day-pick");
+
+    function setDay(day, fromHash) {
+      var today = startOfDay(new Date());
+      viewDay = day && day < today ? day : null;
+      if (!fromHash) {
+        var hash = viewDay ? "#day=" + dayKey(viewDay) : "";
+        history.replaceState({}, "", location.pathname + location.search + hash);
+      }
+      loadBoards();
+    }
+
+    function dayFromHash() {
+      return parseDay((/^#day=(.*)$/.exec(location.hash) || [])[1]);
+    }
+
+    function fetchResults(since, until) {
+      var url = "/api/results?since=" + encodeURIComponent(since.toISOString());
+      if (until) url += "&until=" + encodeURIComponent(until.toISOString());
+      return fetch(url).then(function (res) { return res.json(); });
+    }
+
+    // Today's results drive the game cards' "Done" state whatever day the
+    // scoreboard shows, and the scoreboard too while it's on today.
+    function renderToday(rows) {
+      var byGame = groupByGame(rows);
       renderCards(byGame);
-      renderBoards(byGame);
+      if (viewDay) return;
+      renderBoards(byGame, "Nobody has finished a game yet today. Be the first!");
       document.getElementById("updated").textContent = "Updated " +
         new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
     }
 
-    function refresh() {
-      var midnight = new Date();
-      midnight.setHours(0, 0, 0, 0);
-      fetch("/api/results?since=" + encodeURIComponent(midnight.toISOString()))
-        .then(function (res) { return res.json(); })
-        .then(render)
-        .catch(function () {});
+    function refreshToday() {
+      fetchResults(startOfDay(new Date())).then(renderToday).catch(function () {});
     }
-    refresh();
-    setInterval(refresh, 30000);
+
+    var loadSeq = 0;
+    function loadBoards() {
+      var today = startOfDay(new Date());
+      var day = viewDay || today;
+      prevBtn.disabled = false;
+      nextBtn.disabled = !viewDay;
+      todayBtn.hidden = !viewDay;
+      dayPick.max = dayKey(today);
+      dayPick.value = dayKey(day);
+      document.getElementById("scores-title").textContent = viewDay
+        ? "Scores · " + day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+        : "Today's scores";
+      document.getElementById("updated").textContent = "";
+      if (!viewDay) {
+        refreshToday();
+        return;
+      }
+      var seq = ++loadSeq;
+      var boards = document.getElementById("boards");
+      boards.textContent = "";
+      boards.appendChild(el("p", "empty", "Loading…"));
+      fetchResults(day, addDays(day, 1)).then(function (rows) {
+        // Ignore a slow answer for a day the viewer has already left.
+        if (seq !== loadSeq || !viewDay || viewDay.getTime() !== day.getTime()) return;
+        renderBoards(groupByGame(rows), "Nobody finished a game that day.");
+      }).catch(function () {});
+    }
+
+    prevBtn.addEventListener("click", function () {
+      setDay(addDays(viewDay || startOfDay(new Date()), -1));
+    });
+    nextBtn.addEventListener("click", function () {
+      if (viewDay) setDay(addDays(viewDay, 1));
+    });
+    todayBtn.addEventListener("click", function () { setDay(null); });
+    dayPick.addEventListener("change", function () {
+      var day = parseDay(dayPick.value);
+      if (day) setDay(day);
+    });
+    window.addEventListener("hashchange", function () { setDay(dayFromHash(), true); });
+
+    setDay(dayFromHash(), true);
+    if (viewDay) refreshToday();
+    setInterval(refreshToday, 30000);
   })();
 </script>
 </body>

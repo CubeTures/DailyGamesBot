@@ -64,10 +64,14 @@ added to both its `ports:` list and the `Dockerfile`'s `EXPOSE`.
 `launcher/index.html` is generated from `src/proxy/launcher.html.j2` and the
 game configs (`src/proxy/gen_launcher.py`) every time the proxy starts, so
 don't edit it by hand; commit it after adding or changing a game. It shows a
-card per game (title, description, icon) and today's scoreboard, read from
-`GET /api/results?since=<ISO time>` on the launcher's own server. Clicking a
-result opens the same announcement the bot posts to Discord, rendered from the
-game's `announcement.j2` with Discord shortcodes and markdown turned into HTML.
+card per game (title, description, icon, and whether you've played it today)
+and a scoreboard, read from `GET /api/results?since=<ISO time>[&until=<ISO
+time>]` on the launcher's own server. The scoreboard shows today by default;
+its arrows and date picker step back to earlier days (results are never
+cleared), and the chosen day is kept in the URL as `#day=YYYY-MM-DD` so it can
+be linked. Days run from the viewer's local midnight. Clicking a result opens
+the same announcement the bot posts to Discord, rendered from the game's
+`announcement.j2` with Discord shortcodes and markdown turned into HTML.
 
 ## Adding a game and capturing results
 
