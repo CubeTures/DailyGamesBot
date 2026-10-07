@@ -90,7 +90,7 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
 
 - `launcher/index.html` is generated from `src/launcher/templates/` on
   every proxy start, with the CSS and JS inlined. Edit the templates, not
-  the output; commit the output after adding or changing a game.
+  the output. It is gitignored, so don't commit it.
 - A new game's port must be added to `docker-compose.yml` `ports:` and the
   `Dockerfile` `EXPOSE`.
 - Each listener maps to one origin. If a game's JS fetches an absolute URL on

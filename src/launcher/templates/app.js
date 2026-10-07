@@ -41,9 +41,16 @@
     return node;
   }
 
-  function showMessage(container, text) {
+  function showMessage(container, text, loading) {
     container.textContent = "";
-    container.appendChild(el("p", "empty", text));
+    container.appendChild(el("p", loading ? "empty loading" : "empty", text));
+  }
+
+  // Replays a one-off CSS animation class on an element that already exists.
+  function replay(node, className) {
+    node.classList.remove(className);
+    void node.offsetWidth;
+    node.classList.add(className);
   }
 
   // The game's card icon, reused at a smaller size.
@@ -89,10 +96,24 @@
   }
 
   var dialog = document.getElementById("announcement");
-  dialog.querySelector(".close").addEventListener("click", function () { dialog.close(); });
+
+  // Plays the closing animation (instant under reduced motion), then closes.
+  function closeDialog() {
+    if (dialog.open) dialog.classList.add("closing");
+  }
+  dialog.addEventListener("animationend", function (e) {
+    if (e.target !== dialog || !dialog.classList.contains("closing")) return;
+    dialog.classList.remove("closing");
+    dialog.close();
+  });
+  dialog.addEventListener("cancel", function (e) {
+    e.preventDefault();
+    closeDialog();
+  });
+  dialog.querySelector(".close").addEventListener("click", closeDialog);
   // A click on the backdrop lands on the dialog itself.
   dialog.addEventListener("click", function (e) {
-    if (e.target === dialog) dialog.close();
+    if (e.target === dialog) closeDialog();
   });
 
   function showAnnouncement(result, namesById) {
@@ -101,26 +122,37 @@
     if (oldIcon) oldIcon.remove();
     head.insertBefore(smallIcon(result.game), head.firstChild);
     document.getElementById("announcement-title").textContent =
-      playerName(result.discord_id, result.name) + " · " + gameTitle(result.game);
+      gameTitle(result.game) + " · " + playerName(result.discord_id, result.name);
     dialog.querySelector(".message").innerHTML = discordMarkdown.toHtml(
       result.announcement, function (id) { return playerName(id, namesById[id]); });
-    dialog.showModal();
+    dialog.classList.remove("closing");
+    if (!dialog.open) dialog.showModal();
   }
 
+  var cardsRendered = false;
   function renderCards(byGame) {
     document.querySelectorAll(".card").forEach(function (card) {
       var mine = (byGame[card.dataset.game] || []).filter(function (r) {
         return r.discord_id === discordId;
       })[0];
+      // Celebrate a result that arrives while the page is open.
+      if (cardsRendered && mine && !card.classList.contains("done")) replay(card, "just-done");
       card.classList.toggle("done", !!mine);
       card.querySelector(".status").textContent =
         mine ? "✓ Done · " + formatScore(mine.data) : "Not played";
       card.querySelector(".play").textContent = mine ? "Open" : "Play";
     });
+    cardsRendered = true;
   }
 
-  function boardRow(result, rank, namesById) {
+  // Keys ("game" and "game:discord_id") of what the scoreboard showed last,
+  // or null after a day change so the next render animates in whole.
+  var shownOnBoard = null;
+
+  function boardRow(result, rank, namesById, isNew) {
     var item = el("li", result.discord_id === discordId ? "me" : "");
+    item.style.setProperty("--r", String(Math.min(rank, 10)));
+    if (isNew) item.classList.add("fresh");
     var row = el(result.announcement ? "button" : "div", "row");
     if (result.announcement) {
       row.type = "button";
@@ -137,9 +169,14 @@
     return item;
   }
 
-  function board(game, results, namesById) {
+  function board(game, results, namesById, shown, index) {
     var ranked = results.slice().sort(compareResults);
     var container = el("div", "board");
+    var entering = !shownOnBoard || !shownOnBoard[game];
+    if (entering) {
+      container.classList.add("entering");
+      container.style.setProperty("--i", String(index));
+    }
     var head = el("div", "board-head");
     head.appendChild(smallIcon(game));
     head.appendChild(el("h3", "", gameTitle(game)));
@@ -148,8 +185,11 @@
     container.appendChild(head);
     var list = el("ol");
     ranked.forEach(function (result, rank) {
-      list.appendChild(boardRow(result, rank, namesById));
+      var key = game + ":" + result.discord_id;
+      shown[key] = true;
+      list.appendChild(boardRow(result, rank, namesById, !entering && !shownOnBoard[key]));
     });
+    shown[game] = true;
     container.appendChild(list);
     return container;
   }
@@ -161,6 +201,7 @@
     });
     if (!games.length) {
       showMessage(boards, emptyText);
+      shownOnBoard = {};
       return;
     }
     var namesById = {};
@@ -169,10 +210,12 @@
         if (r.name) namesById[r.discord_id] = r.name;
       });
     });
+    var shown = {};
     boards.textContent = "";
-    games.forEach(function (game) {
-      boards.appendChild(board(game, byGame[game], namesById));
+    games.forEach(function (game, index) {
+      boards.appendChild(board(game, byGame[game], namesById, shown, index));
     });
+    shownOnBoard = shown;
   }
 
   // viewDay is a local midnight, or null to follow today (also across
@@ -208,7 +251,12 @@
   var dayPicker = document.getElementById("day-pick");
 
   function setViewDay(day, fromHash) {
+    var from = viewDay || today();
     viewDay = day && day < today() ? day : null;
+    var to = viewDay || today();
+    // New boards slide in from the side the viewer moved towards.
+    document.getElementById("boards").style.setProperty(
+      "--dx", to < from ? "-16px" : to > from ? "16px" : "0px");
     if (!fromHash) {
       var hash = viewDay ? "#day=" + dayKey(viewDay) : "";
       history.replaceState({}, "", location.pathname + location.search + hash);
@@ -223,8 +271,10 @@
     renderCards(byGame);
     if (viewDay) return;
     renderBoards(byGame, "Nobody has finished a game yet today. Be the first!");
-    document.getElementById("updated").textContent = "Updated " +
+    var updated = document.getElementById("updated");
+    updated.textContent = "Updated " +
       new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    replay(updated, "tick");
   }
 
   function refreshToday() {
@@ -234,7 +284,7 @@
   var pastDayRequest = 0;
   function showPastDay(day) {
     var request = ++pastDayRequest;
-    showMessage(document.getElementById("boards"), "Loading…");
+    showMessage(document.getElementById("boards"), "Loading…", true);
     fetchResults(day, addDays(day, 1)).then(function (results) {
       // Ignore a slow answer for a day the viewer has already left.
       if (request !== pastDayRequest || !viewDay || viewDay.getTime() !== day.getTime()) return;
@@ -248,10 +298,13 @@
     todayButton.hidden = !viewDay;
     dayPicker.max = dayKey(today());
     dayPicker.value = dayKey(day);
-    document.getElementById("scores-title").textContent = viewDay
+    var title = document.getElementById("scores-title");
+    title.textContent = viewDay
       ? "Scores · " + day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
       : "Today's scores";
+    replay(title, "swap");
     document.getElementById("updated").textContent = "";
+    shownOnBoard = null;
     if (viewDay) showPastDay(day);
     else refreshToday();
   }

@@ -77,12 +77,20 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font: inherit;
   font-size: 0.85rem;
 }
-.day-nav button { min-width: 32px; padding: 0 10px; cursor: pointer; }
+.day-nav button {
+  min-width: 32px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.day-nav button:active:not(:disabled) { transform: scale(0.92); }
+#day-today { animation: fade-in 0.2s ease both; }
 .day-nav input { padding: 0 8px; }
 .day-nav button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
 .day-nav button:disabled { opacity: 0.4; cursor: default; }
 .day-nav button:focus-visible, .day-nav input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .day-nav [hidden] { display: none; }
+#scores-title.swap { animation: fade-in 0.25s ease both; }
 @media (max-width: 600px) {
   .section-head.scores-head { flex-wrap: wrap; }
   .scores-head .day-nav { width: 100%; }
@@ -108,6 +116,11 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
+.card:active { transform: translateY(0) scale(0.985); box-shadow: var(--shadow); transition-duration: 0.08s; }
+.card .icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.card:hover .icon { transform: rotate(-4deg) scale(1.06); }
+.card.just-done { animation: card-done 0.9s ease; }
+.card.just-done .status { animation: status-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card-top { display: flex; align-items: center; gap: 14px; }
 .card h3 { margin: 0; font-size: 1.1rem; }
@@ -139,6 +152,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font-size: 0.8rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 .card.done .status { background: var(--done-soft); color: var(--done); }
 .play { color: var(--accent); font-size: 0.9rem; font-weight: 600; }
@@ -171,6 +185,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   align-items: start;
 }
 .board {
+  --i: 0;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
@@ -187,6 +202,12 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .board-head h3 { margin: 0; font-size: 1rem; flex: 1; }
 .board-head .count { color: var(--muted); font-size: 0.8rem; }
 .board ol { list-style: none; margin: 0; padding: 6px; }
+.board.entering { animation: board-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i) * 60ms); }
+.board.entering li {
+  animation: row-in 0.3s ease both;
+  animation-delay: calc(var(--i) * 60ms + 100ms + var(--r, 0) * 35ms);
+}
+.board li.fresh .row { animation: row-fresh 1.6s ease both; }
 .board .row {
   display: grid;
   grid-template-columns: 2rem 1fr auto;
@@ -201,9 +222,11 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font: inherit;
   font-size: 0.92rem;
   text-align: left;
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 .board button.row { cursor: pointer; }
 .board button.row:hover { background: var(--surface-2); }
+.board button.row:active { transform: scale(0.98); }
 .board button.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .board li.me .row { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .board .rank { color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
@@ -222,6 +245,10 @@ dialog {
   box-shadow: var(--shadow-hover);
 }
 dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
+dialog[open] { animation: dialog-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+dialog[open]::backdrop { animation: fade-in 0.22s ease; }
+dialog.closing { animation: dialog-out 0.15s ease forwards; }
+dialog.closing::backdrop { animation: fade-out 0.15s ease forwards; }
 .dialog-head {
   display: flex;
   align-items: center;
@@ -240,6 +267,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 .close:hover { background: var(--surface-2); color: var(--text); }
 .close:focus-visible { outline: 2px solid var(--accent); }
@@ -262,12 +290,15 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 .message code { background: var(--border); }
 
 .empty {
+  animation: fade-in 0.25s ease both;
   padding: 32px 20px;
   border: 1px dashed var(--border-strong);
   border-radius: 16px;
   color: var(--muted);
   text-align: center;
 }
+.empty.loading { animation: pulse 1.2s ease-in-out infinite; }
+.note.tick { animation: fade-in 0.4s ease; }
 
 .warning {
   display: none;
@@ -287,8 +318,9 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   background: var(--surface);
   box-shadow: var(--shadow-hover);
   text-align: center;
+  animation: dialog-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
-.warning-card .emoji { font-size: 2.5rem; line-height: 1; }
+.warning-card .emoji { display: inline-block; font-size: 2.5rem; line-height: 1; animation: roll 0.7s 0.2s ease both; }
 .warning-card h2 { margin: 14px 0 8px; font-size: 1.3rem; }
 .warning-card p { margin: 0; color: var(--muted); }
 .site-foot {
@@ -307,4 +339,31 @@ code {
   background: var(--surface-2);
   color: var(--text);
   font-size: 0.9em;
+}
+
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes pulse { 50% { opacity: 0.45; } }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.96); } }
+@keyframes dialog-out { to { opacity: 0; transform: translateY(4px) scale(0.97); } }
+@keyframes board-in { from { opacity: 0; transform: translate(var(--dx, 0), 10px); } }
+@keyframes row-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes row-fresh {
+  from { opacity: 0; transform: translateX(-6px); background-color: var(--accent-soft); }
+  25% { opacity: 1; transform: none; background-color: var(--accent-soft); }
+}
+@keyframes status-pop { 40% { transform: scale(1.15); } }
+@keyframes card-done {
+  from { box-shadow: var(--shadow), 0 0 0 0 var(--done-soft); border-color: var(--done); }
+  50% { box-shadow: var(--shadow), 0 0 0 8px var(--done-soft); border-color: var(--done); }
+}
+@keyframes roll { from { transform: rotate(-200deg) scale(0.4); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, dialog::backdrop {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

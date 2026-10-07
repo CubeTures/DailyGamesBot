@@ -47,6 +47,7 @@ def render_launcher() -> str:
 
 
 def write_launcher() -> None:
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(render_launcher())
 
 
