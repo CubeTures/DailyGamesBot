@@ -1,16 +1,16 @@
 ---
 name: add-game
-description: Add a new web game to the Daily Games Bot, or build/fix the result-capture config for an existing one. Opens the game through the local proxy in a Playwright browser with an event recorder, has the user play it, then inspects what the page did (storage, network, analytics, DOM events, final screen) to write games/<name>.toml triggers that report the player's result to the results database, and verifies them end to end. Use when the user wants to add/support a game, or create, debug or fix capture config for a game.
+description: Add a new web game to the Daily Games Bot, or build/fix the result-capture config for an existing one. Opens the game through the local proxy in a Playwright browser with an event recorder, has the user play it, then inspects what the page did (storage, network, analytics, DOM events, final screen) to write the games/<name>/ triggers and fields that report the player's result to the results database, and verifies them end to end. Use when the user wants to add/support a game, or create, debug or fix capture config for a game.
 argument-hint: <game url | existing game name>
 ---
 
 # Add a game / build its capture config
 
-Goal: a `games/<name>.toml` whose `[[triggers]]` fire exactly once the player
+Goal: a `games/<name>/` directory whose `config.toml` `[[triggers]]` fire exactly once the player
 has **finished** today's puzzle (won *or* lost), and extract a stable
-`puzzle_id` plus the result fields. Read `games/README.md` first. It is the
-config format reference: trigger types, the expression helpers, and the
-standard field names. The runtime that executes the config is
+`puzzle_id` plus the result fields (`fields.js`). Read `games/README.md` first.
+It is the config format reference: the files in a game's directory, trigger
+types, the expression helpers, and the standard field names. The runtime that executes the config is
 `src/proxy/capture.js`.
 
 Paths below are relative to the repo root. `$SCRATCH` is your scratchpad dir.
@@ -18,12 +18,12 @@ Playwright tools are the `mcp__plugin_playwright_playwright__*` MCP tools.
 
 ## 1. Set up the game entry
 
-- **Existing game** (argument is a name in `games/`): read its TOML and skip to step 2.
+- **Existing game** (argument is a name in `games/`): read the files in `games/<name>/` and skip to step 2.
 - **New game** (argument is a URL):
   - Run `uv run python3 -m src.proxy.config` to see the existing games and the next free port.
   - Split the URL into `origin` (scheme + host) and `landing_path` (path + query).
   - Derive `name` from the host, e.g. `www.minutecryptic.com` becomes `minutecryptic`. It must be lowercase `[a-z0-9_]`.
-  - Write `games/<name>.toml` with `name`, `title`, `origin`, `port` and `landing_path`, and no triggers yet.
+  - Write `games/<name>/config.toml` starting with a `#:schema ../schema.json` line, then `name`, `title`, `origin`, `port` and `landing_path`, and no triggers yet.
   - Add the port to `docker-compose.yml` `ports:` and to the Dockerfile's `EXPOSE`.
   - Run the config command again to validate.
 
@@ -149,11 +149,22 @@ Rules:
 - `puzzle_id` must be identical across reloads and across every trigger of the game, otherwise one play gets saved twice. Prefer the game's own puzzle number, then date, then `today()`.
 - Multiple triggers are fine as primary and fallback. The first to fire is saved and later ones count as duplicates. Keep their fields consistent.
 - Use the standard field names from `games/README.md` where they fit (`won`, `score`, `max_score`, `attempts`, `time_secs`, `share_text`). Add game-specific extras freely.
-- Put a lookup that `when` and the fields share, like "find the state object", in `[triggers.vars]` instead of repeating it.
-- Write expressions defensively with `?.`. A throw is treated as false or null, but a field that silently comes back null is a bug.
+- Put lookups that `when` and the fields share, like "find the state object", in `vars.js` instead of repeating them. Keep `when` in `config.toml` short; for anything longer, compute it in `vars.js` (e.g. `const finished = ...`) and set `when = "finished"`.
+- Comment `vars.js` with what the game stores and what each value means (see `games/wordle/vars.js`), since that's what the next fix will need.
+- Write `vars.js` and `fields.js` defensively with `?.`. A throw anywhere skips the whole check (no result is sent), and a field that silently comes back null is a bug.
 - Don't capture secrets or tokens. Keep `share_text`-like data small.
 
-Write the triggers into the TOML, then validate both the TOML and the generated JS:
+Then write the game's `announcement.j2` template (see "Announcement" in
+`games/README.md`), the Discord message posted for each result. Make it read
+like the game's own result or share screen, using the fields you capture, and
+never spell out the answer. Preview it for both outcomes with the field values
+from the runs:
+
+```sh
+uv run python3 -m src.announce <name> '<fields JSON from a run>'
+```
+
+Write the triggers into `config.toml` and the JS into `vars.js` and `fields.js`, then validate the game and the generated JS:
 
 ```sh
 uv run python3 -m src.proxy.config
@@ -214,6 +225,7 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
 - Report to the user:
   - which signal(s) you chose and why
   - the fields captured, with the values seen in verification for each outcome (win and lose)
+  - the announcement as rendered for each outcome
   - whether the losing path was verified with a real run, with synthetic states only, or not at all (and why)
   - anything fragile, such as DOM-based triggers or timezone-based `puzzle_id`
   - any proxy fixes needed

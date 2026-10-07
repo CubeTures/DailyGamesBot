@@ -14,3 +14,12 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+
+      # Validates games/*/ and regenerates games/schema.json from the
+      # models; a stale schema shows up as a modified file and fails the commit.
+      - id: game-configs
+        name: game configs
+        entry: uv run python3 -m src.proxy.config
+        language: system
+        files: ^(games/|src/proxy/config\.py$)
+        pass_filenames: false

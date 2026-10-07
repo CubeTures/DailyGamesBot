@@ -1,6 +1,6 @@
 """Result capture: injects capture.js into game pages and stores what it reports.
 
-For a game whose games/<name>.toml has triggers, every HTML page the game
+For a game whose games/<name>/config.toml has triggers, every HTML page the game
 serves gets a <script src="/__dgb/capture.js"> at the top of <head>. That
 script watches for the configured "finished" condition and POSTs the result
 to /__dgb/result on the same local origin. Both /__dgb/ paths are answered
@@ -18,7 +18,13 @@ from typing import Any, cast
 from mitmproxy import ctx, http
 
 from src import results
-from src.proxy.config import GameConfig, Trigger
+from src.proxy.config import (
+    FIELDS_EXPORT_RE,
+    EventTrigger,
+    Game,
+    NetworkTrigger,
+    Trigger,
+)
 
 PREFIX = "/__dgb/"
 SCRIPT_PATH = PREFIX + "capture.js"
@@ -31,32 +37,32 @@ _HTML_RE = re.compile(rb"<html\b[^>]*>", re.IGNORECASE)
 _SCRIPT_TAG = f'<script src="{SCRIPT_PATH}"></script>'.encode()
 
 
-def _js_fn(expr: str, vars_: dict[str, str]) -> str:
-    # The newlines let an expression end in a // comment.
-    decls = "".join(f"var {name} = (\n{e}\n);\n" for name, e in vars_.items())
-    return f"function (req, res, event) {{\n{decls}return (\n{expr}\n);\n}}"
+def _js_fn(vars_js: str, body: str) -> str:
+    # vars.js runs first in each, so `when` and the fields can use its names.
+    return f"function (req, res, event) {{\n{vars_js}\n{body}\n}}"
 
 
-def _js_trigger(t: Trigger) -> str:
-    fields = ",\n".join(
-        f"{json.dumps(k)}: {_js_fn(v, t.vars)}" for k, v in t.fields.items()
-    )
+def _js_trigger(t: Trigger, game: Game) -> str:
+    # The newlines let `when` end in a // comment.
+    when = f"return (\n{t.when}\n);"
+    fields = FIELDS_EXPORT_RE.sub("return ", game.fields_js, count=1)
     parts = [
         f"name: {json.dumps(t.name)}",
         f"type: {json.dumps(t.type)}",
-        f"when: {_js_fn(t.when, t.vars)}",
-        f"fields: {{\n{fields}\n}}",
-        f"method: {json.dumps(t.method)}",
-        f"event: {json.dumps(t.event)}",
-        f"target: {json.dumps(t.target)}",
+        f"when: {_js_fn(game.vars_js, when)}",
+        f"fields: {_js_fn(game.vars_js, fields)}",
     ]
-    if t.url is not None:
+    if isinstance(t, NetworkTrigger):
+        parts.append(f"method: {json.dumps(t.method)}")
         parts.append(f"url: new RegExp({json.dumps(t.url)})")
+    elif isinstance(t, EventTrigger):
+        parts.append(f"event: {json.dumps(t.event)}")
+        parts.append(f"target: {json.dumps(t.target)}")
     return "{\n" + ",\n".join(parts) + "\n}"
 
 
-def build_script(game: GameConfig) -> str:
-    triggers = "[\n" + ",\n".join(_js_trigger(t) for t in game.triggers) + "\n]"
+def build_script(game: Game) -> str:
+    triggers = "[\n" + ",\n".join(_js_trigger(t, game) for t in game.triggers) + "\n]"
     return _RUNTIME.replace("__DGB_GAME__", json.dumps(game.name)).replace(
         "__DGB_TRIGGERS__", triggers
     )
@@ -77,7 +83,7 @@ def _json_response(status: int, body: dict[str, Any]) -> http.Response:
     )
 
 
-def _handle_result(flow: http.HTTPFlow, game: GameConfig) -> http.Response:
+def _handle_result(flow: http.HTTPFlow, game: Game) -> http.Response:
     if flow.request.method != "POST":
         return _json_response(405, {"error": "POST only"})
     discord_id = flow.request.cookies.get(DISCORD_COOKIE)
@@ -112,7 +118,7 @@ def _handle_result(flow: http.HTTPFlow, game: GameConfig) -> http.Response:
     return _json_response(200, {"status": status})
 
 
-def handle_request(flow: http.HTTPFlow, game: GameConfig) -> bool:
+def handle_request(flow: http.HTTPFlow, game: Game) -> bool:
     """Answer /__dgb/ requests locally. Returns True if the flow was handled."""
     path = flow.request.path.split("?", 1)[0]
     if not path.startswith(PREFIX):
@@ -130,7 +136,7 @@ def handle_request(flow: http.HTTPFlow, game: GameConfig) -> bool:
     return True
 
 
-def inject(flow: http.HTTPFlow, game: GameConfig) -> None:
+def inject(flow: http.HTTPFlow, game: Game) -> None:
     """Add the capture script to the top of an HTML page's <head>."""
     response = flow.response
     if not game.triggers or response is None or response.status_code != 200:

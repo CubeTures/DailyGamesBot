@@ -1,0 +1,12 @@
+#:schema ../schema.json
+
+name = "wordle"
+title = "Wordle"
+origin = "https://www.nytimes.com"
+port = 8081
+landing_path = "/games/wordle/index.html"
+
+[[triggers]]
+name = "local-state"
+type = "page"
+when = "finished"

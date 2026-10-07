@@ -1,0 +1,13 @@
+:bee: {{ player }} played **Minute Cryptic**
+{% if won %}
+{%- if score is not none %}
+{%- if score < 0 %}{{ -score }} under par
+{%- elif score == 0 %}at par
+{%- else %}{{ score }} over par{% endif %}
+{%- endif %}
+{%- if time_secs %} in {{ time_secs | duration }}{{ "\n" }}{% endif %}
+{% else %}
+revealed every letter...
+{% endif %}
+{{ ":white_large_square:" * hints }}{{ ":yellow_square:" * letters_revealed }}
+{{- ":purple_square:" * (help_available - hints - letters_revealed) if help_available }}

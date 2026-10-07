@@ -1,0 +1,12 @@
+#:schema ../schema.json
+
+name = "minutecryptic"
+title = "Minute Cryptic"
+origin = "https://www.minutecryptic.com"
+port = 8083
+landing_path = "/"
+
+[[triggers]]
+name = "daily-solves"
+type = "page"
+when = "!!s"

@@ -2,10 +2,10 @@
 //
 // Injected by src/proxy/capture.py at the top of every HTML page a game
 // serves. The two placeholders below are filled with the game's name and its
-// triggers compiled from games/<name>.toml; each `when` / field is a
-// function(req, res, event)
-// wrapping the configured JS expression, evaluated in this scope so it can
-// use the helpers below (ls, ss, text, texts, exists, cookie, today).
+// triggers compiled from games/<name>/: each trigger's `when` and `fields` is
+// a function(req, res, event) that runs the game's vars.js and then returns
+// `when` / the fields object, evaluated in this scope so it can use the
+// helpers below (ls, ss, text, texts, exists, cookie, today).
 //
 // Debug from devtools: window.__dgb.status(), .dryRun(), .testNetwork(...)
 (function () {
@@ -74,10 +74,13 @@
   // Evaluate a trigger; return the payload it would send, or null.
   function evaluate(trigger, req, res, event) {
     if (!call(trigger, "when", trigger.when, req, res, event)) return null;
-    var fields = {};
-    for (var k in trigger.fields) {
-      fields[k] = jsonable(call(trigger, k, trigger.fields[k], req, res, event));
+    var raw = call(trigger, "fields", trigger.fields, req, res, event);
+    if (!raw || typeof raw !== "object") {
+      note(state.errors, { trigger: trigger.name, expr: "fields", error: "fields.js gave no object" });
+      return null;
     }
+    var fields = {};
+    for (var k in raw) fields[k] = jsonable(raw[k]);
     var puzzleId = fields.puzzle_id;
     if (puzzleId === null || puzzleId === undefined || puzzleId === "") {
       note(state.errors, { trigger: trigger.name, expr: "puzzle_id", error: "empty puzzle_id" });
