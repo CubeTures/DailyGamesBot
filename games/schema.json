@@ -145,6 +145,34 @@
       "title": "Title",
       "type": "string"
     },
+    "description": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A line or two about the game, shown on the launcher.",
+      "title": "Description"
+    },
+    "icon": {
+      "anyOf": [
+        {
+          "pattern": "^[\\w.-]+(\\.png|\\.svg|\\.webp|\\.jpg|\\.jpeg)$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Image file in the game's directory, shown on the launcher; square, at least 128px. Defaults to the title's first letter.",
+      "title": "Icon"
+    },
     "origin": {
       "description": "The real site, proxied 1:1.",
       "pattern": "^https?://",

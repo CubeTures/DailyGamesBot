@@ -2,6 +2,8 @@
 
 name = "krillion"
 title = "Krillion"
+description = "Seven prompts a day. Rare answers sink you deeper; obvious ones barely count."
+icon = "icon.png"
 origin = "https://krillion.io"
 port = 8084
 landing_path = "/"

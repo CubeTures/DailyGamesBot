@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Games</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --border: #e3e6eb;
+    --border-strong: #cdd2da;
+    --text: #16181d;
+    --muted: #646b79;
+    --accent: #3f5bd8;
+    --accent-soft: rgba(63, 91, 216, 0.1);
+    --done: #1f8a4c;
+    --done-soft: rgba(31, 138, 76, 0.12);
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --shadow-hover: 0 4px 8px rgba(16, 24, 40, 0.06), 0 12px 24px rgba(16, 24, 40, 0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1014;
+      --surface: #171a20;
+      --surface-2: #1e222a;
+      --border: #262a33;
+      --border-strong: #363b47;
+      --text: #e9ebf0;
+      --muted: #8d93a1;
+      --accent: #8ea6ff;
+      --accent-soft: rgba(142, 166, 255, 0.12);
+      --done: #4cc47f;
+      --done-soft: rgba(76, 196, 127, 0.14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; }
+  @media (max-width: 600px) { main { padding: 28px 16px 48px; } }
+
+  header { margin-bottom: 36px; }
+  .date {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  h1 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.25rem); letter-spacing: -0.02em; }
+  .tagline { margin: 6px 0 0; color: var(--muted); }
+
+  section + section { margin-top: 48px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
+  .note { color: var(--muted); font-size: 0.8rem; }
+
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .card-top { display: flex; align-items: center; gap: 14px; }
+  .card h3 { margin: 0; font-size: 1.1rem; }
+  .card .desc {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .card.done .status { background: var(--done-soft); color: var(--done); }
+  .play { color: var(--accent); font-size: 0.9rem; font-weight: 600; }
+  .play::after { content: " \2192"; display: inline-block; transition: transform 0.15s ease; }
+  .card:hover .play::after { transform: translateX(3px); }
+
+  .icon {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: var(--surface-2);
+  }
+  .icon.small { width: 28px; height: 28px; border-radius: 7px; }
+  .mono {
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1.4rem;
+  }
+  .icon.small.mono { font-size: 0.9rem; }
+
+  .boards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .board {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .board-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .board-head h3 { margin: 0; font-size: 1rem; flex: 1; }
+  .board-head .count { color: var(--muted); font-size: 0.8rem; }
+  .board ol { list-style: none; margin: 0; padding: 6px; }
+  .board li {
+    display: grid;
+    grid-template-columns: 2rem 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    font-size: 0.92rem;
+  }
+  .board li.me { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .board .rank { color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
+  .board .medal { font-size: 1.05rem; }
+  .board .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .board .score { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .board .score.lost { color: var(--muted); font-weight: 500; }
+
+  .empty {
+    padding: 32px 20px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 16px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--bg);
+  }
+  .warning-card {
+    max-width: 420px;
+    padding: 32px 28px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    box-shadow: var(--shadow-hover);
+    text-align: center;
+  }
+  .warning-card .emoji { font-size: 2.5rem; line-height: 1; }
+  .warning-card h2 { margin: 14px 0 8px; font-size: 1.3rem; }
+  .warning-card p { margin: 0; color: var(--muted); }
+  code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.9em;
+  }
+</style>
+</head>
+<body>
+  <div class="warning" id="warning">
+    <div class="warning-card">
+      <div class="emoji" aria-hidden="true">🎲</div>
+      <h2>Get your link first</h2>
+      <p>Run <code>/play</code> in Discord to get your personal link, so your scores count.</p>
+    </div>
+  </div>
+  <main>
+    <header>
+      <p class="date" id="date"></p>
+      <h1>Daily Games</h1>
+      <p class="tagline">Play today's puzzles; your results post to Discord automatically.</p>
+    </header>
+
+    <section>
+      <div class="section-head"><h2>Games</h2></div>
+      <div class="games">
+{%- for game in games %}
+        <a class="card" data-game="{{ game.name }}" href="http://localhost:{{ game.port }}{{ game.path }}" target="_blank" rel="noopener">
+          <div class="card-top">
+            {%- if game.icon %}
+            <img class="icon" src="{{ game.icon }}" alt="">
+            {%- else %}
+            <div class="icon mono" aria-hidden="true">{{ game.title[0] }}</div>
+            {%- endif %}
+            <h3>{{ game.title }}</h3>
+          </div>
+          {%- if game.description %}
+          <p class="desc">{{ game.description }}</p>
+          {%- endif %}
+          <div class="card-foot">
+            <span class="status">Not played</span>
+            <span class="play">Play</span>
+          </div>
+        </a>
+{%- endfor %}
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Today's scores</h2>
+        <span class="note" id="updated"></span>
+      </div>
+      <div class="boards" id="boards"><p class="empty">Loading…</p></div>
+    </section>
+  </main>
+<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var discordId = params.get("discord_id");
+    if (discordId) {
+      localStorage.setItem("discord_id", discordId);
+      params.delete("discord_id");
+      var query = params.toString();
+      var newUrl =
+        window.location.pathname + (query ? "?" + query : "") + window.location.hash;
+      window.history.replaceState({}, "", newUrl);
+    } else {
+      discordId = localStorage.getItem("discord_id");
+    }
+
+    if (discordId) {
+      // Games run on other localhost ports, which can't read this page's
+      // localStorage but do share its cookies; the proxy reads this one when
+      // a game reports a result.
+      document.cookie = "dgb_discord_id=" + encodeURIComponent(discordId) +
+        "; path=/; max-age=31536000; SameSite=Lax";
+    }
+
+    if (!discordId) {
+      document.getElementById("warning").style.display = "flex";
+    }
+
+    document.getElementById("date").textContent = new Date().toLocaleDateString(
+      undefined, { weekday: "long", month: "long", day: "numeric" });
+
+    var gameTitles = {{ game_titles | tojson }};
+    var medals = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
+
+    function title(game) {
+      return gameTitles[game] || game;
+    }
+
+    function formatScore(d) {
+      var score = d.score === null || d.score === undefined ? null : d.score;
+      var text;
+      if (d.max_score !== undefined && d.max_score !== null) {
+        text = (score === null ? "X" : score) + "/" + d.max_score;
+      } else {
+        text = score === null ? "–" : String(score);
+      }
+      if (d.won === false && score !== null) text += " ✗";
+      return text;
+    }
+
+    // Lower is better for every game so far (Wordle guesses, Minute Cryptic
+    // help over par); no score (a loss) sorts last, then earliest finish.
+    function compare(a, b) {
+      var sa = a.data.score, sb = b.data.score;
+      var na = typeof sa !== "number", nb = typeof sb !== "number";
+      if (na !== nb) return na ? 1 : -1;
+      if (!na && sa !== sb) return sa - sb;
+      return a.captured_at < b.captured_at ? -1 : 1;
+    }
+
+    function el(tag, className, text) {
+      var e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    // The game's card icon, reused at a smaller size.
+    function icon(game) {
+      var cardIcon = document.querySelector('.card[data-game="' + game + '"] .icon');
+      var copy = cardIcon ? cardIcon.cloneNode(true) : el("div", "icon mono", title(game).charAt(0));
+      copy.classList.add("small");
+      return copy;
+    }
+
+    function renderCards(byGame) {
+      document.querySelectorAll(".card").forEach(function (card) {
+        var mine = (byGame[card.dataset.game] || []).filter(function (r) {
+          return r.discord_id === discordId;
+        })[0];
+        card.classList.toggle("done", !!mine);
+        card.querySelector(".status").textContent =
+          mine ? "✓ Done · " + formatScore(mine.data) : "Not played";
+        card.querySelector(".play").textContent = mine ? "Open" : "Play";
+      });
+    }
+
+    function renderBoards(byGame) {
+      var boards = document.getElementById("boards");
+      boards.textContent = "";
+      var names = Object.keys(byGame).sort(function (a, b) {
+        return title(a).localeCompare(title(b));
+      });
+      if (!names.length) {
+        boards.appendChild(el("p", "empty", "Nobody has finished a game yet today. Be the first!"));
+        return;
+      }
+      names.forEach(function (game) {
+        var rows = byGame[game].sort(compare);
+        var board = el("div", "board");
+        var head = el("div", "board-head");
+        head.appendChild(icon(game));
+        head.appendChild(el("h3", "", title(game)));
+        head.appendChild(el("span", "count",
+          rows.length + (rows.length === 1 ? " player" : " players")));
+        board.appendChild(head);
+        var list = el("ol");
+        rows.forEach(function (r, i) {
+          var li = el("li", r.discord_id === discordId ? "me" : "");
+          var scored = typeof r.data.score === "number" && r.data.won !== false;
+          li.appendChild(i < 3 && scored
+            ? el("span", "rank medal", medals[i])
+            : el("span", "rank", String(i + 1)));
+          li.appendChild(el("span", "name", r.name || "Player …" + r.discord_id.slice(-4)));
+          li.appendChild(el("span", scored ? "score" : "score lost", formatScore(r.data)));
+          list.appendChild(li);
+        });
+        board.appendChild(list);
+        boards.appendChild(board);
+      });
+    }
+
+    function render(rows) {
+      var byGame = {};
+      rows.forEach(function (r) { (byGame[r.game] = byGame[r.game] || []).push(r); });
+      renderCards(byGame);
+      renderBoards(byGame);
+      document.getElementById("updated").textContent = "Updated " +
+        new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+
+    function refresh() {
+      var midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+      fetch("/api/results?since=" + encodeURIComponent(midnight.toISOString()))
+        .then(function (res) { return res.json(); })
+        .then(render)
+        .catch(function () {});
+    }
+    refresh();
+    setInterval(refresh, 30000);
+  })();
+</script>
+</body>
+</html>

@@ -2,6 +2,8 @@
 
 name = "fermi"
 title = "Fermi"
+description = "The daily estimation game: get as close as you can to the real number."
+icon = "icon.png"
 origin = "https://fermi.gg"
 port = 8082
 landing_path = "/"

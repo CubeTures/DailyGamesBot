@@ -23,7 +23,9 @@ Playwright tools are the `mcp__plugin_playwright_playwright__*` MCP tools.
   - Run `uv run python3 -m src.proxy.config` to see the existing games and the next free port.
   - Split the URL into `origin` (scheme + host) and `landing_path` (path + query).
   - Derive `name` from the host, e.g. `www.minutecryptic.com` becomes `minutecryptic`. It must be lowercase `[a-z0-9_]`.
-  - Write `games/<name>/config.toml` starting with a `#:schema ../schema.json` line, then `name`, `title`, `origin`, `port` and `landing_path`, and no triggers yet.
+  - Write `games/<name>/config.toml` starting with a `#:schema ../schema.json` line, then `name`, `title`, `description`, `icon`, `origin`, `port` and `landing_path`, and no triggers yet.
+  - For `description`, write one short sentence on how the game plays, based on the site's `<meta name="description">` or `og:description`.
+  - For `icon`, save the site's largest square icon as `games/<name>/icon.png` and set `icon = "icon.png"`. Look for `apple-touch-icon` or a `<link rel="icon">` of 128px or more, and fall back to `/favicon.ico`. Convert an `.ico` to PNG by extracting its largest frame, and downscale anything over 128px to 128px, e.g. `uv run --no-project --with pillow python -I -c ...`. View the result to make sure it's the logo and not a blank or placeholder image.
   - Add the port to `docker-compose.yml` `ports:` and to the Dockerfile's `EXPOSE`.
   - Run the config command again to validate.
 

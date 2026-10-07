@@ -17,10 +17,6 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
-[tool.ruff.lint.per-file-ignores]
-# Long lines here are embedded HTML template markup, not code.
-"src/proxy/gen_launcher.py" = ["E501"]
-
 [tool.ruff.format]
 # Defaults already match Black's style (quotes, indent, line endings, ...).
 

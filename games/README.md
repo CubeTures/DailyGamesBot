@@ -14,9 +14,12 @@ uv run python3 -m src.proxy.config
 | `vars.js`         | shared lookups, run before `when` and `fields.js` (optional) |
 | `fields.js`       | the result reported when a trigger fires (needed with triggers) |
 | `announcement.j2` | the Discord message for a result (optional)                  |
+| icon (e.g. `icon.png`) | the launcher icon named by `icon` (optional)            |
 
-Anything else in the directory is an error, so a misnamed file doesn't get
-silently ignored.
+The icon should be square and at least 128px; it's inlined into the
+launcher page, so keep it small. Without one, the launcher shows the title's
+first letter. Anything else in the directory is an error, so a misnamed file
+doesn't get silently ignored.
 
 `config.toml`'s format is defined by the Pydantic models in
 `src/proxy/config.py`, and `schema.json` (a JSON Schema) is generated from
@@ -37,6 +40,8 @@ skill's `node --check` step.
 
 name = "wordle"                      # must match the directory; [a-z0-9_]
 title = "Wordle"                     # shown on the launcher (default: name)
+description = "Guess the hidden five-letter word in six tries."  # on the launcher
+icon = "icon.png"                    # image in this directory; png/svg/webp/jpg
 origin = "https://www.nytimes.com"   # real site; proxied 1:1
 port = 8081                          # unique local port (8090 is the launcher)
 landing_path = "/games/wordle/index.html"   # default "/"

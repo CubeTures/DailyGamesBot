@@ -2,6 +2,8 @@
 
 name = "minutecryptic"
 title = "Minute Cryptic"
+description = "One cryptic crossword clue a day. Solve it with as few hints as you can."
+icon = "icon.png"
 origin = "https://www.minutecryptic.com"
 port = 8083
 landing_path = "/"

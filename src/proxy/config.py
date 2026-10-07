@@ -38,6 +38,14 @@ FIELDS_FILE = "fields.js"
 ANNOUNCEMENT_FILE = "announcement.j2"
 GAME_FILES = (CONFIG_FILE, VARS_FILE, FIELDS_FILE, ANNOUNCEMENT_FILE)
 
+ICON_TYPES = {
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
+
 # fields.js is a module whose default export is the fields object; capture.py
 # swaps this for `return` to run it as a function body.
 FIELDS_EXPORT_RE = re.compile(r"^export\s+default\s*", re.MULTILINE)
@@ -138,6 +146,18 @@ class GameConfig(_Model):
         default_factory=lambda data: str(data["name"]).title(),
         description="Shown on the launcher. Defaults to the name.",
     )
+    description: NonEmptyStr | None = Field(
+        default=None,
+        description="A line or two about the game, shown on the launcher.",
+    )
+    icon: str | None = Field(
+        default=None,
+        pattern=rf"^[\w.-]+({'|'.join(re.escape(e) for e in ICON_TYPES)})$",
+        description=(
+            "Image file in the game's directory, shown on the launcher;"
+            " square, at least 128px. Defaults to the title's first letter."
+        ),
+    )
     origin: Annotated[
         str,
         StringConstraints(pattern=r"^https?://"),
@@ -164,6 +184,8 @@ class Game(GameConfig):
 
     vars_js: str = ""
     fields_js: str = ""
+    # The icon's file, if it has one, to read at serve time.
+    icon_path: Path | None = None
     # Jinja template for the result announcement; None uses the default.
     announcement: Annotated[str, AfterValidator(announce.check)] | None = None
 
@@ -183,12 +205,6 @@ def _read(game_dir: Path, name: str) -> str | None:
 
 def parse_game(game_dir: Path) -> Game:
     where = f"{game_dir.name}/"
-    stray = sorted(p.name for p in game_dir.iterdir() if p.name not in GAME_FILES)
-    if stray:
-        raise ConfigError(
-            f"{where}: unexpected {', '.join(stray)}"
-            f" (a game holds only {', '.join(GAME_FILES)})"
-        )
     toml = _read(game_dir, CONFIG_FILE)
     if toml is None:
         raise ConfigError(f"{where}: missing {CONFIG_FILE}")
@@ -200,6 +216,15 @@ def parse_game(game_dir: Path) -> Game:
         raise ConfigError(_format_errors(where + CONFIG_FILE, e)) from None
     if config.name != game_dir.name:
         raise ConfigError(f"{where}: 'name' must match the directory name")
+    allowed = (*GAME_FILES, *([config.icon] if config.icon else []))
+    stray = sorted(p.name for p in game_dir.iterdir() if p.name not in allowed)
+    if stray:
+        raise ConfigError(
+            f"{where}: unexpected {', '.join(stray)}"
+            f" (a game holds only {', '.join(GAME_FILES)} and its icon)"
+        )
+    if config.icon and not (game_dir / config.icon).is_file():
+        raise ConfigError(f"{where}{CONFIG_FILE}: icon {config.icon} doesn't exist")
 
     vars_js = _read(game_dir, VARS_FILE)
     fields_js = _read(game_dir, FIELDS_FILE)
@@ -221,6 +246,7 @@ def parse_game(game_dir: Path) -> Game:
             vars_js=vars_js or "",
             fields_js=fields_js or "",
             announcement=_read(game_dir, ANNOUNCEMENT_FILE),
+            icon_path=game_dir / config.icon if config.icon else None,
         )
     except ValidationError as e:
         raise ConfigError(_format_errors(where + ANNOUNCEMENT_FILE, e)) from None
