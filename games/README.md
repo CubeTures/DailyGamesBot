@@ -138,7 +138,8 @@ prefer these names where they apply so results compare across games:
 When a result is saved, the bot posts it to the channel in
 `DISCORD_RESULTS_CHANNEL_ID`. `announcement.j2` is a
 [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) template for
-that message, so each game can show its result its own way:
+that message, so each game can show its result its own way. The same text is
+shown on the launcher when you click a result on today's scoreboard.
 
 ```jinja
 {{ player }} — **Wordle {{ "{:,}".format(puzzle_number) }}** {{ score if won else "X" }}/6

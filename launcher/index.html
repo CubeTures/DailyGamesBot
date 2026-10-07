@@ -172,21 +172,79 @@
   .board-head h3 { margin: 0; font-size: 1rem; flex: 1; }
   .board-head .count { color: var(--muted); font-size: 0.8rem; }
   .board ol { list-style: none; margin: 0; padding: 6px; }
-  .board li {
+  .board .row {
     display: grid;
     grid-template-columns: 2rem 1fr auto;
     align-items: center;
     gap: 8px;
+    width: 100%;
     padding: 7px 10px;
+    border: 0;
     border-radius: 9px;
+    background: none;
+    color: inherit;
+    font: inherit;
     font-size: 0.92rem;
+    text-align: left;
   }
-  .board li.me { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .board button.row { cursor: pointer; }
+  .board button.row:hover { background: var(--surface-2); }
+  .board button.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .board li.me .row { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .board .rank { color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
   .board .medal { font-size: 1.05rem; }
   .board .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .board .score { font-variant-numeric: tabular-nums; font-weight: 600; }
   .board .score.lost { color: var(--muted); font-weight: 500; }
+
+  dialog {
+    width: min(460px, calc(100vw - 32px));
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-hover);
+  }
+  dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
+  .dialog-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dialog-head h3 { margin: 0; font-size: 1rem; flex: 1; }
+  .close {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--muted);
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .close:hover { background: var(--surface-2); color: var(--text); }
+  .close:focus-visible { outline: 2px solid var(--accent); }
+  .dialog-body { padding: 16px; }
+  .dialog-body .note { margin: 0 0 8px; }
+  .message {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .message .mention {
+    padding: 0 3px;
+    border-radius: 4px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .message code { background: var(--border); }
 
   .empty {
     padding: 32px 20px;
@@ -300,6 +358,15 @@
       <div class="boards" id="boards"><p class="empty">Loading…</p></div>
     </section>
   </main>
+  <dialog id="announcement" aria-labelledby="announcement-title">
+    <div class="dialog-head">
+      <h3 id="announcement-title"></h3>
+      <button class="close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body">
+      <div class="message"></div>
+    </div>
+  </dialog>
 <script>
   (function () {
     var params = new URLSearchParams(window.location.search);
@@ -359,6 +426,66 @@
       return a.captured_at < b.captured_at ? -1 : 1;
     }
 
+    // Discord shortcodes the announcement templates use; any others show as
+    // typed.
+    var shortcodes = {
+      bee: "🐝", green_square: "🟩", yellow_square: "🟨", white_large_square: "⬜",
+      black_large_square: "⬛", purple_square: "🟪", blue_square: "🟦",
+      orange_square: "🟧", red_square: "🟥", brown_square: "🟫",
+      green_circle: "🟢", yellow_circle: "🟡", red_circle: "🔴", white_circle: "⚪",
+      black_circle: "⚫", blue_circle: "🔵", purple_circle: "🟣", orange_circle: "🟠",
+      white_check_mark: "✅", x: "❌", trophy: "🏆", first_place: "🥇",
+      second_place: "🥈", third_place: "🥉", fire: "🔥", star: "⭐", tada: "🎉",
+      stopwatch: "⏱️", clock: "🕐", brain: "🧠", bulb: "💡", skull: "💀",
+      game_die: "🎲", puzzle_piece: "🧩", thinking: "🤔", heart: "❤️"
+    };
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+      });
+    }
+
+    // The subset of Discord markdown announcements use: mentions, shortcodes,
+    // `code`, **bold**, __underline__, *italic*/_italic_ and ~~strike~~.
+    function discordHtml(text, names) {
+      return escapeHtml(text)
+        .replace(/&lt;@!?(\d+)&gt;/g, function (_, id) {
+          var name = names[id] || "Player …" + id.slice(-4);
+          return '<span class="mention">@' + escapeHtml(name) + "</span>";
+        })
+        .replace(/:([a-z0-9_+-]+):/g, function (m, code) {
+          return shortcodes[code] || m;
+        })
+        .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/__([^_\n]+)__/g, "<u>$1</u>")
+        .replace(/\*([^*\n]+)\*|\b_([^_\n]+)_\b/g, function (_, a, b) {
+          return "<em>" + (a || b) + "</em>";
+        })
+        .replace(/~~([^~\n]+)~~/g, "<s>$1</s>");
+    }
+
+    var dialog = document.getElementById("announcement");
+    dialog.querySelector(".close").addEventListener("click", function () {
+      dialog.close();
+    });
+    // A click on the backdrop lands on the dialog itself.
+    dialog.addEventListener("click", function (e) {
+      if (e.target === dialog) dialog.close();
+    });
+
+    function showAnnouncement(r, names) {
+      var head = dialog.querySelector(".dialog-head");
+      var oldIcon = head.querySelector(".icon");
+      if (oldIcon) oldIcon.remove();
+      head.insertBefore(icon(r.game), head.firstChild);
+      document.getElementById("announcement-title").textContent =
+        (r.name || "Player …" + r.discord_id.slice(-4)) + " · " + title(r.game);
+      dialog.querySelector(".message").innerHTML = discordHtml(r.announcement, names);
+      dialog.showModal();
+    }
+
     function el(tag, className, text) {
       var e = document.createElement(tag);
       if (className) e.className = className;
@@ -396,6 +523,12 @@
         boards.appendChild(el("p", "empty", "Nobody has finished a game yet today. Be the first!"));
         return;
       }
+      var playerNames = {};
+      names.forEach(function (game) {
+        byGame[game].forEach(function (r) {
+          if (r.name) playerNames[r.discord_id] = r.name;
+        });
+      });
       names.forEach(function (game) {
         var rows = byGame[game].sort(compare);
         var board = el("div", "board");
@@ -408,12 +541,21 @@
         var list = el("ol");
         rows.forEach(function (r, i) {
           var li = el("li", r.discord_id === discordId ? "me" : "");
+          var row = el(r.announcement ? "button" : "div", "row");
+          if (r.announcement) {
+            row.type = "button";
+            row.title = "Show the Discord announcement";
+            row.addEventListener("click", function () {
+              showAnnouncement(r, playerNames);
+            });
+          }
           var scored = typeof r.data.score === "number" && r.data.won !== false;
-          li.appendChild(i < 3 && scored
+          row.appendChild(i < 3 && scored
             ? el("span", "rank medal", medals[i])
             : el("span", "rank", String(i + 1)));
-          li.appendChild(el("span", "name", r.name || "Player …" + r.discord_id.slice(-4)));
-          li.appendChild(el("span", scored ? "score" : "score lost", formatScore(r.data)));
+          row.appendChild(el("span", "name", r.name || "Player …" + r.discord_id.slice(-4)));
+          row.appendChild(el("span", scored ? "score" : "score lost", formatScore(r.data)));
+          li.appendChild(row);
           list.appendChild(li);
         });
         board.appendChild(list);

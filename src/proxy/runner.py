@@ -8,13 +8,34 @@ from datetime import UTC, datetime, timedelta
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from src import results
+from src import announce, results
 from src.proxy import gen_launcher
-from src.proxy.config import GAMES, LAUNCHER_PORT, REPO_ROOT
+from src.proxy.config import GAME_CONFIGS, GAMES, LAUNCHER_PORT, REPO_ROOT
 
 ADDON_PATH = REPO_ROOT / "src" / "proxy" / "addon.py"
+
+GAMES_BY_NAME = {g.name: g for g in GAME_CONFIGS.values()}
+
+
+def _with_announcement(row: dict[str, Any]) -> dict[str, Any]:
+    """Add the Discord message the bot posts for this result (None if the
+    game's config is gone), so the launcher can show it."""
+    game = GAMES_BY_NAME.get(row["game"])
+    row["announcement"] = (
+        announce.render(
+            game.announcement,
+            game=game.title,
+            player=f"<@{row['discord_id']}>",
+            puzzle_id=row["puzzle_id"],
+            fields=row["data"],
+        )
+        if game is not None
+        else None
+    )
+    return row
 
 
 class LauncherHandler(SimpleHTTPRequestHandler):
@@ -33,7 +54,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         except ValueError:
             # The page sends the viewer's local midnight; fall back to 24h.
             since = datetime.now(UTC) - timedelta(days=1)
-        body = json.dumps(results.results_since(since)).encode()
+        rows = [_with_announcement(r) for r in results.results_since(since)]
+        body = json.dumps(rows).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
