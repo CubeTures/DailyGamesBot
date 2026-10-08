@@ -1,0 +1,12 @@
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{{ correct }}/{{ max_correct }}{{ ", out of guesses" if correct < max_correct }}, uniqueness {{ score }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{% if uniqueness_percentile is not none %}
+better than {{ "%.1f" % uniqueness_percentile }}% of players
+{% endif %}
+{% for row in cells | batch(3) %}
+{% for cell in row %}{{ ":white_check_mark:" if cell else ":red_square:" }}{% endfor %}
+
+{% endfor %}
+{% for row in cells | batch(3) %}
+{{ "||" if loop.first }}{% for cell in row %}{{ cell | md if cell else "—" }}{{ " / " if not loop.last }}{% endfor %}{{ "||" if loop.last }}
+{% endfor %}

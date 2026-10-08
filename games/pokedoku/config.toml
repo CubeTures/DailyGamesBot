@@ -1,0 +1,23 @@
+#:schema ../schema.json
+
+name = "pokedoku"
+title = "PokeDoku"
+description = "Fill a 3x3 grid with Pokémon that match each row and column's categories."
+icon = "icon.png"
+origin = "https://pokedoku.com"
+port = 8088
+landing_path = "/"
+
+# A new grid at midnight Eastern (the results screen counts down to 04:00 UTC
+# in October).
+[reset]
+time = "00:00"
+timezone = "America/New_York"
+
+# All state is server-side (api.pokedoku.com, routed through this port by
+# src/proxy/hooks/pokedoku.py), so this watches the API calls; see vars.js.
+[[triggers]]
+name = "solution-stats"
+type = "network"
+url = "/__host/api\\.pokedoku\\.com/api/(puzzle/current|pokemon/all|puzzle/solution/guess|puzzle/\\d+/solution(/stats)?)$"
+when = "finished"

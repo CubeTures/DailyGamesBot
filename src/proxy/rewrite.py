@@ -12,6 +12,7 @@ _FRAMING_AND_TRANSPORT_HEADERS = (
 )
 _COOKIE_DOMAIN_RE = re.compile(rb";\s*Domain=[^;]*", re.IGNORECASE)
 _COOKIE_SECURE_RE = re.compile(rb";\s*Secure", re.IGNORECASE)
+_SECURE_PREFIXES = (b"__Secure-", b"__Host-")
 _TEXT_CONTENT_TYPES = ("html", "javascript", "json", "css", "text/")
 
 
@@ -38,7 +39,10 @@ def localize_cookies(response: http.Response) -> None:
     for cookie in set_cookies:
         raw = cookie.encode("latin-1")
         raw = _COOKIE_DOMAIN_RE.sub(b"", raw)
-        raw = _COOKIE_SECURE_RE.sub(b"", raw)
+        # Browsers reject __Secure-/__Host- cookies without Secure, but do
+        # accept Secure cookies from http://localhost, so those keep it.
+        if not raw.lstrip().startswith(_SECURE_PREFIXES):
+            raw = _COOKIE_SECURE_RE.sub(b"", raw)
         localized.append(raw.decode("latin-1"))
     response.headers.set_all("set-cookie", localized)
 
@@ -71,3 +75,43 @@ class OriginRewriter:
             content = content.replace(real, local)
         if content != original:
             response.content = content
+
+
+class ForeignHostRouter:
+    """Serves other hosts a game's JS fetches from under the game's own port.
+
+    A game whose JS fetches an absolute URL on a separate API/CDN host is
+    blocked by CORS from localhost. This rewrites those URLs in text responses
+    to `<local origin>/__host/<host>/...`, and `route` sends requests for that
+    prefix on to the real host. Use it from a game's hooks
+    (`src/proxy/hooks/<game>.py`).
+    """
+
+    PREFIX = "/__host/"
+
+    def __init__(self, game_origin: str, local_origin: str, hosts: list[str]) -> None:
+        self._game_origin = game_origin
+        self._hosts = set(hosts)
+        self._rewriters = [
+            OriginRewriter(f"https://{host}", f"{local_origin}{self.PREFIX}{host}")
+            for host in hosts
+        ]
+
+    def route(self, request: http.Request) -> None:
+        if not request.path.startswith(self.PREFIX):
+            return
+        host, _, path = request.path.removeprefix(self.PREFIX).partition("/")
+        if host not in self._hosts:
+            return
+        request.scheme, request.host, request.port = "https", host, 443
+        request.path = "/" + path
+        request.headers["host"] = host
+        # The real hosts only allow the game's own origin.
+        if "origin" in request.headers:
+            request.headers["origin"] = self._game_origin
+        if "referer" in request.headers:
+            request.headers["referer"] = self._game_origin + "/"
+
+    def apply(self, response: http.Response) -> None:
+        for rewriter in self._rewriters:
+            rewriter.apply(response)

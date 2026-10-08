@@ -14,8 +14,6 @@
 - https://cluesbysam.com/
 - https://www.puzzmo.com/game/circuits/
 - https://dailyorbs.com/
-- https://pokedoku.com/
-- https://costcodle.com/
 - https://googlefeud.com/feudle/
 - https://framed.wtf/
 - https://www.lyricle.app/
