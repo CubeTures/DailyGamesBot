@@ -46,7 +46,12 @@
           <p class="desc">{{ game.description }}</p>
           {%- endif %}
           <div class="card-foot">
-            <span class="status">Not played</span>
+            <div class="tags">
+              <span class="status">Not played</span>
+              {%- if game.reset_timezone %}
+              <span class="reset" data-timezone="{{ game.reset_timezone }}">{{ game.reset_timezone }}</span>
+              {%- endif %}
+            </div>
             <span class="play">Play</span>
           </div>
         </div>
@@ -85,6 +90,7 @@
     </div>
   </dialog>
 <script id="game-titles" type="application/json">{{ game_titles | tojson }}</script>
+<script id="resets" type="application/json">{{ resets | tojson }}</script>
 <script id="higher-score-wins" type="application/json">{{ higher_score_wins | tojson }}</script>
 <script>
 {% include "discord-markdown.js" %}

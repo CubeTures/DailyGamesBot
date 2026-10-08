@@ -1,5 +1,6 @@
 (function () {
   var GAME_TITLES = JSON.parse(document.getElementById("game-titles").textContent);
+  var RESETS = JSON.parse(document.getElementById("resets").textContent);
   var HIGHER_SCORE_WINS = JSON.parse(document.getElementById("higher-score-wins").textContent);
   var MEDALS = ["🥇", "🥈", "🥉"];
   var REFRESH_MS = 30000;
@@ -113,10 +114,11 @@
     return byGame;
   }
 
-  function fetchResults(since, until) {
-    var url = "/api/results?since=" + encodeURIComponent(since.toISOString());
-    if (until) url += "&until=" + encodeURIComponent(until.toISOString());
-    return fetch(url).then(function (res) { return res.json(); });
+  // Results are filed by game day (when each game's puzzle changes), so a
+  // game that resets in another timezone shows on the board of its puzzle's
+  // date, which may be the viewer's tomorrow or yesterday.
+  function fetchResults(day) {
+    return fetch("/api/results?day=" + dayKey(day)).then(function (res) { return res.json(); });
   }
 
   var dialog = document.getElementById("dialog");
@@ -345,6 +347,19 @@
     return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
   }
 
+  // The game day a game's current puzzle belongs to, as a local midnight like
+  // today(): the date, in its reset timezone (the viewer's own if none), of
+  // its reset time before now. Mirrors gameDay() in proxy/capture/runtime.js.
+  function currentGameDay(game) {
+    var reset = RESETS[game];
+    var shifted = new Date(Date.now() - reset.minutes * 60000);
+    if (!reset.timezone) return new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate());
+    // en-CA formats dates as YYYY-MM-DD.
+    return parseDayKey(new Intl.DateTimeFormat("en-CA", {
+      timeZone: reset.timezone, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(shifted));
+  }
+
   function dayFromHash() {
     return parseDayKey((/^#day=(.*)$/.exec(location.hash) || [])[1]);
   }
@@ -369,28 +384,47 @@
     showViewDay();
   }
 
-  // Today's results drive the game cards' "Done" state whatever day the
-  // scoreboard shows, and the scoreboard too while it's on today.
+  // Today's results drive the scoreboard while it's on today.
   function renderToday(results) {
-    var byGame = groupByGame(results);
-    renderCards(byGame);
     if (viewDay) return;
-    renderBoards(byGame, "Nobody has finished a game yet today. Be the first!");
+    renderBoards(groupByGame(results), "Nobody has finished a game yet today. Be the first!");
     var updated = document.getElementById("updated");
     updated.textContent = "Updated " +
       new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
     replay(updated, "tick");
   }
 
+  // Each card's "Done" state is for its game's current puzzle, whatever day
+  // the scoreboard shows: a game that resets in an earlier timezone may
+  // already be on the viewer's tomorrow. So fetch today plus any such day.
   function refreshToday() {
-    fetchResults(today()).then(renderToday).catch(function () {});
+    var todayKey = dayKey(today());
+    var cardDays = {};
+    var days = {};
+    days[todayKey] = today();
+    Object.keys(RESETS).forEach(function (game) {
+      var day = currentGameDay(game);
+      cardDays[game] = dayKey(day);
+      days[dayKey(day)] = day;
+    });
+    var keys = Object.keys(days);
+    Promise.all(keys.map(function (key) { return fetchResults(days[key]); })).then(function (lists) {
+      var byDay = {};
+      keys.forEach(function (key, i) { byDay[key] = groupByGame(lists[i]); });
+      var current = {};
+      Object.keys(cardDays).forEach(function (game) {
+        current[game] = byDay[cardDays[game]][game];
+      });
+      renderCards(current);
+      renderToday(lists[keys.indexOf(todayKey)]);
+    }).catch(function () {});
   }
 
   var pastDayRequest = 0;
   function showPastDay(day) {
     var request = ++pastDayRequest;
     showMessage(document.getElementById("boards"), "Loading…", true);
-    fetchResults(day, addDays(day, 1)).then(function (results) {
+    fetchResults(day).then(function (results) {
       // Ignore a slow answer for a day the viewer has already left.
       if (request !== pastDayRequest || !viewDay || viewDay.getTime() !== day.getTime()) return;
       renderBoards(groupByGame(results), "Nobody finished a game that day.");
@@ -413,6 +447,25 @@
     if (viewDay) showPastDay(day);
     else refreshToday();
   }
+
+  // Reset pills show the game's timezone abbreviated, e.g. "ET"; the
+  // template's fallback text is the IANA name.
+  function labelResets() {
+    document.querySelectorAll(".card .reset").forEach(function (tag) {
+      var zone = tag.dataset.timezone, label = zone;
+      // shortGeneric ("ET") is newer than short ("EDT").
+      ["shortGeneric", "short"].some(function (style) {
+        try {
+          var part = new Intl.DateTimeFormat(undefined, { timeZone: zone, timeZoneName: style })
+            .formatToParts(new Date()).filter(function (p) { return p.type === "timeZoneName"; })[0];
+          if (part) label = part.value;
+          return !!part;
+        } catch (e) { return false; }
+      });
+      tag.textContent = label;
+    });
+  }
+  labelResets();
 
   // The bell on each card toggles the game's Discord role; the bot gives or
   // takes it within a few seconds.

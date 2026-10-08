@@ -121,6 +121,10 @@
   }
 
   currentTimer();
+  // The game day this page's puzzle belongs to, reported with its result so
+  // the launcher files it under the right day. Taken at load, so a puzzle
+  // started before the reset and finished after it keeps its own day.
+  var PAGE_DAY = gameDay();
   ["pointerdown", "keydown"].forEach(function (name) {
     window.addEventListener(name, function (event) {
       var timer = currentTimer();
@@ -157,6 +161,7 @@
       game: GAME,
       trigger: trigger.name,
       puzzle_id: String(puzzleId),
+      game_day: PAGE_DAY,
       fields: fields,
       url: location.href,
     };

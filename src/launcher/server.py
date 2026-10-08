@@ -4,7 +4,7 @@ subscriptions API its role pickers use."""
 import json
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import date
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
@@ -20,13 +20,12 @@ RESULTS_API_PATH = "/api/results"
 SUBSCRIPTIONS_API_PATH = "/api/subscriptions"
 
 
-def _parse_aware_time(raw: str | None) -> datetime | None:
-    """An ISO time with a timezone, or None if it's missing or invalid."""
+def _parse_day(raw: str | None) -> date | None:
+    """A YYYY-MM-DD date, or None if it's missing or invalid."""
     try:
-        parsed = datetime.fromisoformat(raw or "")
+        return date.fromisoformat(raw or "")
     except ValueError:
         return None
-    return parsed if parsed.tzinfo is not None else None
 
 
 def _result_json(result: results.StoredResult) -> dict[str, Any]:
@@ -50,14 +49,10 @@ def _result_json(result: results.StoredResult) -> dict[str, Any]:
 
 
 def _results_for_query(query: str) -> list[dict[str, Any]]:
-    """GET /api/results?since=<ISO time>[&until=<ISO time>]."""
-    params = _query_params(query)
-    # The page sends the viewer's local midnight(s); fall back to 24h.
-    since = _parse_aware_time(params.get("since")) or (
-        datetime.now(UTC) - timedelta(days=1)
-    )
-    until = _parse_aware_time(params.get("until"))
-    return [_result_json(r) for r in results.captured_between(since, until)]
+    """GET /api/results?day=<YYYY-MM-DD>: that game day's results."""
+    # The page sends the viewer's local date; fall back to the server's.
+    day = _parse_day(_query_params(query).get("day")) or date.today()
+    return [_result_json(r) for r in results.on_day(day)]
 
 
 def _query_params(query: str) -> dict[str, str]:

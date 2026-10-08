@@ -77,9 +77,15 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
   kept in the game's localStorage under `__dgb_timer`.
 - **Launcher.** `launcher/index.html` is rendered from
   `src/launcher/templates/` and the game configs on every proxy start. It shows a card per game and a
-  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?since=<ISO>[&until=<ISO>]` on the
-  launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`;
-  days run from the viewer's local midnight. Clicking a result shows the
+  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD` on the
+  launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
+  Results are filed by game day, not capture time: `runtime.js` reports the
+  day the page loaded in, by the game's `[reset]`, as `game_day`. So a game
+  resetting at Eastern midnight, played at 10pm Pacific, shows on the
+  viewer's tomorrow. A card's "Done" state is for its game's current game
+  day (`currentGameDay()` in `app.js`, mirroring `runtime.js`). Cards of
+  games whose reset isn't `local` show its timezone (e.g. "ET") in a
+  pill beside their status. Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
   `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the
   player's game role via `GET`/`POST /api/subscriptions`. Cards are divs

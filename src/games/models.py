@@ -5,6 +5,7 @@ editors can check config.toml as it's written.
 """
 
 import re
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -81,6 +82,21 @@ class Reset(_StrictModel):
         """Minutes past midnight."""
         hours, minutes = self.time.split(":")
         return int(hours) * 60 + int(minutes)
+
+    def js_config(self) -> dict[str, int | str | None]:
+        """What gameDay() in proxy/capture/runtime.js and the launcher's
+        currentGameDay() take; a null timezone is the player's own."""
+        return {
+            "minutes": self.minutes,
+            "timezone": None if self.timezone == LOCAL_TIMEZONE else self.timezone,
+        }
+
+    def day_at(self, time: datetime) -> date:
+        """The game day `time` falls in: the date, in the reset timezone (the
+        server's own for "local"), of `minutes` before it. Mirrors gameDay()
+        in proxy/capture/runtime.js, which uses the player's timezone."""
+        zone = None if self.timezone == LOCAL_TIMEZONE else ZoneInfo(self.timezone)
+        return (time.astimezone(zone) - timedelta(minutes=self.minutes)).date()
 
 
 class _TriggerBase(_StrictModel):

@@ -170,7 +170,10 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
-.status {
+.tags { display: flex; align-items: center; gap: 6px; }
+/* .reset names the timezone of a game that resets in a fixed one, not the
+   player's own. */
+.status, .reset {
   display: inline-flex;
   align-items: center;
   gap: 6px;

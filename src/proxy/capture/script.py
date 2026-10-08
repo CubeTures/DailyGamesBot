@@ -8,7 +8,6 @@ from mitmproxy import http
 
 from src.games.models import (
     FIELDS_EXPORT_RE,
-    LOCAL_TIMEZONE,
     EventTrigger,
     Game,
     NetworkTrigger,
@@ -49,15 +48,9 @@ def _js_trigger(trigger: Trigger, game: Game) -> str:
 
 def build_script(game: Game) -> str:
     triggers = ",\n".join(_js_trigger(t, game) for t in game.triggers)
-    reset = {
-        "minutes": game.reset.minutes,
-        "timezone": None
-        if game.reset.timezone == LOCAL_TIMEZONE
-        else game.reset.timezone,
-    }
     return (
         _RUNTIME.replace("__DGB_GAME__", json.dumps(game.name))
-        .replace("__DGB_RESET__", json.dumps(reset))
+        .replace("__DGB_RESET__", json.dumps(game.reset.js_config()))
         .replace("__DGB_TRIGGERS__", f"[\n{triggers}\n]")
     )
 

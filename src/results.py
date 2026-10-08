@@ -3,6 +3,9 @@ which games' Discord roles each player wants.
 
 One row per (game, discord_id, puzzle_id); the first capture wins and later
 ones (e.g. the game re-showing its finished state on reload) are ignored.
+Each result is filed under its game day, the day the puzzle belongs to by the
+game's [reset], so a scoreboard day holds the same puzzles for every viewer
+whatever their timezone and whenever they played.
 
 Results are saved by the proxy, which runs in mitmdump's process and can't
 reach the Discord bot. So instead of calling the bot, a save marks the
@@ -13,11 +16,12 @@ bot gives or takes the role and marks them synced.
 """
 
 import json
+import re
 import sqlite3
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from src.settings import db_path
@@ -32,6 +36,7 @@ CREATE TABLE IF NOT EXISTS results (
     trigger     TEXT NOT NULL,
     url         TEXT,
     captured_at TEXT NOT NULL,
+    game_day    TEXT NOT NULL,  -- YYYY-MM-DD
     announced   INTEGER NOT NULL DEFAULT 0,
     UNIQUE (game, discord_id, puzzle_id)
 );
@@ -60,6 +65,7 @@ class NewResult:
     game: str
     discord_id: str
     puzzle_id: str
+    game_day: date
     data: dict[str, Any]
     trigger: str
     url: str | None = None
@@ -91,6 +97,7 @@ def _connect() -> Generator[sqlite3.Connection]:
     try:
         conn.executescript(_SCHEMA)
         _add_announced_column(conn)
+        _add_game_day_column(conn)
         with conn:
             yield conn
     finally:
@@ -113,6 +120,46 @@ def _add_announced_column(conn: sqlite3.Connection) -> None:
         return
     # Results from before announcements existed are old news.
     conn.execute("UPDATE results SET announced = 1")
+    conn.commit()
+
+
+_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _backfilled_game_day(game: str, puzzle_id: str, captured_at: str) -> str:
+    """Best guess at an old result's game day: its puzzle_id when that's a
+    date (as most are), else the day it was captured in by the game's reset."""
+    if _DAY_RE.match(puzzle_id):
+        return puzzle_id
+    # Imported here: src.games.registry imports this module (via announce).
+    from src.games.registry import GAMES_BY_NAME
+
+    captured = datetime.fromisoformat(captured_at)
+    config = GAMES_BY_NAME.get(game)
+    day = config.reset.day_at(captured) if config else captured.astimezone().date()
+    return day.isoformat()
+
+
+def _add_game_day_column(conn: sqlite3.Connection) -> None:
+    """Migrate databases from before results were filed by game day."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(results)")}
+    if "game_day" in columns:
+        return
+    try:
+        conn.execute("ALTER TABLE results ADD COLUMN game_day TEXT NOT NULL DEFAULT ''")
+    except sqlite3.OperationalError as e:
+        # The bot and the proxy can both get here at once.
+        if "duplicate column" not in str(e):
+            raise
+        return
+    rows = conn.execute("SELECT id, game, puzzle_id, captured_at FROM results")
+    conn.executemany(
+        "UPDATE results SET game_day = ? WHERE id = ?",
+        [
+            (_backfilled_game_day(game, puzzle_id, captured_at), id_)
+            for id_, game, puzzle_id, captured_at in rows.fetchall()
+        ],
+    )
     conn.commit()
 
 
@@ -144,12 +191,13 @@ def save(result: NewResult) -> bool:
     with _connect() as conn:
         cursor = conn.execute(
             "INSERT OR IGNORE INTO results"
-            " (game, discord_id, puzzle_id, data, trigger, url, captured_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            " (game, discord_id, puzzle_id, game_day, data, trigger, url,"
+            " captured_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 result.game,
                 result.discord_id,
                 result.puzzle_id,
+                result.game_day.isoformat(),
                 json.dumps(result.data),
                 result.trigger,
                 result.url,
@@ -166,15 +214,9 @@ def save(result: NewResult) -> bool:
         return saved
 
 
-def captured_between(
-    since: datetime, until: datetime | None = None
-) -> list[StoredResult]:
-    """Results captured at or after `since` and before `until`, if given."""
-    until_iso = _utc_iso(until) if until else None
-    return _query_results(
-        "r.captured_at >= ? AND (? IS NULL OR r.captured_at < ?)",
-        (_utc_iso(since), until_iso, until_iso),
-    )
+def on_day(day: date) -> list[StoredResult]:
+    """Results for the puzzles of game day `day`."""
+    return _query_results("r.game_day = ?", (day.isoformat(),))
 
 
 def unannounced() -> list[StoredResult]:

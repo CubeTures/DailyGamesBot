@@ -6,6 +6,7 @@ cookies are shared across ports on localhost, unlike localStorage.
 """
 
 import json
+from datetime import UTC, date, datetime
 from typing import Any, cast
 
 from mitmproxy import ctx, http
@@ -42,6 +43,17 @@ def _error(status: int, message: str) -> http.Response:
     return _json_response(status, {"error": message})
 
 
+def _game_day(raw: object, game: Game) -> date:
+    """The game day the page reported, or else today's by the game's reset
+    (in the server's timezone for "local" games)."""
+    if isinstance(raw, str):
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            pass
+    return game.reset.day_at(datetime.now(UTC))
+
+
 def _parse_result(request: http.Request, game: Game) -> results.NewResult | str:
     """The result a POST reports, or why it can't be saved."""
     discord_id = request.cookies.get(DISCORD_ID_COOKIE)
@@ -66,6 +78,7 @@ def _parse_result(request: http.Request, game: Game) -> results.NewResult | str:
         game=game.name,
         discord_id=discord_id,
         puzzle_id=puzzle_id,
+        game_day=_game_day(payload.get("game_day"), game),
         data=cast(dict[str, Any], fields),
         trigger=str(payload.get("trigger", "")),
         url=url if isinstance(url, str) else None,
@@ -80,7 +93,8 @@ def _save_result(request: http.Request, game: Game) -> http.Response:
         return _error(400, result)
     status = "saved" if results.save(result) else "duplicate"
     ctx.log.info(
-        f"[capture] {game.name} {result.puzzle_id} for {result.discord_id}: {status}"
+        f"[capture] {game.name} {result.puzzle_id} ({result.game_day})"
+        f" for {result.discord_id}: {status}"
     )
     return _json_response(200, {"status": status})
 

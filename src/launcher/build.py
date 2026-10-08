@@ -7,7 +7,7 @@ from typing import Any
 import jinja2
 
 from src.discord_bot.settings import results_channel_id
-from src.games.models import ICON_MIME_TYPES, Game
+from src.games.models import ICON_MIME_TYPES, LOCAL_TIMEZONE, Game
 from src.games.registry import GAMES_BY_PORT
 from src.settings import LAUNCHER_DIR
 
@@ -31,6 +31,11 @@ def _card(game: Game) -> dict[str, Any]:
         "description": game.description,
         "icon": _icon_data_uri(game),
         "url": game.local_origin + game.landing_path,
+        # Only games that don't reset at the player's own midnight name their
+        # timezone.
+        "reset_timezone": None
+        if game.reset.timezone == LOCAL_TIMEZONE
+        else game.reset.timezone,
     }
 
 
@@ -44,6 +49,7 @@ def render_launcher() -> str:
     return env.get_template("index.html.j2").render(
         games=[_card(game) for game in games],
         game_titles={game.name: game.title for game in games},
+        resets={game.name: game.reset.js_config() for game in games},
         higher_score_wins=[game.name for game in games if game.higher_score_wins],
         # Game roles live in the results channel's server.
         roles_enabled=results_channel_id() is not None,

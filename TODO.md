@@ -1,10 +1,15 @@
-- See results of krillion
-- See what we can do about the fact some games reset at pacific time
+- See results of krillion, fermi
+- 
 - Admin panel to enable and disable games
 - Nginx docker container so many ports can be opened
-- Time everything that doesn't track time itself
 - Let players download their own results
 - Fix connections announcement and leaderboard
+
+## To Test
+
+- Game timers
+- Connections score collection
+- Timezoned games
 
 ## Games
 
