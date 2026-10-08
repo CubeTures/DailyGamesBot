@@ -1,0 +1,19 @@
+#:schema ../schema.json
+
+name = "cluesbysam"
+title = "Clues by Sam"
+description = "A daily logic puzzle: use the clues to deduce who is innocent and who is a criminal."
+icon = "icon.png"
+origin = "https://cluesbysam.com"
+port = 8089
+landing_path = "/"
+# The daily puzzle changes at New York midnight (the game's "Next puzzle in"
+# countdown).
+[reset]
+time = "00:00"
+timezone = "America/New_York"
+
+[[triggers]]
+name = "local-state"
+type = "page"
+when = "finished"
