@@ -11,7 +11,6 @@
 
 ## Games
 
-- https://www.theatlantic.com/games/bracket-city/
 - https://cluesbysam.com/
 - https://www.puzzmo.com/game/circuits/
 - https://dailyorbs.com/
