@@ -1,0 +1,20 @@
+#:schema ../schema.json
+
+name = "bracketcity"
+title = "Bracket City"
+description = "Solve nested clues, innermost first, to reveal a fact about this day in history."
+icon = "icon.png"
+origin = "https://www.theatlantic.com"
+port = 8086
+landing_path = "/games/bracket-city/"
+higher_score_wins = true
+
+# The daily puzzle is picked by New York date.
+[reset]
+time = "00:00"
+timezone = "America/New_York"
+
+[[triggers]]
+name = "puzzle-state"
+type = "page"
+when = "finished"

@@ -14,7 +14,10 @@ var discordMarkdown = (function () {
     game_die: "🎲", puzzle_piece: "🧩", thinking: "🤔", heart: "❤️",
     shrimp: "🦐", fish: "🐟", bubbles: "🫧", squid: "🦑", clown: "🤡",
     izakaya_lantern: "🏮", star2: "🌟", arrow_up: "⬆️", arrow_down: "⬇️",
-    dart: "🎯"
+    dart: "🎯", eyes: "👀", ring_buoy: "🛟", camera_with_flash: "📸",
+    steam_locomotive: "🚂", house: "🏠", classical_building: "🏛️",
+    police_officer: "👮", medal: "🏅", briefcase: "💼", crown: "👑",
+    crystal_ball: "🔮"
   };
 
   var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
