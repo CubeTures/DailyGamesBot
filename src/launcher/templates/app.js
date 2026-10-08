@@ -203,8 +203,7 @@
       if (cardsRendered && mine && !card.classList.contains("done")) replay(card, "just-done");
       card.classList.toggle("done", !!mine);
       card.querySelector(".status").textContent =
-        mine ? "✓ Done · " + formatScore(mine.data) +
-          (hasTime(mine.data) ? " · " + formatTime(mine.data.time_secs) : "") : "Not played";
+        mine ? "✓ Done · " + formatScore(mine.data) : "Not played";
       card.querySelector(".play").textContent = mine ? "Open" : "Play";
     });
     cardsRendered = true;
@@ -388,10 +387,6 @@
   function renderToday(results) {
     if (viewDay) return;
     renderBoards(groupByGame(results), "Nobody has finished a game yet today. Be the first!");
-    var updated = document.getElementById("updated");
-    updated.textContent = "Updated " +
-      new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    replay(updated, "tick");
   }
 
   // Each card's "Done" state is for its game's current puzzle, whatever day
@@ -440,7 +435,7 @@
     var title = document.getElementById("scores-title");
     title.textContent = viewDay
       ? "Scores · " + day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
-      : "Today's scores";
+      : "Today's Scores";
     replay(title, "swap");
     document.getElementById("updated").textContent = "";
     shownOnBoard = null;
@@ -448,24 +443,66 @@
     else refreshToday();
   }
 
-  // Reset pills show the game's timezone abbreviated, e.g. "ET"; the
+  // Reset pills show the game's timezone abbreviated, e.g. "EDT"; the
   // template's fallback text is the IANA name.
   function labelResets() {
     document.querySelectorAll(".card .reset").forEach(function (tag) {
       var zone = tag.dataset.timezone, label = zone;
-      // shortGeneric ("ET") is newer than short ("EDT").
-      ["shortGeneric", "short"].some(function (style) {
-        try {
-          var part = new Intl.DateTimeFormat(undefined, { timeZone: zone, timeZoneName: style })
-            .formatToParts(new Date()).filter(function (p) { return p.type === "timeZoneName"; })[0];
-          if (part) label = part.value;
-          return !!part;
-        } catch (e) { return false; }
-      });
-      tag.textContent = label;
+      try {
+        var part = new Intl.DateTimeFormat(undefined, { timeZone: zone, timeZoneName: "short" })
+          .formatToParts(new Date()).filter(function (p) { return p.type === "timeZoneName"; })[0];
+        if (part) label = part.value;
+      } catch (e) { /* keep the IANA name */ }
+      tag.querySelector(".zone").textContent = label;
     });
   }
   labelResets();
+
+  // Each card is tinted with its icon's dominant color: the icon is drawn
+  // small, its opaque and not-too-grey pixels are binned by hue (weighted by
+  // saturation), and the heaviest bin's pixels are averaged. The CSS mixes
+  // --tint into the card's surface, so it stays muted in either theme.
+  function dominantColor(img) {
+    var size = 32, canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, size, size);
+    var pixels = ctx.getImageData(0, 0, size, size).data;
+    var bins = [];
+    for (var i = 0; i < pixels.length; i += 4) {
+      var r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+      if (pixels[i + 3] < 128) continue;
+      var max = Math.max(r, g, b), min = Math.min(r, g, b), chroma = max - min;
+      if (chroma < 40 || max < 40) continue;
+      var hue = max === r ? (g - b) / chroma : max === g ? 2 + (b - r) / chroma : 4 + (r - g) / chroma;
+      var bin = bins[Math.floor(((hue + 6) % 6) * 2)] ||
+        (bins[Math.floor(((hue + 6) % 6) * 2)] = { weight: 0, r: 0, g: 0, b: 0 });
+      var weight = chroma / max;
+      bin.weight += weight; bin.r += r * weight; bin.g += g * weight; bin.b += b * weight;
+    }
+    var best = bins.reduce(function (a, c) { return c && (!a || c.weight > a.weight) ? c : a; }, null);
+    if (!best) return null;
+    // Keep the hue and saturation but fix the lightness, so pale and dark
+    // icons tint equally.
+    var r = best.r / best.weight, g = best.g / best.weight, b = best.b / best.weight;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b), chroma = max - min;
+    var hue = max === r ? (g - b) / chroma : max === g ? 2 + (b - r) / chroma : 4 + (r - g) / chroma;
+    var sat = chroma / (255 - Math.abs(max + min - 255));
+    return "hsl(" + Math.round(((hue + 6) % 6) * 60) + " " + Math.round(sat * 100) + "% 50%)";
+  }
+
+  function tintCards() {
+    document.querySelectorAll(".card img.icon").forEach(function (img) {
+      function tint() {
+        try {
+          var color = dominantColor(img);
+          if (color) img.closest(".card").style.setProperty("--tint", color);
+        } catch (e) { /* leave the card untinted */ }
+      }
+      if (img.complete) tint(); else img.addEventListener("load", tint);
+    });
+  }
+  tintCards();
 
   // The bell on each card toggles the game's Discord role; the bot gives or
   // takes it within a few seconds.

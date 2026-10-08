@@ -84,8 +84,9 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
   resetting at Eastern midnight, played at 10pm Pacific, shows on the
   viewer's tomorrow. A card's "Done" state is for its game's current game
   day (`currentGameDay()` in `app.js`, mirroring `runtime.js`). Cards of
-  games whose reset isn't `local` show its timezone (e.g. "ET") in a
-  pill beside their status. Clicking a result shows the
+  games whose reset isn't `local` show its timezone (e.g. "EDT") in a
+  pill, with a globe icon, beside their status. Each card is tinted with
+  its icon's dominant color (`tintCards()` in `app.js`). Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
   `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the
   player's game role via `GET`/`POST /api/subscriptions`. Cards are divs
