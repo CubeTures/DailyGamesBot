@@ -65,6 +65,13 @@ class OriginRewriter:
         ]
 
     def apply(self, response: http.Response) -> None:
+        # Redirects to the real origin (e.g. an old path moved) would take the
+        # player off the proxy.
+        location = cast(str | None, response.headers.get("location"))
+        if location is not None:
+            real, local = (r.decode() for r in self._replacements[0])
+            if location == real or location.startswith((real + "/", real + "?")):
+                response.headers["location"] = local + location.removeprefix(real)
         content_type = cast(str, response.headers.get("content-type", ""))
         if not any(t in content_type for t in _TEXT_CONTENT_TYPES):
             return

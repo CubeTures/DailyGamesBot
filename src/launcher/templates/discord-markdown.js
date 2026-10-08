@@ -12,6 +12,7 @@ var discordMarkdown = (function () {
     second_place: "🥈", third_place: "🥉", fire: "🔥", star: "⭐", tada: "🎉",
     stopwatch: "⏱️", clock: "🕐", brain: "🧠", bulb: "💡", skull: "💀",
     game_die: "🎲", puzzle_piece: "🧩", thinking: "🤔", heart: "❤️",
+    green_heart: "💚", broken_heart: "💔",
     shrimp: "🦐", fish: "🐟", bubbles: "🫧", squid: "🦑", clown: "🤡",
     izakaya_lantern: "🏮", star2: "🌟", arrow_up: "⬆️", arrow_down: "⬇️",
     dart: "🎯", eyes: "👀", ring_buoy: "🛟", camera_with_flash: "📸",

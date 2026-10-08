@@ -1,0 +1,19 @@
+#:schema ../schema.json
+
+name = "chess"
+title = "Chess.com"
+description = "Find the winning moves in one chess puzzle a day, getting harder through the week."
+icon = "icon.png"
+origin = "https://www.chess.com"
+port = 8091
+landing_path = "/daily"
+
+# A new puzzle at the player's local midnight.
+[reset]
+time = "00:00"
+timezone = "local"
+
+[[triggers]]
+name = "puzzle-board"
+type = "page"
+when = "finished"
