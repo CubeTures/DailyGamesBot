@@ -1,3 +1,6 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {{ score }} points{{ " in %s" % (time_secs | duration) if time_secs }}
 {{ rows }}
+{% for a in answers or [] %}
+{{ "||" if loop.first }}{{ loop.index }}. {{ a.prompt | md }} {{ a.emoji }} {{ a.answer | md if a.answer else "*no answer*" }}{{ "||" if loop.last }}
+{% endfor %}

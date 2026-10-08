@@ -150,6 +150,19 @@
     if (e.target === dialog) closeDialog();
   });
 
+  // Spoilers in an announcement reveal on click or Enter/Space, as in Discord.
+  function revealSpoiler(e) {
+    var spoiler = e.target.closest(".spoiler:not(.revealed)");
+    if (!spoiler || (e.type === "keydown" && e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    spoiler.classList.add("revealed");
+    spoiler.removeAttribute("role");
+    spoiler.removeAttribute("tabindex");
+    spoiler.removeAttribute("title");
+  }
+  message.addEventListener("click", revealSpoiler);
+  message.addEventListener("keydown", revealSpoiler);
+
   // The dialog shows either an announcement or a game's full scoreboard;
   // `back`, if given, is what its back button returns to.
   function showDialog(game, title, showList, back) {

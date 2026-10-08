@@ -8,6 +8,14 @@ export default {
   band: band(day.score),
   tiers: day.tiers,
   round_scores: day.results?.map(r => r.score) ?? null,
+  // What the player answered each round. Answers are their own, so unlike
+  // most games' they can't be looked up later; the announcement shows them
+  // behind spoilers.
+  answers: day.results?.map(r => ({
+    prompt: r.promptText,
+    answer: r.answer,
+    emoji: tierEmoji[r.tier]?.[1] ?? ":black_large_square:",
+  })) ?? null,
   misses: day.tiers.filter(t => t === "miss").length,
   rows: day.tiers.map(t => tierEmoji[t]?.[1] ?? ":black_large_square:").join(""),
   share_text: `Krillion #${day.dayNumber} 🦐\n${day.score}\n\n${day.tiers.map(t => tierEmoji[t]?.[0] ?? "⬛").join("")}`,

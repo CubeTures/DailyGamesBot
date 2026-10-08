@@ -208,13 +208,19 @@ which renders as:
 - Cover every outcome: a loss or give-up should read as one, not as a
   missing score.
 - Never spell out the answer; others in the channel may not have played yet.
+  What the player put is fine behind a spoiler when nobody could look it up
+  later, because it's their own (Krillion's answers).
+  Put them in one spoiler block at the end, a line each, so one click
+  reveals them all; see `krillion/announcement.j2`. A shared answer
+  (Wordle's word) stays out entirely.
 - Write emoji as Discord shortcodes (`:green_square:`), not as the characters
   themselves, so they look the same in Discord and on the launcher. The
   launcher only knows the shortcodes in the `SHORTCODES` map in
   `src/launcher/templates/discord-markdown.js`; any other shows as typed, so add it there
   when a template needs it.
 - Stick to the markdown the launcher renders too: `**bold**`, `*italic*`,
-  `__underline__`, `~~strike~~` and `` `code` ``.
+  `__underline__`, `~~strike~~`, `` `code` ``, `||spoiler||` and `\`
+  escapes.
 
 ### Template reference
 
@@ -228,7 +234,9 @@ In scope:
   subscribers), its `title` on the launcher; `puzzle_id`; `fields`: all fields as a dict
 - filters: `duration` (seconds as `1:05` / `1:02:03`) and
   `tiles(answer)` (a guess scored against the answer as a 🟩🟨⬛ row; this
-  uses the answer, so only reach for it when the game reports one)
+  uses the answer, so only reach for it when the game reports one), `md`
+  (a value on one line with its markdown escaped, so text the player typed
+  shows as typed) and `spoiler` (the same, as a `||spoiler||`)
 
 Blocks trim their own line, so put `{% ... %}` tags on lines of their own and
 use `{%-` to join onto the previous line. Without `announcement.j2`, a generic

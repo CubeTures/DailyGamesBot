@@ -7,6 +7,7 @@ Preview one against made-up fields with:
     uv run python3 -m src.announce wordle '{"won": true, "score": 3, ...}'
 """
 
+import re
 from collections import Counter
 from typing import Any, cast
 
@@ -55,10 +56,27 @@ def tiles(guess: str, answer: str) -> str:
     return "".join(row)
 
 
+# Characters Discord reads as markdown, mentions or emoji shortcodes.
+_MARKDOWN_RE = re.compile(r"([\\*_~`|<>:\[\]])")
+
+
+def md(value: object) -> str:
+    """`value` on one line with its markdown escaped, so text a player typed
+    shows as typed."""
+    return _MARKDOWN_RE.sub(r"\\\1", " ".join(str(value).split()))
+
+
+def spoiler(value: object) -> str:
+    """`value` as a Discord ||spoiler||, escaped as by `md`."""
+    return f"||{md(value)}||"
+
+
 # Sandboxed: templates only format data, they shouldn't reach into Python.
 _env = SandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
 # Jinja types this dict as holding only its built-in filters.
-cast(dict[str, Any], _env.filters).update(duration=duration, tiles=tiles)
+cast(dict[str, Any], _env.filters).update(
+    duration=duration, tiles=tiles, md=md, spoiler=spoiler
+)
 
 
 def check_template(template: str) -> None:

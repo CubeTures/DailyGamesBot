@@ -391,6 +391,19 @@ dialog.closing::backdrop { animation: fade-out 0.15s ease forwards; }
   font-weight: 600;
 }
 .message code { background: var(--border); }
+.message .spoiler {
+  padding: 0 2px;
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.message .spoiler:hover { background: var(--muted); }
+/* Hidden, not just transparent: emoji ignore `color`. */
+.message .spoiler:not(.revealed) > span { visibility: hidden; }
+.message .spoiler.revealed { background: var(--border); cursor: auto; }
 
 .empty {
   animation: fade-in 0.25s ease both;

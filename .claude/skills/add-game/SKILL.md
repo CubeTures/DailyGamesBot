@@ -180,7 +180,7 @@ Rules:
 - Use the standard field names from `games/README.md` where they fit (`won`, `score`, `max_score`, `attempts`, `time_secs`, `share_text`). Report `won` whenever the game can be lost. Add game-specific extras freely, especially anything the announcement shows. Only report `time_secs` if the game times the solve itself; otherwise the capture script fills it in. Either way, show it in the announcement. Set `[reset]` to when the game's daily puzzle changes (default: the player's local midnight).
 - Comment any field whose meaning isn't obvious: a score's sign or units, a derived number, a formula (see `games/minutecryptic/fields.js`).
 - Write `vars.js` and `fields.js` defensively with `?.`. A throw anywhere skips the whole check (no result is sent), and a field that silently comes back null is a bug.
-- Don't capture secrets or tokens. Keep `share_text`-like data small. Fields may hold the answer (Wordle's `guesses` end with it), but the announcement must not show it.
+- Don't capture secrets or tokens. Keep `share_text`-like data small. Fields may hold the answer (Wordle's `guesses` end with it), but the announcement must not show it. When the player's answers are their own and can't be looked up later (Krillion's free-text answers), capture them as a field so the announcement can show them behind a spoiler.
 
 ### announcement.j2
 
@@ -190,9 +190,9 @@ Write the game's announcement following the house style in "Announcement" in
 - First line `:bee: {{ player }} played **<title>** <puzzle>`: the game's puzzle number (`#{{ puzzle_number }}`), or `{{ puzzle_id }}` if it has none.
 - Then the result in the game's own terms (score vs. par, time, guesses), and an emoji grid or bar if the game's share screen has one. Mirror that share screen.
 - Every outcome reads correctly: win, loss or give-up, and missing optional fields (`{% if x is not none %}`).
-- Never spell out the answer.
+- Never spell out the answer. The player's own answers (see above) go in one `||spoiler||` block at the end, a line each, escaped with `| md` (see `games/krillion/announcement.j2`).
 - Emoji as Discord shortcodes (`:green_square:`), only ones in the `SHORTCODES` map in `src/launcher/templates/discord-markdown.js`. If you need another, add it to that map (the shortcode and its emoji) so the launcher renders it too.
-- Only the markdown the launcher renders: `**bold**`, `*italic*`, `__underline__`, `~~strike~~`, `` `code` ``.
+- Only the markdown the launcher renders: `**bold**`, `*italic*`, `__underline__`, `~~strike~~`, `` `code` ``, `||spoiler||`.
 
 Preview it for every outcome with the field values from the runs:
 
