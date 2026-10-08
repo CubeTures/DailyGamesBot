@@ -8,6 +8,10 @@ origin = "https://fermi.gg"
 port = 8082
 landing_path = "/"
 
+[reset]
+time = "00:00"
+timezone = "America/New_York"
+
 [[triggers]]
 name = "results-screen"
 type = "page"

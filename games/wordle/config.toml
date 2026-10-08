@@ -8,6 +8,10 @@ origin = "https://www.nytimes.com"
 port = 8081
 landing_path = "/games/wordle/index.html"
 
+[reset]
+time = "00:00"
+timezone = "local"
+
 [[triggers]]
 name = "local-state"
 type = "page"

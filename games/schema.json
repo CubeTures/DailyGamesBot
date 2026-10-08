@@ -129,6 +129,27 @@
       ],
       "title": "PageTrigger",
       "type": "object"
+    },
+    "Reset": {
+      "additionalProperties": false,
+      "description": "When the game's daily puzzle changes. The solve timer starts afresh\neach game day.",
+      "properties": {
+        "time": {
+          "default": "00:00",
+          "description": "24-hour HH:MM.",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "title": "Time",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "local",
+          "description": "An IANA timezone such as \"America/New_York\", or \"local\" for the player's own.",
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "title": "Reset",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -197,6 +218,10 @@
       "description": "Rank the scoreboard by highest `score` first. By default the lowest score (fewest guesses, mistakes) ranks first.",
       "title": "Higher Score Wins",
       "type": "boolean"
+    },
+    "reset": {
+      "$ref": "#/$defs/Reset",
+      "description": "When the daily puzzle changes. Default: the player's midnight."
     },
     "triggers": {
       "description": "Each says when the player has finished and what to report. They share the game's vars.js and fields.js. A game with no triggers is still proxied, just not captured.",

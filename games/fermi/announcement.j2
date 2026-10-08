@@ -1,5 +1,5 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
-{{ score_text }}{{ " for top %s%%" % top_percent if top_percent }}
+{{ score_text }}{{ " for top %s%%" % top_percent if top_percent }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% for f in factor_texts %}
 {{ ":arrow_up:" if sides[loop.index0] == "high" else ":arrow_down:" if sides[loop.index0] == "low" else ":dart:" }} {{ f }}
 {% endfor %}

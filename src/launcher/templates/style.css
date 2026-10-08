@@ -269,7 +269,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .ranks li.fresh .row { animation: row-fresh 1.6s ease both; }
 .ranks .row {
   display: grid;
-  grid-template-columns: 2rem 1fr auto;
+  grid-template-columns: 2rem 1fr auto auto;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -293,6 +293,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .ranks .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranks .score { font-variant-numeric: tabular-nums; font-weight: 600; }
 .ranks .score.lost { color: var(--muted); font-weight: 500; }
+/* A fixed width keeps scores lined up whether or not a row has a time. */
+.ranks .time { min-width: 3.2em; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; font-weight: 500; text-align: right; }
 
 dialog {
   width: min(460px, calc(100vw - 32px));

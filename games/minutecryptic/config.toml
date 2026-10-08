@@ -8,6 +8,10 @@ origin = "https://www.minutecryptic.com"
 port = 8083
 landing_path = "/"
 
+[reset]
+time = "00:00"
+timezone = "local"
+
 [[triggers]]
 name = "daily-solves"
 type = "page"

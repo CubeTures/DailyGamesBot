@@ -9,6 +9,10 @@ port = 8085
 landing_path = "/games/connections"
 higher_score_wins = true
 
+[reset]
+time = "00:00"
+timezone = "local"
+
 [[triggers]]
 name = "local-state"
 type = "page"

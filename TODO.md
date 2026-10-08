@@ -1,11 +1,6 @@
-- Link to a discord username
-- Store results by user
-- Update UI to include other user stats
-
 - See results of krillion
 - See what we can do about the fact some games reset at pacific time
 - Admin panel to enable and disable games
-
 - Nginx docker container so many ports can be opened
 - Time everything that doesn't track time itself
 - Let players download their own results
@@ -13,7 +8,7 @@
 
 ## Games
 
-- https://www.theatlantic.com/games/bracket-city/?date=2026-10-07
+- https://www.theatlantic.com/games/bracket-city/
 - https://cluesbysam.com/
 - https://www.puzzmo.com/game/circuits/
 - https://dailyorbs.com/

@@ -7,6 +7,7 @@ editors can check config.toml as it's written.
 import re
 from pathlib import Path
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
@@ -41,9 +42,45 @@ def _valid_regex(pattern: str) -> str:
     return pattern
 
 
+def _valid_timezone(name: str) -> str:
+    if name != LOCAL_TIMEZONE:
+        try:
+            ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError) as e:
+            raise ValueError(f"unknown timezone {name!r}") from e
+    return name
+
+
 class _StrictModel(BaseModel):
     # strict: TOML is typed, so "8081" for a port is a mistake, not a coercion.
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+
+LOCAL_TIMEZONE = "local"
+
+
+class Reset(_StrictModel):
+    """When the game's daily puzzle changes. The solve timer starts afresh
+    each game day."""
+
+    time: str = Field(
+        default="00:00",
+        pattern=r"^([01]\d|2[0-3]):[0-5]\d$",
+        description="24-hour HH:MM.",
+    )
+    timezone: Annotated[str, AfterValidator(_valid_timezone)] = Field(
+        default=LOCAL_TIMEZONE,
+        description=(
+            'An IANA timezone such as "America/New_York", or "local" for the'
+            " player's own."
+        ),
+    )
+
+    @property
+    def minutes(self) -> int:
+        """Minutes past midnight."""
+        hours, minutes = self.time.split(":")
+        return int(hours) * 60 + int(minutes)
 
 
 class _TriggerBase(_StrictModel):
@@ -144,6 +181,10 @@ class GameConfig(_StrictModel):
             "Rank the scoreboard by highest `score` first. By default the"
             " lowest score (fewest guesses, mistakes) ranks first."
         ),
+    )
+    reset: Reset = Field(
+        default_factory=Reset,
+        description="When the daily puzzle changes. Default: the player's midnight.",
     )
     triggers: Annotated[list[Trigger], AfterValidator(_unique_trigger_names)] = Field(
         default_factory=list[Trigger],

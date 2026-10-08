@@ -71,10 +71,13 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
   finished; `fields.js` says which result fields to extract. The proxy
   injects `capture/runtime.js` into the game's pages, which evaluates them
   and reports back; `capture/endpoints.py` saves results via
-  `src/results.py`, keyed on the player's Discord ID.
+  `src/results.py`, keyed on the player's Discord ID. When `fields.js` gives
+  no `time_secs`, `runtime.js` fills it in as the time since the game's
+  first page load that game day (a day starts at the config's `[reset]`),
+  kept in the game's localStorage under `__dgb_timer`.
 - **Launcher.** `launcher/index.html` is rendered from
   `src/launcher/templates/` and the game configs on every proxy start. It shows a card per game and a
-  scoreboard read from `GET /api/results?since=<ISO>[&until=<ISO>]` on the
+  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?since=<ISO>[&until=<ISO>]` on the
   launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`;
   days run from the viewer's local midnight. Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With

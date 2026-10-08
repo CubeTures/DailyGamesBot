@@ -47,6 +47,12 @@ port = 8081                          # unique local port (8090 is the launcher)
 landing_path = "/games/wordle/index.html"   # default "/"
 # higher_score_wins = true           # scoreboard ranks highest score first (default: lowest)
 
+# When the daily puzzle changes; the solve timer starts afresh each game day.
+[reset]
+time = "00:00"                       # 24-hour HH:MM (default "00:00")
+timezone = "local"                   # IANA name, e.g. "America/New_York", or "local"
+                                     # for the player's own (default "local")
+
 # Zero or more triggers. Each one says "when X is true, the player has
 # finished; report fields.js". A game with no triggers is still proxied, just
 # not captured.
@@ -154,8 +160,17 @@ prefer these names where they apply so results compare across games:
 | `score`      | number: the game's headline score                         |
 | `max_score`  | number: best possible / out-of                            |
 | `attempts`   | number: guesses/tries used                                |
-| `time_secs`  | number: solve time                                        |
+| `time_secs`  | number: solve time; filled in by the proxy if not given   |
 | `share_text` | the game's own share string, if it has one                |
+
+Report `time_secs` only when the game times the solve itself (Minute
+Cryptic does). Otherwise the capture script fills it in: the first time a
+page of the game loads in a game day (see `[reset]`) is when the player
+started, and `time_secs` is how long before the result that was. Reloading
+or leaving the tab doesn't pause or reset it. It's left out if the player
+never clicked or typed since that load, i.e. the puzzle was finished outside
+the proxy and its result fired on load. The scoreboard breaks score ties by
+it and shows it beside each score.
 
 ## Announcement
 
@@ -186,7 +201,8 @@ which renders as:
 
 - Open with `:bee: {{ player }} played **{{ game }}** <puzzle>` (the
   puzzle number, e.g. `#{{ puzzle_number }}`, or the date if it has none), then the result in the
-  game's own terms (par, time, guesses), then a grid or row of emoji if the
+  game's own terms (par, guesses) followed by the time,
+  `{{ " in %s" % (time_secs | duration) if time_secs }}`, then a grid or row of emoji if the
   game's share screen has one. See `minutecryptic/announcement.j2` for a
   game with a score and a hint bar.
 - Cover every outcome: a loss or give-up should read as one, not as a

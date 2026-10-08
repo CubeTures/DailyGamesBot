@@ -77,8 +77,21 @@
     return data.won === false;
   }
 
+  function hasTime(data) {
+    return typeof data.time_secs === "number";
+  }
+
+  // Seconds as "1:05" or "1:02:03", like the announcements' `duration`.
+  function formatTime(secs) {
+    var total = Math.round(secs);
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    var hours = Math.floor(total / 3600), minutes = Math.floor(total / 60) % 60;
+    return (hours ? hours + ":" + pad(minutes) : String(minutes)) + ":" + pad(total % 60);
+  }
+
   // Lower is better unless the game's config says `higher_score_wins`;
-  // outright losses sort last, then no score, then earliest finish.
+  // outright losses sort last, then no score. Ties go to the fastest time
+  // (results without one after those with), then the earliest finish.
   function compareResults(a, b) {
     var aLost = lost(a.data), bLost = lost(b.data);
     if (aLost !== bLost) return aLost ? 1 : -1;
@@ -88,6 +101,9 @@
       var diff = a.data.score - b.data.score;
       return HIGHER_SCORE_WINS.indexOf(a.game) >= 0 ? -diff : diff;
     }
+    var aTimed = hasTime(a.data), bTimed = hasTime(b.data);
+    if (aTimed !== bTimed) return aTimed ? -1 : 1;
+    if (aTimed && a.data.time_secs !== b.data.time_secs) return a.data.time_secs - b.data.time_secs;
     return a.captured_at < b.captured_at ? -1 : 1;
   }
 
@@ -185,7 +201,8 @@
       if (cardsRendered && mine && !card.classList.contains("done")) replay(card, "just-done");
       card.classList.toggle("done", !!mine);
       card.querySelector(".status").textContent =
-        mine ? "✓ Done · " + formatScore(mine.data) : "Not played";
+        mine ? "✓ Done · " + formatScore(mine.data) +
+          (hasTime(mine.data) ? " · " + formatTime(mine.data.time_secs) : "") : "Not played";
       card.querySelector(".play").textContent = mine ? "Open" : "Play";
     });
     cardsRendered = true;
@@ -230,6 +247,7 @@
     row.appendChild(rankCell);
     row.appendChild(el("span", "name", playerName(result.discord_id, result.name)));
     row.appendChild(el("span", scored ? "score" : "score lost", formatScore(result.data)));
+    row.appendChild(el("span", "time", hasTime(result.data) ? formatTime(result.data.time_secs) : ""));
     item.appendChild(row);
     return item;
   }

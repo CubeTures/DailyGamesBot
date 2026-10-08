@@ -1,11 +1,13 @@
 // Daily Games Bot result capture runtime, injected at the top of every HTML
 // page a game with triggers serves (see capture/script.py).
 //
-// The two placeholders are filled with the game's name and its triggers. Each
+// The placeholders are filled with the game's name, its reset time and its
+// triggers. Each
 // trigger's `when` and `fields` is a function(req, res, event) that runs the
 // game's vars.js and returns `when` / the fields object. They're compiled into
 // this scope so they can use the helpers below (ls, ss, text, texts, exists,
-// cookie, today).
+// cookie, today). A solve timer fills in time_secs for games that don't
+// report one.
 //
 // Debug from devtools: window.__dgb.status(), .dryRun(), .testNetwork(...)
 (function () {
@@ -72,6 +74,62 @@
     }
   }
 
+  // Solve timer, for games that don't time themselves: the first time a
+  // page of the game loads in a game day, that's when the player started,
+  // and a report's time_secs is how long ago that was. Kept in this game's
+  // localStorage, so reloads and leaving the tab don't reset it. A game day
+  // runs from the game's reset time (config.toml [reset]). The time is only
+  // reported if the player has clicked or typed since the start, so a puzzle
+  // already finished elsewhere, whose result fires on load, gets none.
+  var RESET = __DGB_RESET__;
+  var TIMER_KEY = "__dgb_timer";
+
+  // The current game day, as YYYY-MM-DD: the date, in the reset timezone
+  // (the player's own if none), of RESET.minutes before now.
+  function gameDay() {
+    var shifted = new Date(Date.now() - RESET.minutes * 60000);
+    if (!RESET.timezone) {
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      return shifted.getFullYear() + "-" + pad(shifted.getMonth() + 1) + "-" + pad(shifted.getDate());
+    }
+    // en-CA formats dates as YYYY-MM-DD.
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: RESET.timezone, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(shifted);
+  }
+
+  function saveTimer(timer) {
+    // Through the prototype, so the setItem wrapper below doesn't schedule a check.
+    try { Storage.prototype.setItem.call(localStorage, TIMER_KEY, JSON.stringify(timer)); } catch (e) { /* storage unavailable */ }
+  }
+
+  // {day, start (epoch ms), played (input seen since)} for today's game day,
+  // started now if there isn't one yet.
+  function currentTimer() {
+    var day = gameDay();
+    var timer = ls(TIMER_KEY);
+    if (!timer || timer.day !== day || typeof timer.start !== "number") {
+      timer = { day: day, start: Date.now(), played: false };
+      saveTimer(timer);
+    }
+    return timer;
+  }
+
+  function timerSecs() {
+    var timer = currentTimer();
+    return timer.played ? Math.round((Date.now() - timer.start) / 1000) : null;
+  }
+
+  currentTimer();
+  ["pointerdown", "keydown"].forEach(function (name) {
+    window.addEventListener(name, function (event) {
+      var timer = currentTimer();
+      if (!event.isTrusted || timer.played) return;
+      timer.played = true;
+      saveTimer(timer);
+    }, true);
+  });
+
   function toJsonValue(value) {
     try { return JSON.parse(JSON.stringify(value === undefined ? null : value)); } catch (e) { return String(value); }
   }
@@ -90,6 +148,10 @@
     if (puzzleId === null || puzzleId === undefined || puzzleId === "") {
       noteError(trigger, "puzzle_id", "empty puzzle_id");
       return null;
+    }
+    if (typeof fields.time_secs !== "number") {
+      var secs = timerSecs();
+      if (secs !== null) fields.time_secs = secs;
     }
     return {
       game: GAME,
@@ -275,7 +337,7 @@
       });
     },
     status: function () {
-      return { game: GAME, triggers: this.triggers, sent: state.sent, log: state.log, errors: state.errors };
+      return { game: GAME, triggers: this.triggers, sent: state.sent, log: state.log, errors: state.errors, timer: ls(TIMER_KEY) };
     },
     check: checkPage,
   };

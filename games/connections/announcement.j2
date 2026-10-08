@@ -1,8 +1,8 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% if won %}
-{{ mistakes }} mistake{{ "s" if mistakes != 1 }}
+{{ mistakes }} mistake{{ "s" if mistakes != 1 }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}
-{{ groups_found }} solves
+{{ groups_found }} solves{{ " after %s" % (time_secs | duration) if time_secs }}
 {% endif %}
 {% for row in rows %}
 {{ row }}
