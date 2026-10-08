@@ -2,8 +2,10 @@ export default {
   puzzle_id: d,
   // 2024-06-26, the first day in the site's archive, is #1
   puzzle_number: Math.round((Date.parse(d) - Date.parse("2024-06-26")) / 864e5) + 1,
-  // Revealing every letter ends the game as "gave_up" (letterRevealOrder empties).
-  won: p ? p.letterRevealOrder.length > 0 : null,
+  // Revealing every letter ends the game as "gave_up". Counted from the help
+  // used, not mc-puzzle's letterRevealOrder: the game writes the solve before
+  // it empties that, so a check in between would read a give-up as a win.
+  won: p ? s.h.filter(x => x === "LETTER").length < Object.keys(p.puzzlePieces).length : null,
   // Help used minus par: negative is under par ("4 under par" is -4).
   score: par != null ? s.h.length - par : null,
   par: par,

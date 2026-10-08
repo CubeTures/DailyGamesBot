@@ -261,9 +261,13 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
 ## 10. Clean up and report
 
 - Stop the proxy (step 8) and call `browser_close`.
+- Add a live-test driver, `tests/e2e/games/<name>.py`, with a scenario per
+  outcome the game has (see "Adding a game" in `tests/README.md`), and run it
+  with `uv run pytest -m live -k <name>`. A new game fails `uv run pytest`
+  until it has one.
 - Delete `$SCRATCH/add-game.db` and `.playwright-mcp/add-game/`.
 - Run `uv run ruff check src && uv run pyright` if you touched Python.
-- Run `uv run python3 -m src.games` once more, then `git status`. The changes should be exactly the files in the table at the top (plus `src/launcher/templates/discord-markdown.js` if you added a shortcode).
+- Run `uv run python3 -m src.games` once more, then `git status`. The changes should be exactly the files in the table at the top plus the driver in `tests/e2e/games/` (and `src/launcher/templates/discord-markdown.js` if you added a shortcode).
 - Report to the user:
   - which signal(s) you chose and why
   - the fields captured, with the values seen in verification for each outcome (win and lose)

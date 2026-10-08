@@ -14,6 +14,9 @@ uv run python3 -m src.proxy      # proxy + launcher only (no token needed)
 uv run python3 -m src.discord_bot      # Discord bot only
 uv run python3 -m src.games            # validate games/ and regenerate games/schema.json
 docker compose up --build        # everything, in Docker
+uv run pytest                    # offline checks (every game has a test driver)
+uv run pytest -m live            # play every game live and check its capture
+uv run pytest -m live -k wordle --headed   # one game, watching the browser
 ```
 
 `.env` (from `.env.example`) holds `DISCORD_BOT_TOKEN` and, optionally,
@@ -31,11 +34,14 @@ uv run pyright --level error
 
 If `games/` or `src/games/` changed, also run
 `uv run python3 -m src.games`. It regenerates `games/schema.json`;
-commit the result.
+commit the result. If a game's capture (`vars.js`, `fields.js`, triggers)
+or the capture runtime changed, run that game's live tests
+(`uv run pytest -m live -k <game>`); see `tests/README.md`.
 
-Pyright runs in strict mode against `src/`, so every function needs full type
-annotations. Its config is `[tool.pyright]` in `pyproject.toml`. The same
-checks run as pre-commit hooks (`uv run pre-commit install`).
+Pyright runs in strict mode against `src/` and `tests/`, so every function
+needs full type annotations. Its config is `[tool.pyright]` in
+`pyproject.toml`. The same checks run as pre-commit hooks
+(`uv run pre-commit install`).
 
 ## Layout
 
@@ -57,6 +63,8 @@ checks run as pre-commit hooks (`uv run pre-commit install`).
 - `src/announce.py`: renders a result's `announcement.j2`
 - `src/results.py`: SQLite results store (`data/results.db`, override with
   `DGB_DB_PATH`)
+- `tests/e2e/`: live end-to-end tests of every game's capture; one driver per
+  game in `tests/e2e/games/` (see `tests/README.md`)
 - `games/<name>/`: one directory per game (`config.toml`, `fields.js`,
   `announcement.j2`, icon); format in `games/README.md`
 
