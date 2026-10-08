@@ -45,6 +45,7 @@ icon = "icon.png"                    # image in this directory; png/svg/webp/jpg
 origin = "https://www.nytimes.com"   # real site; proxied 1:1
 port = 8081                          # unique local port (8090 is the launcher)
 landing_path = "/games/wordle/index.html"   # default "/"
+# higher_score_wins = true           # scoreboard ranks highest score first (default: lowest)
 
 # Zero or more triggers. Each one says "when X is true, the player has
 # finished; report fields.js". A game with no triggers is still proxied, just

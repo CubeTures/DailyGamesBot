@@ -39,8 +39,13 @@ def _result_json(result: results.StoredResult) -> dict[str, Any]:
         "data": result.data,
         "captured_at": result.captured_at.isoformat(),
         # What the bot posts, so the launcher can show it; None if the game's
-        # config is gone.
-        "announcement": announce.render_result(game, result) if game else None,
+        # config is gone. The page has no role IDs, so the game's role mention
+        # carries its name instead.
+        "announcement": (
+            announce.render_result(game, result, game_mention=f"<@&{game.name}>")
+            if game
+            else None
+        ),
     }
 
 

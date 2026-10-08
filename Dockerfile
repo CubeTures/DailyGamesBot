@@ -12,6 +12,6 @@ RUN uv sync --locked --no-dev --no-install-project
 COPY . .
 RUN uv sync --locked --no-dev
 
-EXPOSE 8090 8081 8082 8083 8084
+EXPOSE 8090 8081 8082 8083 8084 8085
 
 CMD ["uv", "run", "python3", "-m", "src"]

@@ -7,6 +7,7 @@ icon = "icon.png"
 origin = "https://krillion.io"
 port = 8084
 landing_path = "/"
+higher_score_wins = true
 
 [[triggers]]
 name = "daily-history"

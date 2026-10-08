@@ -1,0 +1,15 @@
+#:schema ../schema.json
+
+name = "connections"
+title = "Connections"
+description = "Sort sixteen words into four groups that share a common thread."
+icon = "icon.png"
+origin = "https://www.nytimes.com"
+port = 8085
+landing_path = "/games/connections"
+higher_score_wins = true
+
+[[triggers]]
+name = "local-state"
+type = "page"
+when = "finished"

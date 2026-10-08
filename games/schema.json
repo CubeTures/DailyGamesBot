@@ -192,6 +192,12 @@
       "title": "Landing Path",
       "type": "string"
     },
+    "higher_score_wins": {
+      "default": false,
+      "description": "Rank the scoreboard by highest `score` first. By default the lowest score (fewest guesses, mistakes) ranks first.",
+      "title": "Higher Score Wins",
+      "type": "boolean"
+    },
     "triggers": {
       "description": "Each says when the player has finished and what to report. They share the game's vars.js and fields.js. A game with no triggers is still proxied, just not captured.",
       "items": {

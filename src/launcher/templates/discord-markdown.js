@@ -23,12 +23,19 @@ var discordMarkdown = (function () {
     return text.replace(/[&<>"']/g, function (c) { return HTML_ESCAPES[c]; });
   }
 
-  // Only the subset announcements use: mentions, shortcodes, `code`,
-  // **bold**, __underline__, *italic*/_italic_ and ~~strike~~.
-  function toHtml(text, nameForId) {
+  function mentionHtml(name) {
+    return '<span class="mention">@' + escapeHtml(name) + "</span>";
+  }
+
+  // Only the subset announcements use: user and role mentions, shortcodes,
+  // `code`, **bold**, __underline__, *italic*/_italic_ and ~~strike~~.
+  function toHtml(text, nameForId, nameForRole) {
     return escapeHtml(text)
       .replace(/&lt;@!?(\d+)&gt;/g, function (_, id) {
-        return '<span class="mention">@' + escapeHtml(nameForId(id)) + "</span>";
+        return mentionHtml(nameForId(id));
+      })
+      .replace(/&lt;@&amp;([\w-]+)&gt;/g, function (_, role) {
+        return mentionHtml(nameForRole(role));
       })
       .replace(/:([a-z0-9_+-]+):/g, function (match, code) {
         return SHORTCODES[code] || match;

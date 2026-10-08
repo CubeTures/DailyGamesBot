@@ -44,6 +44,7 @@ def render_launcher() -> str:
     return env.get_template("index.html.j2").render(
         games=[_card(game) for game in games],
         game_titles={game.name: game.title for game in games},
+        higher_score_wins=[game.name for game in games if game.higher_score_wins],
         # Game roles live in the results channel's server.
         roles_enabled=results_channel_id() is not None,
     )

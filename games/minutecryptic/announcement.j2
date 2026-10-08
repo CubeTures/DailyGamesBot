@@ -7,7 +7,7 @@
 {%- endif %}
 {%- if time_secs %} in {{ time_secs | duration }}{{ "\n" }}{% endif %}
 {% else %}
-revealed every letter...
+max over par in {{ time_secs | duration }}
 {% endif %}
 {{ ":white_large_square:" * hints }}{{ ":yellow_square:" * letters_revealed }}
 {{- ":purple_square:" * (help_available - hints - letters_revealed) if help_available }}

@@ -1,5 +1,6 @@
 (function () {
   var GAME_TITLES = JSON.parse(document.getElementById("game-titles").textContent);
+  var HIGHER_SCORE_WINS = JSON.parse(document.getElementById("higher-score-wins").textContent);
   var MEDALS = ["🥇", "🥈", "🥉"];
   var REFRESH_MS = 30000;
 
@@ -65,21 +66,26 @@
     return typeof data.score === "number";
   }
 
+  // Just the number: players know each game's scale, so no "/6".
   function formatScore(data) {
-    var score = data.score == null ? null : data.score;
-    var text = data.max_score != null
-      ? (score === null ? "X" : score) + "/" + data.max_score
-      : (score === null ? "–" : String(score));
-    if (data.won === false && score !== null) text += " ✗";
-    return text;
+    return lost(data) || !hasScore(data) ? "–" : String(data.score);
   }
 
-  // Lower is better for every game so far (Wordle guesses, Minute Cryptic
-  // help over par); no score (a loss) sorts last, then earliest finish.
+  function lost(data) {
+    return data.won === false;
+  }
+
+  // Lower is better unless the game's config says `higher_score_wins`;
+  // outright losses sort last, then no score, then earliest finish.
   function compareResults(a, b) {
+    var aLost = lost(a.data), bLost = lost(b.data);
+    if (aLost !== bLost) return aLost ? 1 : -1;
     var aScored = hasScore(a.data), bScored = hasScore(b.data);
     if (aScored !== bScored) return aScored ? -1 : 1;
-    if (aScored && a.data.score !== b.data.score) return a.data.score - b.data.score;
+    if (aScored && a.data.score !== b.data.score) {
+      var diff = a.data.score - b.data.score;
+      return HIGHER_SCORE_WINS.indexOf(a.game) >= 0 ? -diff : diff;
+    }
     return a.captured_at < b.captured_at ? -1 : 1;
   }
 
@@ -124,7 +130,7 @@
     document.getElementById("announcement-title").textContent =
       gameTitle(result.game) + " · " + playerName(result.discord_id, result.name);
     dialog.querySelector(".message").innerHTML = discordMarkdown.toHtml(
-      result.announcement, function (id) { return playerName(id, namesById[id]); });
+      result.announcement, function (id) { return playerName(id, namesById[id]); }, gameTitle);
     dialog.classList.remove("closing");
     if (!dialog.open) dialog.showModal();
   }
@@ -159,10 +165,12 @@
       row.title = "Show the Discord announcement";
       row.addEventListener("click", function () { showAnnouncement(result, namesById); });
     }
-    var scored = hasScore(result.data) && result.data.won !== false;
-    row.appendChild(rank < 3 && scored
-      ? el("span", "rank medal", MEDALS[rank])
-      : el("span", "rank", String(rank + 1)));
+    var scored = hasScore(result.data) && !lost(result.data);
+    var rankCell = lost(result.data) ? el("span", "rank medal", "💀")
+      : rank < 3 && scored ? el("span", "rank medal", MEDALS[rank])
+      : el("span", "rank", String(rank + 1));
+    if (lost(result.data)) rankCell.title = "Lost";
+    row.appendChild(rankCell);
     row.appendChild(el("span", "name", playerName(result.discord_id, result.name)));
     row.appendChild(el("span", scored ? "score" : "score lost", formatScore(result.data)));
     item.appendChild(row);

@@ -138,6 +138,13 @@ class GameConfig(_StrictModel):
         description=f"Unique local port ({LAUNCHER_PORT} is the launcher's).",
     )
     landing_path: str = Field(default="/", pattern=r"^/")
+    higher_score_wins: bool = Field(
+        default=False,
+        description=(
+            "Rank the scoreboard by highest `score` first. By default the"
+            " lowest score (fewest guesses, mistakes) ranks first."
+        ),
+    )
     triggers: Annotated[list[Trigger], AfterValidator(_unique_trigger_names)] = Field(
         default_factory=list[Trigger],
         description=(
