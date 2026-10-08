@@ -3,6 +3,8 @@
   var HIGHER_SCORE_WINS = JSON.parse(document.getElementById("higher-score-wins").textContent);
   var MEDALS = ["🥇", "🥈", "🥉"];
   var REFRESH_MS = 30000;
+  // Rows a scoreboard card shows before the rest move to the full list.
+  var BOARD_ROWS = 5;
 
   var discordId = rememberDiscordId();
 
@@ -101,7 +103,14 @@
     return fetch(url).then(function (res) { return res.json(); });
   }
 
-  var dialog = document.getElementById("announcement");
+  var dialog = document.getElementById("dialog");
+  var dialogHead = dialog.querySelector(".dialog-head");
+  var dialogTitle = document.getElementById("dialog-title");
+  var dialogBody = dialog.querySelector(".dialog-body");
+  var backButton = dialog.querySelector(".back");
+  var message = dialog.querySelector(".message");
+  var fullBoard = dialog.querySelector(".ranks");
+  var dialogBack = null;
 
   // Plays the closing animation (instant under reduced motion), then closes.
   function closeDialog() {
@@ -117,22 +126,53 @@
     closeDialog();
   });
   dialog.querySelector(".close").addEventListener("click", closeDialog);
+  backButton.addEventListener("click", function () { if (dialogBack) dialogBack(); });
   // A click on the backdrop lands on the dialog itself.
   dialog.addEventListener("click", function (e) {
     if (e.target === dialog) closeDialog();
   });
 
-  function showAnnouncement(result, namesById) {
-    var head = dialog.querySelector(".dialog-head");
-    var oldIcon = head.querySelector(".icon");
+  // The dialog shows either an announcement or a game's full scoreboard;
+  // `back`, if given, is what its back button returns to.
+  function showDialog(game, title, showList, back) {
+    var oldIcon = dialogHead.querySelector(".icon");
     if (oldIcon) oldIcon.remove();
-    head.insertBefore(smallIcon(result.game), head.firstChild);
-    document.getElementById("announcement-title").textContent =
-      gameTitle(result.game) + " · " + playerName(result.discord_id, result.name);
-    dialog.querySelector(".message").innerHTML = discordMarkdown.toHtml(
-      result.announcement, function (id) { return playerName(id, namesById[id]); }, gameTitle);
+    dialogHead.insertBefore(smallIcon(game), dialogTitle);
+    dialogTitle.textContent = title;
+    dialogBack = back || null;
+    backButton.hidden = !back;
+    message.hidden = showList;
+    fullBoard.hidden = !showList;
     dialog.classList.remove("closing");
     if (!dialog.open) dialog.showModal();
+    dialogBody.scrollTop = 0;
+  }
+
+  function showAnnouncement(result, namesById, back) {
+    message.innerHTML = discordMarkdown.toHtml(
+      result.announcement, function (id) { return playerName(id, namesById[id]); }, gameTitle);
+    showDialog(result.game,
+      gameTitle(result.game) + " · " + playerName(result.discord_id, result.name), false, back);
+  }
+
+  // Scrolls to `focusId`'s row and focuses it (coming back from their
+  // announcement), or else just scrolls to the viewer's own row.
+  function showFullBoard(game, ranked, namesById, focusId) {
+    fullBoard.textContent = "";
+    var target = null;
+    ranked.forEach(function (result, rank) {
+      var item = boardRow(result, rank, namesById, false, function () {
+        showFullBoard(game, ranked, namesById, result.discord_id);
+      });
+      if (result.discord_id === (focusId || discordId)) target = item;
+      fullBoard.appendChild(item);
+    });
+    showDialog(game, gameTitle(game) + " · " + playerCount(ranked.length), true);
+    if (target) {
+      target.scrollIntoView({ block: "center" });
+      var row = target.querySelector(".row");
+      if (focusId && row) row.focus({ preventScroll: true });
+    }
   }
 
   var cardsRendered = false;
@@ -155,7 +195,24 @@
   // or null after a day change so the next render animates in whole.
   var shownOnBoard = null;
 
-  function boardRow(result, rank, namesById, isNew) {
+  function playerCount(n) {
+    return n + (n === 1 ? " player" : " players");
+  }
+
+  // Which ranks a card shows: everyone, or if that's too many the top
+  // BOARD_ROWS, with the viewer's own row in place of the last if lower.
+  // Cutting a single row would save nothing, so that never happens.
+  function visibleRanks(ranked) {
+    var all = ranked.map(function (_, rank) { return rank; });
+    if (ranked.length <= BOARD_ROWS + 1) return all;
+    var top = all.slice(0, BOARD_ROWS);
+    var mine = ranked.findIndex(function (r) { return r.discord_id === discordId; });
+    if (mine >= BOARD_ROWS) top[BOARD_ROWS - 1] = mine;
+    return top;
+  }
+
+  // `back` is passed on to the announcement, for rows in the full list.
+  function boardRow(result, rank, namesById, isNew, back) {
     var item = el("li", result.discord_id === discordId ? "me" : "");
     item.style.setProperty("--r", String(Math.min(rank, 10)));
     if (isNew) item.classList.add("fresh");
@@ -163,7 +220,7 @@
     if (result.announcement) {
       row.type = "button";
       row.title = "Show the Discord announcement";
-      row.addEventListener("click", function () { showAnnouncement(result, namesById); });
+      row.addEventListener("click", function () { showAnnouncement(result, namesById, back); });
     }
     var scored = hasScore(result.data) && !lost(result.data);
     var rankCell = lost(result.data) ? el("span", "rank medal", "💀")
@@ -188,17 +245,39 @@
     var head = el("div", "board-head");
     head.appendChild(smallIcon(game));
     head.appendChild(el("h3", "", gameTitle(game)));
-    head.appendChild(el("span", "count",
-      ranked.length + (ranked.length === 1 ? " player" : " players")));
+    var visible = visibleRanks(ranked);
+    var truncated = visible.length < ranked.length;
+    var openFull = function () { showFullBoard(game, ranked, namesById); };
+    var count = el(truncated ? "button" : "span", "count", playerCount(ranked.length));
+    if (truncated) {
+      count.type = "button";
+      count.title = "Show everyone's scores";
+      count.addEventListener("click", openFull);
+    }
+    head.appendChild(count);
     container.appendChild(head);
-    var list = el("ol");
+    var list = el("ol", "ranks");
+    var hiddenNew = false;
     ranked.forEach(function (result, rank) {
       var key = game + ":" + result.discord_id;
+      var isNew = !entering && !shownOnBoard[key];
       shown[key] = true;
-      list.appendChild(boardRow(result, rank, namesById, !entering && !shownOnBoard[key]));
+      if (visible.indexOf(rank) < 0) {
+        hiddenNew = hiddenNew || isNew;
+        return;
+      }
+      list.appendChild(boardRow(result, rank, namesById, isNew));
     });
+    // A new result below the cut can't flash its row, so flash the count.
+    if (hiddenNew) count.classList.add("fresh");
     shown[game] = true;
     container.appendChild(list);
+    if (truncated) {
+      var more = el("button", "see-all", "See all " + ranked.length);
+      more.type = "button";
+      more.addEventListener("click", openFull);
+      container.appendChild(more);
+    }
     return container;
   }
 

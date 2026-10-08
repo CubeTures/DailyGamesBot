@@ -230,14 +230,44 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 }
 .board-head h3 { margin: 0; font-size: 1rem; flex: 1; }
 .board-head .count { color: var(--muted); font-size: 0.8rem; }
-.board ol { list-style: none; margin: 0; padding: 6px; }
+.board-head button.count {
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.board-head button.count:hover { background: var(--surface-2); color: var(--text); }
+.board-head button.count:focus-visible { outline: 2px solid var(--accent); }
+.board-head .count.fresh { animation: count-fresh 1.6s ease both; }
+.ranks { list-style: none; margin: 0; padding: 6px; }
+.see-all {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.see-all:hover { background: var(--surface-2); }
+.see-all:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .board.entering { animation: board-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i) * 60ms); }
 .board.entering li {
   animation: row-in 0.3s ease both;
   animation-delay: calc(var(--i) * 60ms + 100ms + var(--r, 0) * 35ms);
 }
-.board li.fresh .row { animation: row-fresh 1.6s ease both; }
-.board .row {
+.ranks li.fresh .row { animation: row-fresh 1.6s ease both; }
+.ranks .row {
   display: grid;
   grid-template-columns: 2rem 1fr auto;
   align-items: center;
@@ -253,16 +283,16 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   text-align: left;
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
-.board button.row { cursor: pointer; }
-.board button.row:hover { background: var(--surface-2); }
-.board button.row:active { transform: scale(0.98); }
-.board button.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.board li.me .row { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.board .rank { color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
-.board .medal { font-size: 1.05rem; }
-.board .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.board .score { font-variant-numeric: tabular-nums; font-weight: 600; }
-.board .score.lost { color: var(--muted); font-weight: 500; }
+.ranks button.row { cursor: pointer; }
+.ranks button.row:hover { background: var(--surface-2); }
+.ranks button.row:active { transform: scale(0.98); }
+.ranks button.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ranks li.me .row { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ranks .rank { color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
+.ranks .medal { font-size: 1.05rem; }
+.ranks .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranks .score { font-variant-numeric: tabular-nums; font-weight: 600; }
+.ranks .score.lost { color: var(--muted); font-weight: 500; }
 
 dialog {
   width: min(460px, calc(100vw - 32px));
@@ -274,6 +304,11 @@ dialog {
   box-shadow: var(--shadow-hover);
 }
 dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: min(640px, calc(100dvh - 32px));
+}
 dialog[open] { animation: dialog-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 dialog[open]::backdrop { animation: fade-in 0.22s ease; }
 dialog.closing { animation: dialog-out 0.15s ease forwards; }
@@ -286,7 +321,8 @@ dialog.closing::backdrop { animation: fade-out 0.15s ease forwards; }
   border-bottom: 1px solid var(--border);
 }
 .dialog-head h3 { margin: 0; font-size: 1rem; flex: 1; }
-.close {
+.close, .back {
+  flex: none;
   width: 32px;
   height: 32px;
   border: 0;
@@ -298,9 +334,15 @@ dialog.closing::backdrop { animation: fade-out 0.15s ease forwards; }
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.close:hover { background: var(--surface-2); color: var(--text); }
-.close:focus-visible { outline: 2px solid var(--accent); }
-.dialog-body { padding: 16px; }
+.close:hover, .back:hover { background: var(--surface-2); color: var(--text); }
+.close:focus-visible, .back:focus-visible { outline: 2px solid var(--accent); }
+.back[hidden] { display: none; }
+.dialog-body { padding: 16px; overflow-y: auto; }
+.dialog-body .ranks { padding: 0; }
+.back {
+  margin-right: -4px;
+  font-size: 1.5rem;
+}
 .dialog-body .note { margin: 0 0 8px; }
 .message {
   padding: 12px 14px;
@@ -381,6 +423,7 @@ code {
   from { opacity: 0; transform: translateX(-6px); background-color: var(--accent-soft); }
   25% { opacity: 1; transform: none; background-color: var(--accent-soft); }
 }
+@keyframes count-fresh { from, 25% { background-color: var(--accent-soft); color: var(--accent); } }
 @keyframes ring { 20% { transform: rotate(14deg); } 45% { transform: rotate(-10deg); } 70% { transform: rotate(5deg); } }
 @keyframes status-pop { 40% { transform: scale(1.15); } }
 @keyframes card-done {
