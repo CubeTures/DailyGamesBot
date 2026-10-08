@@ -1,8 +1,6 @@
-- See results of krillion, fermi
 - Admin panel to enable and disable games
 - Nginx docker container so many ports can be opened
 - Let players download their own results
-- Fix connections announcement and leaderboard
 - Game "favorites" list that promote in sorting order the ones you played yesterday
 
 ## To Test

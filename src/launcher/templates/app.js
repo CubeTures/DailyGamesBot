@@ -8,6 +8,8 @@
   var BOARD_ROWS = 5;
 
   var discordId = rememberDiscordId();
+  // Each game's icon color, by game name, once tintCards() has found it.
+  var TINTS = {};
 
   function rememberDiscordId() {
     var params = new URLSearchParams(location.search);
@@ -269,6 +271,8 @@
   function board(game, results, namesById, shown, index) {
     var ranked = results.slice().sort(compareResults);
     var container = el("div", "board");
+    container.dataset.game = game;
+    if (TINTS[game]) container.style.setProperty("--tint", TINTS[game]);
     var entering = !shownOnBoard || !shownOnBoard[game];
     if (entering) {
       container.classList.add("entering");
@@ -471,10 +475,10 @@
   }
   labelResets();
 
-  // Each card is tinted with its icon's dominant color: the icon is drawn
+  // Each card and scoreboard is tinted with its icon's dominant color: the icon is drawn
   // small, its opaque and not-too-grey pixels are binned by hue (weighted by
   // saturation), and the heaviest bin's pixels are averaged. The CSS mixes
-  // --tint into the card's surface, so it stays muted in either theme.
+  // --tint into their surfaces, so it stays muted in either theme.
   function dominantColor(img) {
     var size = 32, canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
@@ -509,7 +513,12 @@
       function tint() {
         try {
           var color = dominantColor(img);
-          if (color) img.closest(".card").style.setProperty("--tint", color);
+          if (!color) return;
+          var game = img.closest(".card").dataset.game;
+          TINTS[game] = color;
+          // Boards drawn before this ran pick it up here; later ones in board().
+          document.querySelectorAll('.card[data-game="' + game + '"], .board[data-game="' + game + '"]')
+            .forEach(function (node) { node.style.setProperty("--tint", color); });
         } catch (e) { /* leave the card untinted */ }
       }
       if (img.complete) tint(); else img.addEventListener("load", tint);
