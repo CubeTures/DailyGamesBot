@@ -254,8 +254,8 @@ The proxy injects `/__dgb/capture.js` (built from `src/proxy/capture/runtime.js`
 the game's directory) at the top of every HTML page of a game that has
 triggers. When a trigger fires it POSTs to `/__dgb/result` on the same local
 origin; the proxy answers that itself and saves a row in SQLite
-(`data/results.db`, see `src/store/results.py`), keyed on the `dgb_discord_id`
-cookie the launcher sets from the `/play` link.
+(`data/results.db`, see `src/store/results.py`), keyed on the Discord ID that the
+`dgb_token` cookie (set from the player's `/play` link) stands for.
 
 Debug in devtools on a game page: `__dgb.status()`, `__dgb.dryRun()`,
 `__dgb.testNetwork(method, url, reqBody, resBody)`.

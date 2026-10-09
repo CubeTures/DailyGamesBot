@@ -17,7 +17,7 @@ from src.proxy import rewrite
 from src.proxy.capture.endpoints import (
     handle_capture_request,
     is_capture_path,
-    strip_discord_id_cookie,
+    strip_token_cookie,
 )
 from src.proxy.capture.script import inject_script_tag
 from src.proxy.hooks import load_hooks
@@ -49,7 +49,7 @@ def request(flow: http.HTTPFlow) -> None:
     if handle_capture_request(flow, game):
         return
     _route_to_origin(flow.request, game)
-    strip_discord_id_cookie(flow.request)
+    strip_token_cookie(flow.request)
     rewrite.drop_cache_validators(flow.request)
     _hooks[game.name].request(flow)
 

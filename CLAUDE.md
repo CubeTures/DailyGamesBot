@@ -13,6 +13,7 @@ uv run python3 -m src            # proxy + launcher + Discord bot
 uv run python3 -m src.proxy      # proxy + launcher only (no token needed)
 uv run python3 -m src.discord_bot      # Discord bot only
 uv run python3 -m src.games            # validate games/ and regenerate games/schema.json
+uv run python3 -m src.store reset-token ID  # invalidate a leaked /play link
 docker compose up --build        # everything, in Docker
 uv run pytest                    # offline unit tests + every game has a driver
 uv run pytest -m live            # play every game live and check its capture
@@ -55,7 +56,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
 - `src/store/`: the SQLite store (`data/results.db`, override with
   `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
   `subscriptions.py`, `hidden_games.py`; `db.py` connects, creates the
-  tables and migrates old databases
+  tables and migrates old databases; `__main__.py` is the admin CLI
 - `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads and
   that routes each subdomain to its game (`addon.py`), localhost rewrites
   (`rewrite.py`)
@@ -95,8 +96,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
   finished; `fields.js` says which result fields to extract. The proxy
   injects `capture/runtime.js` into the game's pages, which evaluates them
   and reports back; `capture/endpoints.py` saves results via
-  `src/store/results.py`, keyed on the player's Discord ID (the
-  `dgb_discord_id` cookie; see the Discord bot below). When `fields.js` gives
+  `src/store/results.py`, keyed on the player's Discord ID (looked up
+  from the `dgb_token` cookie; see the Discord bot below). When `fields.js` gives
   no `time_secs`, `runtime.js` fills it in as the time since the game's
   first page load that game day (a day starts at the config's `[reset]`; see
   `src/games/game_day.js`), kept in the game's localStorage under `__dgb_timer`.
@@ -122,10 +123,17 @@ needs full type annotations. Its config is `[tool.pyright]` in
   whose title link stretches over the whole card, so the bell can be a
   button inside it.
 - **Discord bot.** `/play` replies ephemerally with a launcher link tagged
-  `?discord_id=...`; the launcher stores it in `localStorage` and strips it
-  from the URL. Game subdomains can't see the launcher's storage or cookies,
-  so its card links go through the game's `/__dgb/enter?discord_id=...&to=`,
-  which sets a `dgb_discord_id` cookie on that subdomain and redirects to the
+  `?token=...`, a UUID saved in `players.token` that stands in for the
+  player's Discord ID. It's made on their first `/play` and kept after
+  that; if a link leaks, an admin runs
+  `uv run python3 -m src.store reset-token DISCORD_ID` and the player's
+  next `/play` gets a new one. The launcher stores the token
+  in `localStorage`, strips it from the URL, and asks `GET /api/me` whose it
+  is (401 means expired: it shows the "run /play" warning). Every launcher
+  API that acts for a player takes the token, never a Discord ID. Game
+  subdomains can't see the launcher's storage or cookies, so its card links
+  go through the game's `/__dgb/enter?token=...&to=`, which sets an
+  HttpOnly `dgb_token` cookie on that subdomain and redirects to the
   game. The bot records usernames for the
   scoreboard on first `/play` and after each result. With
   `DISCORD_RESULTS_CHANNEL_ID` set, it polls every 15s for unannounced

@@ -1,4 +1,4 @@
-:bee: {{ player }} played **{{ game }}** {{ date or puzzle_id }}
+:bee: {{ player }} played **{{ game }}** {{ "#%s" % puzzle_number if puzzle_number else date or puzzle_id }}
 {{ "{:,}".format(score) if score is not none else "?" }} points{{ " in %s" % (time_secs | duration) if time_secs }}
 {{ submits }} submit{{ "s" if submits != 1 }}, {{ wrong }} wrong{{ ", %s :zap:" % bolts if bolts }}
 {% for w in box_wrong %}

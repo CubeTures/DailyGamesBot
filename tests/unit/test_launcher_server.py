@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from src.launcher import build, server
-from src.store import hidden_games, results
+from src.store import hidden_games, players, results
 
 
 @pytest.fixture
@@ -64,24 +64,39 @@ def test_results_api(launcher: str) -> None:
     assert _get(f"{launcher}/api/results?day=2026-10-09") == (200, [])
 
 
+def test_me_api(launcher: str) -> None:
+    old = players.token_for("7")
+    players.reset_token("7")
+    token = players.token_for("7")
+    assert _get(f"{launcher}/api/me?token={token}") == (200, {"discord_id": "7"})
+    assert _get(f"{launcher}/api/me?token={old}")[0] == 401
+    assert _get(f"{launcher}/api/me")[0] == 401
+
+
 def test_subscriptions_api(launcher: str) -> None:
-    assert _get(f"{launcher}/api/subscriptions?discord_id=x")[0] == 400
-    assert _post(f"{launcher}/api/subscriptions", {"discord_id": "7"})[0] == 400
-    sub = {"discord_id": "7", "game": "wordle", "subscribed": True}
+    token = players.token_for("7")
+    assert _get(f"{launcher}/api/subscriptions?token=x")[0] == 401
+    assert _post(f"{launcher}/api/subscriptions", {"token": token})[0] == 400
+    sub = {"token": token, "game": "wordle", "subscribed": True}
+    assert _post(f"{launcher}/api/subscriptions", {**sub, "subscribed": 1})[0] == 400
+    assert _post(f"{launcher}/api/subscriptions", {**sub, "token": "x"})[0] == 401
     assert _post(f"{launcher}/api/subscriptions", sub) == (200, {"ok": True})
-    assert _get(f"{launcher}/api/subscriptions?discord_id=7") == (
+    assert _get(f"{launcher}/api/subscriptions?token={token}") == (
         200,
         {"games": ["wordle"]},
     )
 
 
 def test_hidden_api(launcher: str) -> None:
-    hide = {"discord_id": "7", "game": "wordle", "level": "all"}
-    assert _get(f"{launcher}/api/hidden?discord_id=7") == (200, {"games": {}})
+    token = players.token_for("7")
+    hide = {"token": token, "game": "wordle", "level": "all"}
+    assert _get(f"{launcher}/api/hidden?token={token}") == (200, {"games": {}})
     assert _post(f"{launcher}/api/hidden", {**hide, "game": "nope"})[0] == 400
     assert _post(f"{launcher}/api/hidden", {**hide, "level": "some"})[0] == 400
+    assert _post(f"{launcher}/api/hidden", {**hide, "token": "x"})[0] == 401
     assert _post(f"{launcher}/api/hidden", hide) == (200, {"ok": True})
-    assert _get(f"{launcher}/api/hidden?discord_id=7") == (
+    assert hidden_games.levels("7") == {"wordle": "all"}
+    assert _get(f"{launcher}/api/hidden?token={token}") == (
         200,
         {"games": {"wordle": "all"}},
     )

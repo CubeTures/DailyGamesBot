@@ -42,6 +42,22 @@ def test_players() -> None:
     assert players.all_ids() == ["1"]
 
 
+def test_tokens_last_until_reset() -> None:
+    assert players.add("1")
+    token = players.token_for("1")
+    assert players.token_for("1") == token
+    assert players.discord_id_for(token) == "1"
+    assert players.reset_token("1")
+    assert not players.reset_token("1")
+    assert players.discord_id_for(token) is None
+    new = players.token_for("1")
+    assert new != token
+    assert players.discord_id_for(new) == "1"
+    assert players.discord_id_for("") is None
+    assert players.token_for("2") != new
+    assert players.all_ids() == ["1", "2"]
+
+
 def test_subscriptions_sync_only_the_latest_choice() -> None:
     on = subscriptions.Subscription("1", "wordle", True)
     subscriptions.save(on)
@@ -92,3 +108,4 @@ def test_migrates_old_databases(scratch_db: Path) -> None:
     assert [r.puzzle_id for r in results.on_day(date(2026, 1, 2))] == ["2026-01-02"]
     assert [r.puzzle_id for r in results.on_day(date(2026, 1, 3))] == ["77"]
     assert players.all_ids() == ["1"]
+    assert players.discord_id_for(players.token_for("1")) == "1"

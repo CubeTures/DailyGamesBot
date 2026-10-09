@@ -28,7 +28,7 @@ so the real `data/results.db` is never touched.
 
 1. Learns the day's solution if the scenario needs it (see below).
 2. Opens a fresh browser context (so today's puzzle is unplayed), visits the
-   launcher with its own numeric Discord ID, then the game.
+   launcher with a /play token for its own numeric Discord ID, then the game.
 3. Plays to one outcome: usually `win`, `lose` and `mixed` (a win with
    mistakes or hints). Games with no losing have their worst outcome instead
    (`reveal_all`, `hinted`, `far_off`, `misses`).

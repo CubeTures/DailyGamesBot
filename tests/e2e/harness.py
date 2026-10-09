@@ -37,6 +37,7 @@ class NoResult(AssertionError):
 class Player:
     game: Game
     discord_id: str
+    token: str  # from their /play link
     context: BrowserContext
     page: Page
     db_path: Path
@@ -47,12 +48,12 @@ class Player:
 
     def open(self, path: str | None = None) -> Page:
         """Visit the launcher as this player, as a /play link does, then the
-        game through its card's link, which sets the dgb_discord_id cookie on
-        the game's subdomain."""
-        self.page.goto(f"{LAUNCHER_URL}/?discord_id={self.discord_id}")
+        game through its card's link, which sets the dgb_token cookie on the
+        game's subdomain."""
+        self.page.goto(f"{LAUNCHER_URL}/?token={self.token}")
         card_link = self.page.locator(f'a.card-link[href^="{self.game.local_origin}/"]')
         enter_url = card_link.get_attribute("href") or ""
-        assert f"discord_id={self.discord_id}" in enter_url, enter_url
+        assert f"token={self.token}" in enter_url, enter_url
         self.page.goto(enter_url, wait_until="domcontentloaded")
         if path is not None:
             self.page.goto(self.url(path), wait_until="domcontentloaded")

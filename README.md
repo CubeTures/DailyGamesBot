@@ -17,7 +17,10 @@ Or with Docker: `docker compose up --build`.
 Open http://localhost:8080 for the launcher (games open on its subdomains,
 e.g. http://wordle.localhost:8080; use Chrome or Firefox, which resolve them
 without any setup), or run `/play` in Discord to get
-your personal link so your scores count. On the launcher you can also pick
+your personal link so your scores count. Keep it to yourself: it's how the
+games know it's you. If it leaks, an admin can reset it with
+`uv run python3 -m src.store reset-token <discord id>`, and your next `/play`
+gets a new one. On the launcher you can also pick
 which games' Discord roles you want, to get pinged when someone finishes them.
 The pencil beside "Games" lets you hide games you don't play: click a game
 once to hide its card, twice to hide its scoreboard too.

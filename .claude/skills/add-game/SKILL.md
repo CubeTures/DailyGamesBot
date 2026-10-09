@@ -61,8 +61,8 @@ an earlier proxy is still running: stop it as in step 8.
 
 1. If you already used the browser in this session, call `browser_close` first. Init scripts stack up per context.
 2. Install the recorder: call `browser_run_code_unsafe` with `filename` set to the **absolute** path of `.claude/skills/add-game/install-recorder.js`. It records fetch, XHR and sendBeacon calls with bodies, plus storage writes, cookie writes, dispatched DOM events, postMessage, history changes and dataLayer pushes. The log persists across reloads.
-3. Call `browser_navigate` to `http://localhost:8080/?discord_id=dgb-test`. For a new game, take a `browser_snapshot` and check its card shows the right title, description and icon.
-4. Call `browser_navigate` to `http://<name>.localhost:8080/__dgb/enter?discord_id=dgb-test&to=<landing_path>` (what the card's link does). It sets the `dgb_discord_id` cookie that results are keyed on, on the game's subdomain, and redirects to the game. Take a `browser_snapshot` to confirm the game actually renders and is playable.
+3. Get a token for the test player, as `/play` would: `DGB_DB_PATH=$SCRATCH/add-game.db uv run python3 -c "from src.store import players; print(players.token_for('dgb-test'))"`. Call `browser_navigate` to `http://localhost:8080/?token=<token>`. For a new game, take a `browser_snapshot` and check its card shows the right title, description and icon.
+4. Call `browser_navigate` to `http://<name>.localhost:8080/__dgb/enter?token=<token>&to=<landing_path>` (what the card's link does). It sets the `dgb_token` cookie that results are keyed on (via the player it stands for), on the game's subdomain, and redirects to the game. Take a `browser_snapshot` to confirm the game actually renders and is playable.
    - If it's broken, check `browser_console_messages` and `browser_network_requests`. Typical causes are absolute URLs to another host (see "Known limitation" in `README.md`) or the game living in a cross-origin iframe. In the iframe case, the config's `origin` should probably be the iframe's origin.
    - Fix the problem or report it before involving the user.
 5. Check whether today's puzzle already shows as finished in this browser profile. If it does, tell the user. Ideally they play from a fresh state.
@@ -140,7 +140,7 @@ silently miss losses, so get a real one where the game has it.
      return "cleared";
    }
    ```
-   This also removes the game's `dgb_discord_id` cookie and the recorder's log. The recorder itself stays installed.
+   This also removes the game's `dgb_token` cookie and the recorder's log. The recorder itself stays installed.
 4. Call `browser_navigate` to the `/__dgb/enter` URL from step 3 again.
 5. Take a `browser_snapshot` to confirm today's puzzle is **unplayed** again. If it still shows finished, the game keeps state server-side (by account or IP), so a second run isn't possible this way. In that case:
    - Say so.

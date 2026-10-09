@@ -9,7 +9,7 @@ def _request_to(host: str, path: str = "/") -> http.HTTPFlow:
     flow.request.scheme, flow.request.host, flow.request.port = "http", "x", 8090
     flow.request.path = path
     flow.request.headers["host"] = host
-    flow.request.headers["cookie"] = "dgb_discord_id=42; theirs=1"
+    flow.request.headers["cookie"] = "dgb_token=ab-12; theirs=1"
     addon.request(flow)
     return flow
 

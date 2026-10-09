@@ -24,11 +24,12 @@ from playwright.sync_api import Browser, sync_playwright
 
 from src.games.registry import GAMES_BY_NAME
 from src.settings import LAUNCHER_PORT, PROXY_PORT, REPO_ROOT
+from src.store import players as player_store
 from tests.e2e.harness import Player
 
 ARTIFACTS_DIR = Path(__file__).with_name(".artifacts")
 
-# Discord IDs are digits (the launcher checks); a per-session base keeps
+# Discord IDs are digits (the bot looks them up); a per-session base keeps
 # reruns of the same test apart in the launcher's player list.
 _ID_BASE = 900_000_000_000_000_000 + (int(time.time()) % 1_000_000) * 1000
 
@@ -148,9 +149,15 @@ def players(
         context.route(_ADS, lambda route: route.abort())
         context.tracing.start(screenshots=True, snapshots=True, sources=False)
         page = context.new_page()
+        discord_id = str(_ID_BASE + len(made) + 100 * _test_index(request))
+        # As /play does, on the proxy's database.
+        with pytest.MonkeyPatch.context() as env:
+            env.setenv("DGB_DB_PATH", str(db_path))
+            token = player_store.token_for(discord_id)
         player = Player(
             game=GAMES_BY_NAME[game],
-            discord_id=str(_ID_BASE + len(made) + 100 * _test_index(request)),
+            discord_id=discord_id,
+            token=token,
             context=context,
             page=page,
             db_path=db_path,

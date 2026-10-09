@@ -1,5 +1,4 @@
 - Let players download their own results
-- Custom ID mapping to discord ID for security
 
 ## Games
 

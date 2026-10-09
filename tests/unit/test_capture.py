@@ -11,19 +11,22 @@ from src.games.models import Game
 from src.games.registry import GAMES_BY_NAME
 from src.proxy.capture.endpoints import handle_capture_request
 from src.proxy.capture.script import build_script, inject_script_tag
-from src.store import results
+from src.store import players, results
 
 WORDLE = GAMES_BY_NAME["wordle"]
 CAPTURED_GAMES = [g for g in GAMES_BY_NAME.values() if g.triggers]
 
 
-def _post(game: Game, body: object, discord_id: str | None = "42") -> http.HTTPFlow:
+def _post(game: Game, body: object, token: str | None = "") -> http.HTTPFlow:
+    """POST a result, by default as player 42 with their current token."""
+    if token == "":
+        token = players.token_for("42")
     flow = tflow.tflow()
     flow.request.method = "POST"
     flow.request.path = "/__dgb/result"
     flow.request.text = json.dumps(body)
-    if discord_id:
-        flow.request.headers["cookie"] = f"dgb_discord_id={discord_id}"
+    if token:
+        flow.request.headers["cookie"] = f"dgb_token={token}"
     assert handle_capture_request(flow, game)
     assert flow.response is not None
     return flow
@@ -48,17 +51,26 @@ def test_saves_result_once() -> None:
     )
 
 
+def test_rejects_reset_tokens() -> None:
+    old = players.token_for("42")
+    players.reset_token("42")
+    flow = _post(WORDLE, {"puzzle_id": "1", "fields": {}}, old)
+    assert flow.response and flow.response.status_code == 400
+    assert results.unannounced() == []
+
+
 @pytest.mark.parametrize(
-    ("body", "discord_id"),
+    ("body", "token"),
     [
         ({"puzzle_id": "1", "fields": {}}, None),
-        ([], "42"),
-        ({"puzzle_id": "", "fields": {}}, "42"),
-        ({"puzzle_id": "1", "fields": []}, "42"),
+        ({"puzzle_id": "1", "fields": {}}, "never-issued"),
+        ([], ""),
+        ({"puzzle_id": "", "fields": {}}, ""),
+        ({"puzzle_id": "1", "fields": []}, ""),
     ],
 )
-def test_rejects_bad_results(body: object, discord_id: str | None) -> None:
-    flow = _post(WORDLE, body, discord_id)
+def test_rejects_bad_results(body: object, token: str | None) -> None:
+    flow = _post(WORDLE, body, token)
     assert flow.response and flow.response.status_code == 400
     assert results.unannounced() == []
 
@@ -83,12 +95,12 @@ def test_serves_script_and_404s_unknown_paths() -> None:
     ("query", "location", "cookie"),
     [
         (
-            "?discord_id=42&to=/games/wordle/index.html",
+            "?token=ab-12&to=/games/wordle/index.html",
             "/games/wordle/index.html",
-            "dgb_discord_id=42; Path=/;",
+            "dgb_token=ab-12; Path=/; HttpOnly;",
         ),
         ("?to=/x", "/x", None),
-        ("?discord_id=4;2&to=//evil.com", "/games/wordle/index.html", None),
+        ("?token=4;2&to=//evil.com", "/games/wordle/index.html", None),
         ("?to=https://evil.com", "/games/wordle/index.html", None),
     ],
 )

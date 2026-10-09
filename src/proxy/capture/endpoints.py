@@ -1,10 +1,11 @@
 """Answers the capture script's /__dgb/ requests, which never reach the real
 game server.
 
-The player is identified by the dgb_discord_id cookie. Each game is on its
-own subdomain, so the launcher's cookies don't reach it: the launcher's game
-links go through /__dgb/enter?discord_id=ID&to=PATH, which sets the cookie on
-the game's subdomain and redirects to the game.
+The player is identified by the dgb_token cookie, holding the token from
+their /play link (see store/players.py). Each game is on its own
+subdomain, so the launcher's cookies don't reach it: the launcher's game links
+go through /__dgb/enter?token=TOKEN&to=PATH, which sets the cookie on the
+game's subdomain and redirects to the game.
 """
 
 import json
@@ -19,11 +20,11 @@ from mitmproxy import http
 from src.games.models import Game
 from src.proxy.capture import ENTER_PATH, PATH_PREFIX, RESULT_PATH, SCRIPT_PATH
 from src.proxy.capture.script import build_script
-from src.store import results
+from src.store import players, results
 
-DISCORD_ID_COOKIE = "dgb_discord_id"
+TOKEN_COOKIE = "dgb_token"
 _COOKIE_MAX_AGE_SECS = 365 * 24 * 60 * 60
-# Discord IDs are digits; tests use IDs like "dgb-test".
+# Tokens are UUIDs.
 _COOKIE_VALUE_RE = re.compile(r"[\w-]+", re.ASCII)
 
 _NO_STORE = {"Cache-Control": "no-store"}
@@ -35,11 +36,11 @@ def is_capture_path(path: str) -> bool:
     return path.startswith(PATH_PREFIX)
 
 
-def strip_discord_id_cookie(request: http.Request) -> None:
-    """Keep the player's ID from leaking to the real game server."""
+def strip_token_cookie(request: http.Request) -> None:
+    """Keep the player's token from leaking to the real game server."""
     cookies = request.cookies
-    if DISCORD_ID_COOKIE in cookies:
-        del cookies[DISCORD_ID_COOKIE]
+    if TOKEN_COOKIE in cookies:
+        del cookies[TOKEN_COOKIE]
 
 
 def handle_capture_request(flow: http.HTTPFlow, game: Game) -> bool:
@@ -68,10 +69,10 @@ def _enter(request: http.Request, game: Game) -> http.Response:
     if not to.startswith("/") or to.startswith("//") or "\\" in to:
         to = game.landing_path
     headers = {"Location": to, **_NO_STORE}
-    discord_id = params.get("discord_id", "")
-    if _COOKIE_VALUE_RE.fullmatch(discord_id):
+    token = params.get("token", "")
+    if _COOKIE_VALUE_RE.fullmatch(token):
         headers["Set-Cookie"] = (
-            f"{DISCORD_ID_COOKIE}={discord_id}; Path=/;"
+            f"{TOKEN_COOKIE}={token}; Path=/; HttpOnly;"
             f" Max-Age={_COOKIE_MAX_AGE_SECS}; SameSite=Lax"
         )
     return http.Response.make(302, b"", headers)
@@ -97,10 +98,14 @@ def _save_result(request: http.Request, game: Game) -> http.Response:
 
 def _parse_result(request: http.Request, game: Game) -> results.NewResult | str:
     """The result a POST reports, or why it can't be saved."""
-    discord_id = request.cookies.get(DISCORD_ID_COOKIE)
-    if not discord_id:
-        log.warning("%s: result with no %s cookie", game.name, DISCORD_ID_COOKIE)
-        return "no discord id; open the /play link"
+    token = request.cookies.get(TOKEN_COOKIE)
+    if not token:
+        log.warning("%s: result with no %s cookie", game.name, TOKEN_COOKIE)
+        return "no token; open the /play link"
+    discord_id = players.discord_id_for(token)
+    if discord_id is None:
+        log.warning("%s: result with an unknown or reset token", game.name)
+        return "link expired; open your latest /play link"
     try:
         body: Any = json.loads(request.get_text() or "")
     except json.JSONDecodeError:

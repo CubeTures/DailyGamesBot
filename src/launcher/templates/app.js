@@ -7,35 +7,57 @@
   // Rows a scoreboard card shows before the rest move to the full list.
   var BOARD_ROWS = 5;
 
-  var discordId = rememberDiscordId();
+  // The token from the player's /play link, which the server maps to their
+  // Discord ID. It stops working if an admin resets it (say, after a leak).
+  var token = rememberToken();
+  // The viewer's Discord ID, once identify() has asked the server.
+  var discordId = null;
   // Each game's icon color, by game name, once tintCards() has found it.
   var TINTS = {};
   // Games the viewer has hidden, by name: "card" hides just its card, "all"
   // its scoreboard too. See setUpHiding().
   var hiddenGames = loadHiddenGames();
 
-  function rememberDiscordId() {
+  function rememberToken() {
     var params = new URLSearchParams(location.search);
-    var id = params.get("discord_id");
-    if (id) {
-      localStorage.setItem("discord_id", id);
-      params.delete("discord_id");
+    var value = params.get("token");
+    // Left over from when links carried the Discord ID itself.
+    localStorage.removeItem("discord_id");
+    if (value) {
+      localStorage.setItem("token", value);
+      params.delete("token");
       var query = params.toString();
       history.replaceState({}, "", location.pathname + (query ? "?" + query : "") + location.hash);
     } else {
-      id = localStorage.getItem("discord_id");
+      value = localStorage.getItem("token");
     }
-    if (id) tagGameLinks(id);
-    return id;
+    if (value) tagGameLinks(value);
+    return value;
+  }
+
+  // Resolves to the viewer's Discord ID, or null without a working link.
+  function identify() {
+    if (!token) return Promise.resolve(null);
+    return fetch("/api/me?token=" + encodeURIComponent(token)).then(function (res) {
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        var warning = document.getElementById("warning");
+        warning.querySelector("h2").textContent = "Your link has expired";
+        warning.querySelector("p").textContent =
+          "Run /play in Discord for a new one.";
+        return null;
+      }
+      return res.json().then(function (body) { return body.discord_id; });
+    }).catch(function () { return null; });
   }
 
   // Games run on their own subdomains, which can't read this page's storage
   // or cookies. Their links go through the proxy's /__dgb/enter, which sets
   // the cookie the proxy reads when a game reports a result.
-  function tagGameLinks(id) {
+  function tagGameLinks(value) {
     document.querySelectorAll("a.card-link").forEach(function (link) {
       var url = new URL(link.href);
-      url.searchParams.set("discord_id", id);
+      url.searchParams.set("token", value);
       link.href = url.toString();
     });
   }
@@ -611,11 +633,11 @@
         var pinged = button.getAttribute("aria-pressed") !== "true";
         setPinged(button, pinged);
         if (pinged) replay(button, "rung");
-        postJson("/api/subscriptions", { discord_id: discordId, game: game, subscribed: pinged })
+        postJson("/api/subscriptions", { token: token, game: game, subscribed: pinged })
           .catch(function () { setPinged(button, !pinged); });
       });
     });
-    getJson("/api/subscriptions?discord_id=" + encodeURIComponent(discordId))
+    getJson("/api/subscriptions?token=" + encodeURIComponent(token))
       .then(function (body) {
         buttons.forEach(function (button) {
           setPinged(button, body.games.indexOf(button.closest(".card").dataset.game) !== -1);
@@ -661,7 +683,6 @@
   }
 
   function setUpHiding() {
-    applyHiddenGames();
     if (!discordId) return;
     var games = document.getElementById("games");
     var editButton = document.getElementById("edit-games");
@@ -678,7 +699,7 @@
       var from = hiddenGames[game] || "shown";
       var to = HIDE_CYCLE[(HIDE_CYCLE.indexOf(from) + 1) % HIDE_CYCLE.length];
       setLevel(game, to);
-      postJson("/api/hidden", { discord_id: discordId, game: game, level: to })
+      postJson("/api/hidden", { token: token, game: game, level: to })
         .catch(function () { setLevel(game, from); });
     }
 
@@ -696,16 +717,14 @@
       editButton.title = editing ? "Done choosing games" : "Choose which games you see";
       note.hidden = !editing;
     });
-    getJson("/api/hidden?discord_id=" + encodeURIComponent(discordId))
+    getJson("/api/hidden?token=" + encodeURIComponent(token))
       .then(function (body) {
         hiddenGames = body.games;
         applyHiddenGames();
       }).catch(function () {});
   }
 
-  if (!discordId) document.getElementById("warning").style.display = "flex";
-  setUpPings();
-  setUpHiding();
+  applyHiddenGames();
 
   prevButton.addEventListener("click", function () {
     setViewDay(addDays(shownDay(), -1));
@@ -720,7 +739,15 @@
   });
   window.addEventListener("hashchange", function () { setViewDay(dayFromHash(), true); });
 
-  setViewDay(dayFromHash(), true);
-  if (viewDay) refreshToday();
-  setInterval(refreshToday, REFRESH_MS);
+  // The scoreboard waits for the viewer's ID: it marks their rows, and
+  // whether they've played tomorrow's games decides the day it opens on.
+  identify().then(function (id) {
+    discordId = id;
+    if (!discordId) document.getElementById("warning").style.display = "flex";
+    setUpPings();
+    setUpHiding();
+    setViewDay(dayFromHash(), true);
+    if (viewDay) refreshToday();
+    setInterval(refreshToday, REFRESH_MS);
+  });
 })();

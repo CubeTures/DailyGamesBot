@@ -2,6 +2,9 @@
 announced in the channel named by DISCORD_RESULTS_CHANNEL_ID (if set),
 pinging the game's role in that channel's server (see roles.py).
 
+A link carries a token standing in for the player's Discord ID (see
+store/players.py). It stays the same until an admin resets it.
+
 The proxy saves results in another process, so the bot polls the store for
 names to look up, results to post, and roles to give or take.
 """
@@ -63,10 +66,16 @@ def create_client(results_channel_id: int | None) -> discord.Client:
     @tree.command(name="play", description="Get your personal link to the games hub")
     async def play(interaction: discord.Interaction) -> None:
         discord_id = str(interaction.user.id)
-        link = f"[Let's play some games!]({LAUNCHER_URL}/?discord_id={discord_id})"
-        # Reply first: Discord drops interactions not answered within 3s.
+        is_new = await asyncio.to_thread(players.add, discord_id)
+        token = await asyncio.to_thread(players.token_for, discord_id)
+        link = (
+            f"[Let's play some games!]({LAUNCHER_URL}/?token={token})\n"
+            "-# This link is yours alone, so don't share it."
+        )
+        # Reply before the name lookup: Discord drops interactions not
+        # answered within 3s.
         await interaction.response.send_message(link, ephemeral=True)
-        if await asyncio.to_thread(players.add, discord_id):
+        if is_new:
             await refresh_player_name(client, discord_id)
 
     return client

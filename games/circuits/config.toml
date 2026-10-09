@@ -8,7 +8,8 @@ origin = "https://www.puzzmo.com"
 landing_path = "/game/circuits/"
 higher_score_wins = true
 
-# Puzzmo's dailies change at midnight Central (its todayDateKey).
+# Puzzmo's dailies change at midnight Chicago time: its servers "pretend to
+# live in Chicago" and turn that day's date into the daily's dateKey.
 [reset]
 time = "00:00"
 timezone = "America/Chicago"

@@ -2,7 +2,8 @@
 reads, the role subscriptions its bells toggle, and the games each player has
 hidden.
 
-Players are identified by the unauthenticated `discord_id` the page sends.
+Players are identified by the token from their /play link, which the
+page sends and the store maps to their Discord ID (see store/players.py).
 """
 
 import json
@@ -12,14 +13,14 @@ from datetime import date
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import Any, TypeGuard, cast
+from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 from src import announce
 from src.games.registry import GAMES_BY_NAME
 from src.launcher.build import write_launcher
 from src.settings import LAUNCHER_DIR, LAUNCHER_PORT
-from src.store import hidden_games, results, subscriptions
+from src.store import hidden_games, players, results, subscriptions
 
 Reply = tuple[int, Any]
 
@@ -31,39 +32,37 @@ def _get_results(params: dict[str, str]) -> Reply:
     return 200, [_result_json(r) for r in results.on_day(day)]
 
 
+def _get_me(params: dict[str, str]) -> Reply:
+    """GET /api/me?token=TOKEN: {"discord_id"} of the token's player."""
+    return 200, {"discord_id": _player(params.get("token"))}
+
+
 def _get_subscriptions(params: dict[str, str]) -> Reply:
-    """GET /api/subscriptions?discord_id=ID: the games whose role they want."""
-    discord_id = params.get("discord_id")
-    if not _is_discord_id(discord_id):
-        return _error(400, "need a discord_id")
+    """GET /api/subscriptions?token=TOKEN: the games whose role they want."""
+    discord_id = _player(params.get("token"))
     return 200, {"games": subscriptions.subscribed_games(discord_id)}
 
 
 def _get_hidden(params: dict[str, str]) -> Reply:
-    """GET /api/hidden?discord_id=ID: {game: "card" | "all"} for the games
+    """GET /api/hidden?token=TOKEN: {game: "card" | "all"} for the games
     they've hidden."""
-    discord_id = params.get("discord_id")
-    if not _is_discord_id(discord_id):
-        return _error(400, "need a discord_id")
+    discord_id = _player(params.get("token"))
     return 200, {"games": hidden_games.levels(discord_id)}
 
 
 def _post_subscription(body: bytes) -> Reply:
-    """POST /api/subscriptions {"discord_id", "game", "subscribed"}."""
-    request = _player_game_flag(body, "subscribed")
-    if request is None:
-        return _error(400, "need discord_id, game and subscribed")
-    subscriptions.save(subscriptions.Subscription(*request))
+    """POST /api/subscriptions {"token", "game", "subscribed"}."""
+    discord_id, game, subscribed = _player_game_value(body, "subscribed")
+    if not isinstance(subscribed, bool):
+        return _error(400, "need token, game and subscribed")
+    subscriptions.save(subscriptions.Subscription(discord_id, game, subscribed))
     return 200, {"ok": True}
 
 
 def _post_hidden(body: bytes) -> Reply:
-    """POST /api/hidden {"discord_id", "game", "level"}, where level is
-    "shown", "card" or "all"."""
-    request = _player_game_value(body, "level")
-    if request is None:
-        return _error(400, "need discord_id, game and level")
-    discord_id, game, level = request
+    """POST /api/hidden {"token", "game", "level"}, where level is "shown",
+    "card" or "all"."""
+    discord_id, game, level = _player_game_value(body, "level")
     if not hidden_games.is_hide_level(level):
         return _error(400, "level must be shown, card or all")
     hidden_games.set_level(discord_id, game, level)
@@ -71,6 +70,7 @@ def _post_hidden(body: bytes) -> Reply:
 
 
 _GET_ROUTES: dict[str, Callable[[dict[str, str]], Reply]] = {
+    "/api/me": _get_me,
     "/api/results": _get_results,
     "/api/subscriptions": _get_subscriptions,
     "/api/hidden": _get_hidden,
@@ -89,7 +89,7 @@ class _LauncherRequestHandler(SimpleHTTPRequestHandler):
             super().do_GET()  # the page itself
             return
         params = {key: values[0] for key, values in parse_qs(url.query).items()}
-        self._send_json(*route(params))
+        self._send_json(*_answer(route, params))
 
     def do_POST(self) -> None:
         route = _POST_ROUTES.get(urlsplit(self.path).path)
@@ -97,7 +97,7 @@ class _LauncherRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(*_error(404, "not found"))
             return
         length = int(self.headers.get("Content-Length") or 0)
-        self._send_json(*route(self.rfile.read(length)))
+        self._send_json(*_answer(route, self.rfile.read(length)))
 
     def _send_json(self, status: int, body: Any) -> None:
         encoded = json.dumps(body).encode()
@@ -142,37 +142,27 @@ def _result_json(result: results.StoredResult) -> dict[str, Any]:
     }
 
 
-def _player_game_flag(body: bytes, flag: str) -> tuple[str, str, bool] | None:
-    """`discord_id`, `game` and the boolean `flag` from a JSON body, or None
-    if any is missing or invalid."""
-    request = _player_game_value(body, flag)
-    if request is None or not isinstance(request[2], bool):
-        return None
-    return request[0], request[1], request[2]
+def _player(token: object) -> str:
+    """The Discord ID a token from a /play link stands for."""
+    discord_id = players.discord_id_for(token) if isinstance(token, str) else None
+    if discord_id is None:
+        # Never issued, or an admin has reset it since.
+        raise _ApiError(401, "link expired; run /play for a new one")
+    return discord_id
 
 
-def _player_game_value(body: bytes, key: str) -> tuple[str, str, object] | None:
-    """`discord_id`, `game` and the value of `key` from a JSON body, or None
-    if the body, player or game is invalid."""
+def _player_game_value(body: bytes, key: str) -> tuple[str, str, object]:
+    """The player its `token` stands for, `game` and the value of `key` from
+    a JSON body."""
     try:
         payload: Any = json.loads(body)
     except ValueError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    fields = cast(dict[str, Any], payload)
-    discord_id, game, value = (
-        fields.get("discord_id"),
-        fields.get("game"),
-        fields.get(key),
-    )
-    if not _is_discord_id(discord_id) or game not in GAMES_BY_NAME:
-        return None
-    return discord_id, cast(str, game), value
-
-
-def _is_discord_id(value: object) -> TypeGuard[str]:
-    return isinstance(value, str) and value.isascii() and value.isdigit()
+        payload = None
+    fields = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+    game = fields.get("game")
+    if game not in GAMES_BY_NAME:
+        raise _ApiError(400, f"need token, game and {key}")
+    return _player(fields.get("token")), cast(str, game), fields.get(key)
 
 
 def _parse_day(raw: str | None) -> date | None:
@@ -185,3 +175,18 @@ def _parse_day(raw: str | None) -> date | None:
 
 def _error(status: int, message: str) -> Reply:
     return status, {"error": message}
+
+
+class _ApiError(Exception):
+    """Raised by a route to reply with an error."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.reply = _error(status, message)
+
+
+def _answer[T](route: Callable[[T], Reply], request: T) -> Reply:
+    try:
+        return route(request)
+    except _ApiError as e:
+        return e.reply

@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS results (
 CREATE TABLE IF NOT EXISTS players (
     discord_id  TEXT PRIMARY KEY,
     name        TEXT,
-    name_stale  INTEGER NOT NULL DEFAULT 0
+    name_stale  INTEGER NOT NULL DEFAULT 0,
+    token       TEXT  -- in their /play link; see players.token_for
 );
 CREATE TABLE IF NOT EXISTS subscriptions (
     discord_id  TEXT NOT NULL,
@@ -81,6 +82,8 @@ def _prepare(conn: sqlite3.Connection) -> None:
         "game_day TEXT NOT NULL DEFAULT ''",
         backfill=lambda: _backfill_game_days(conn),
     )
+    _add_column(conn, "players", "token TEXT")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS players_token ON players (token)")
 
 
 def _add_column(
