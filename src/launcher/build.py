@@ -2,10 +2,12 @@
 
 import base64
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 import jinja2
 
+from src import results
 from src.discord_bot.settings import results_channel_id
 from src.games.models import ICON_MIME_TYPES, LOCAL_TIMEZONE, Game
 from src.games.registry import GAMES_BY_PORT
@@ -13,6 +15,8 @@ from src.settings import LAUNCHER_DIR
 
 TEMPLATES_DIR = Path(__file__).with_name("templates")
 OUTPUT_PATH = LAUNCHER_DIR / "index.html"
+# The launcher's server re-renders the page from its request threads.
+_write_lock = Lock()
 
 
 def _icon_data_uri(game: Game) -> str | None:
@@ -24,7 +28,7 @@ def _icon_data_uri(game: Game) -> str | None:
     return f"data:{mime_type};base64,{data}"
 
 
-def _card(game: Game) -> dict[str, Any]:
+def _card(game: Game, disabled: set[str]) -> dict[str, Any]:
     return {
         "name": game.name,
         "title": game.title,
@@ -36,18 +40,21 @@ def _card(game: Game) -> dict[str, Any]:
         "reset_timezone": None
         if game.reset.timezone == LOCAL_TIMEZONE
         else game.reset.timezone,
+        # Turned off by an admin: hidden, except to admins editing the list.
+        "disabled": game.name in disabled,
     }
 
 
 def render_launcher() -> str:
     games = sorted(GAMES_BY_PORT.values(), key=lambda game: game.title.casefold())
+    disabled = results.disabled_games()
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,
         keep_trailing_newline=True,
     )
     return env.get_template("index.html.j2").render(
-        games=[_card(game) for game in games],
+        games=[_card(game, disabled) for game in games],
         game_titles={game.name: game.title for game in games},
         resets={game.name: game.reset.js_config() for game in games},
         higher_score_wins=[game.name for game in games if game.higher_score_wins],
@@ -57,8 +64,12 @@ def render_launcher() -> str:
 
 
 def write_launcher() -> None:
+    """Write the page, swapping it in whole so it's never served half-written."""
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(render_launcher())
+    temp_path = OUTPUT_PATH.with_suffix(".tmp")
+    with _write_lock:
+        temp_path.write_text(render_launcher())
+        temp_path.replace(OUTPUT_PATH)
 
 
 if __name__ == "__main__":

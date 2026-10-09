@@ -59,7 +59,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   server with the results API (`server.py`)
 - `src/discord_bot/`: client and `/play` (`bot.py`), result posts
   (`announcer.py`), username lookups (`player_names.py`), game roles
-  (`roles.py`)
+  (`roles.py`), admin checks (`admins.py`)
 - `src/announce.py`: renders a result's `announcement.j2`
 - `src/results.py`: SQLite results store (`data/results.db`, override with
   `DGB_DB_PATH`)
@@ -114,6 +114,17 @@ needs full type annotations. Its config is `[tool.pyright]` in
   picks from the launcher are saved in the `subscriptions` table and the bot
   polls every 15s to give or take the role. The table is the source of
   truth: roles changed by hand in Discord aren't reflected on the launcher.
+- **Turning games off.** The bot records whether each player has
+  Administrator in the results channel's server as `players.is_admin`: for
+  every known player at startup and every 5 minutes, and on each `/play`
+  (with no results channel, only then, for the server `/play` ran in). The launcher
+  asks `GET /api/admin` and shows admins a pencil beside "Games"; in edit
+  mode every card shows an eye, and `POST /api/games` (refused unless
+  `is_admin`) saves the game in `disabled_games` and re-renders the
+  launcher, which leaves turned-off cards out unless editing. The proxy
+  answers a turned-off game's requests with a 410 page (re-checking the
+  table every 5s). Results and scoreboards are untouched. Admin rights
+  rest on the unauthenticated `discord_id`, like the rest of the launcher.
 
 ## Gotchas
 

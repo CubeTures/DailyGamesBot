@@ -17,9 +17,9 @@
 // Anything after that point (more orbs once the day is won) is left out, as
 // the game's own share text does.
 
-// The server rolls the day over at 09:00 UTC (its game-day API's
-// nextRollover), the same as [reset].
-const day = new Date(Date.now() - 9 * 3600e3).toISOString().slice(0, 10);
+// The game day changes at midnight Hawaii-Aleutian time, the same as [reset]
+// (en-CA formats a date as YYYY-MM-DD).
+const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Adak" }).format(new Date());
 const st = (() => { const s = ls(`daily-orbs-${day}`); return s?.dateKey === day ? s : null; })();
 
 const outcome = (() => {

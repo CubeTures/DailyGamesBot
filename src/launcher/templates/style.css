@@ -138,7 +138,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .card-top { display: flex; align-items: center; gap: 14px; }
 .card h3 { flex: 1; margin: 0; font-size: 1.1rem; }
 
-.ping {
+.ping, .icon-btn {
   position: relative;
   z-index: 1;
   flex: none;
@@ -154,8 +154,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   animation: fade-in 0.25s ease both;
   transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.ping[hidden] { display: none; }
-.ping svg {
+:is(.ping, .icon-btn)[hidden] { display: none; }
+:is(.ping, .icon-btn) svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -164,12 +164,29 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.ping:hover { background: var(--surface-2); border-color: var(--border); color: var(--text); }
-.ping:active { transform: scale(0.9); }
-.ping:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.ping[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+:is(.ping, .icon-btn):hover { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+:is(.ping, .icon-btn):active { transform: scale(0.9); }
+:is(.ping, .icon-btn):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:is(.ping, .icon-btn)[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 .ping[aria-pressed="true"] svg { fill: currentColor; }
 .ping.rung svg { animation: ring 0.5s ease; transform-origin: 50% 10%; }
+
+/* Admins' edit mode (#edit-games): every card shows, with an eye that turns
+   the game on or off for everyone. Turned-off games are hidden otherwise. */
+.games-head { align-items: center; }
+.games-head .note { animation: fade-in 0.2s ease both; }
+.games-head .note[hidden] { display: none; }
+#edit-games { margin-left: auto; }
+.card.off { display: none; }
+.card .visibility { display: none; }
+.games.editing .card { cursor: pointer; }
+.games.editing .card.off { display: flex; opacity: 0.55; border-style: dashed; box-shadow: none; }
+.games.editing .card.off:hover { opacity: 0.8; }
+.games.editing .card-link { pointer-events: none; }
+.games.editing .ping { display: none; }
+.games.editing .visibility { display: grid; }
+.visibility .eye-off, .visibility[aria-pressed="false"] .eye { display: none; }
+.visibility[aria-pressed="false"] .eye-off { display: block; }
 .card .desc {
   margin: 0;
   color: var(--muted);

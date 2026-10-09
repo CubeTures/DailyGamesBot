@@ -1,5 +1,6 @@
 """SQLite store for captured game results, the players who made them, and
-which games' Discord roles each player wants.
+which games' Discord roles each player wants, plus which games admins have
+turned off.
 
 One row per (game, discord_id, puzzle_id); the first capture wins and later
 ones (e.g. the game re-showing its finished state on reload) are ignored.
@@ -12,7 +13,8 @@ reach the Discord bot. So instead of calling the bot, a save marks the
 player's name stale and leaves the result unannounced; the bot polls for both
 (see discord_bot/), looks the name up, posts the result and marks it
 announced. Likewise the launcher saves role subscriptions unsynced, and the
-bot gives or takes the role and marks them synced.
+bot gives or takes the role and marks them synced, and the bot records which
+players are admins of its server for the launcher to check.
 """
 
 import json
@@ -43,7 +45,8 @@ CREATE TABLE IF NOT EXISTS results (
 CREATE TABLE IF NOT EXISTS players (
     discord_id  TEXT PRIMARY KEY,
     name        TEXT,
-    name_stale  INTEGER NOT NULL DEFAULT 0
+    name_stale  INTEGER NOT NULL DEFAULT 0,
+    is_admin    INTEGER NOT NULL DEFAULT 0  -- may turn games on and off
 );
 CREATE TABLE IF NOT EXISTS subscriptions (
     discord_id  TEXT NOT NULL,
@@ -51,6 +54,11 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     subscribed  INTEGER NOT NULL,
     synced      INTEGER NOT NULL DEFAULT 0,  -- the bot has given/taken the role
     PRIMARY KEY (discord_id, game)
+);
+-- Games an admin has turned off: hidden on the launcher and not proxied.
+-- Their results stay.
+CREATE TABLE IF NOT EXISTS disabled_games (
+    game        TEXT PRIMARY KEY
 );
 """
 
@@ -98,6 +106,7 @@ def _connect() -> Generator[sqlite3.Connection]:
         conn.executescript(_SCHEMA)
         _add_announced_column(conn)
         _add_game_day_column(conn)
+        _add_is_admin_column(conn)
         with conn:
             yield conn
     finally:
@@ -160,6 +169,23 @@ def _add_game_day_column(conn: sqlite3.Connection) -> None:
             for id_, game, puzzle_id, captured_at in rows.fetchall()
         ],
     )
+    conn.commit()
+
+
+def _add_is_admin_column(conn: sqlite3.Connection) -> None:
+    """Migrate databases from before players could be admins."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(players)")}
+    if "is_admin" in columns:
+        return
+    try:
+        conn.execute(
+            "ALTER TABLE players ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
+        )
+    except sqlite3.OperationalError as e:
+        # The bot and the proxy can both get here at once.
+        if "duplicate column" not in str(e):
+            raise
+        return
     conn.commit()
 
 
@@ -248,6 +274,12 @@ def set_player_name(discord_id: str, name: str | None) -> None:
         )
 
 
+def player_ids() -> list[str]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT discord_id FROM players").fetchall()
+    return [discord_id for (discord_id,) in rows]
+
+
 def stale_player_ids() -> list[str]:
     """Players whose name should be looked up again."""
     with _connect() as conn:
@@ -255,6 +287,41 @@ def stale_player_ids() -> list[str]:
             "SELECT discord_id FROM players WHERE name_stale = 1"
         ).fetchall()
     return [discord_id for (discord_id,) in rows]
+
+
+def set_player_admin(discord_id: str, is_admin: bool) -> None:
+    """Record whether a known player (see add_player) is an admin of the
+    bot's server."""
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE players SET is_admin = ? WHERE discord_id = ?",
+            (is_admin, discord_id),
+        )
+
+
+def is_admin(discord_id: str) -> bool:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT is_admin FROM players WHERE discord_id = ?", (discord_id,)
+        ).fetchone()
+    return bool(row and row[0])
+
+
+def set_game_enabled(game: str, enabled: bool) -> None:
+    """Turn a game on or off. Its results are kept either way."""
+    with _connect() as conn:
+        if enabled:
+            conn.execute("DELETE FROM disabled_games WHERE game = ?", (game,))
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO disabled_games (game) VALUES (?)", (game,)
+            )
+
+
+def disabled_games() -> set[str]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT game FROM disabled_games").fetchall()
+    return {game for (game,) in rows}
 
 
 def set_subscription(sub: Subscription) -> None:

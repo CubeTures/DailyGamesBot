@@ -563,8 +563,63 @@
       }).catch(function () {});
   }
 
+  // Server admins (as the bot saw on their last /play) get a pencil that
+  // shows every card with an eye to turn the game on or off for everyone.
+  // A turned-off game's card is hidden and the proxy stops serving it; its
+  // past scores stay on the scoreboard.
+  function setVisible(button, visible) {
+    var card = button.closest(".card");
+    var title = gameTitle(card.dataset.game);
+    button.setAttribute("aria-pressed", String(visible));
+    button.setAttribute("aria-label", visible ? "Hide " + title + " from everyone" : "Show " + title + " to everyone");
+    button.title = visible ? "Shown to everyone" : "Hidden from everyone";
+    card.classList.toggle("off", !visible);
+  }
+
+  function setUpAdmin() {
+    if (!discordId) return;
+    var games = document.getElementById("games");
+    var editButton = document.getElementById("edit-games");
+    var note = document.getElementById("edit-note");
+    var buttons = document.querySelectorAll(".card .visibility");
+
+    function toggle(button) {
+      var visible = button.getAttribute("aria-pressed") !== "true";
+      setVisible(button, visible);
+      fetch("/api/games", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discord_id: discordId, game: button.closest(".card").dataset.game, enabled: visible }),
+      }).then(function (res) {
+        if (!res.ok) throw new Error(res.statusText);
+      }).catch(function () {
+        setVisible(button, !visible);
+      });
+    }
+
+    buttons.forEach(function (button) {
+      setVisible(button, button.getAttribute("aria-pressed") === "true");
+      button.addEventListener("click", function () { toggle(button); });
+      // While editing, a click anywhere on the card toggles it too.
+      button.closest(".card").addEventListener("click", function (e) {
+        if (games.classList.contains("editing") && !e.target.closest("button")) toggle(button);
+      });
+    });
+    editButton.addEventListener("click", function () {
+      var editing = games.classList.toggle("editing");
+      editButton.setAttribute("aria-pressed", String(editing));
+      editButton.title = editing ? "Done choosing games" : "Choose which games are shown";
+      note.hidden = !editing;
+    });
+    fetch("/api/admin?discord_id=" + encodeURIComponent(discordId))
+      .then(function (res) { return res.json(); })
+      .then(function (body) { editButton.hidden = !body.admin; })
+      .catch(function () {});
+  }
+
   if (!discordId) document.getElementById("warning").style.display = "flex";
   setUpPings();
+  setUpAdmin();
 
   prevButton.addEventListener("click", function () {
     setViewDay(addDays(viewDay || today(), -1));

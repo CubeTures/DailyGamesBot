@@ -9,10 +9,11 @@ port = 8093
 landing_path = "/"
 higher_score_wins = true
 
-# The server's game day rolls over at 09:00 UTC (nextRollover in /api/game-day).
+# Midnight Hawaii-Aleutian time: the server's game day rolled over at
+# 09:00 UTC (nextRollover in /api/game-day) during daylight saving time.
 [reset]
-time = "09:00"
-timezone = "UTC"
+time = "00:00"
+timezone = "America/Adak"
 
 [[triggers]]
 name = "day-state"
