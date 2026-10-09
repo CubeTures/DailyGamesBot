@@ -1,187 +1,105 @@
-"""Serves the launcher page, the results API its scoreboard reads, the
-subscriptions API its role pickers use, and the admin API that turns games
-on and off."""
+"""Serves the launcher page and its JSON API: the results its scoreboard
+reads, the role subscriptions its bells toggle, and the admin calls that turn
+games on and off.
+
+Players are identified by the unauthenticated `discord_id` the page sends.
+"""
 
 import json
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import date
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import Any, cast
+from typing import Any, TypeGuard, cast
 from urllib.parse import parse_qs, urlsplit
 
-from src import announce, results
+from src import announce
 from src.games.registry import GAMES_BY_NAME
 from src.launcher.build import write_launcher
 from src.settings import LAUNCHER_DIR, LAUNCHER_PORT
+from src.store import disabled_games, players, results, subscriptions
 
-RESULTS_API_PATH = "/api/results"
-SUBSCRIPTIONS_API_PATH = "/api/subscriptions"
-ADMIN_API_PATH = "/api/admin"
-GAMES_API_PATH = "/api/games"
+Reply = tuple[int, Any]
 
 
-def _parse_day(raw: str | None) -> date | None:
-    """A YYYY-MM-DD date, or None if it's missing or invalid."""
-    try:
-        return date.fromisoformat(raw or "")
-    except ValueError:
-        return None
-
-
-def _result_json(result: results.StoredResult) -> dict[str, Any]:
-    game = GAMES_BY_NAME.get(result.game)
-    return {
-        "game": result.game,
-        "discord_id": result.discord_id,
-        "name": result.player_name,
-        "puzzle_id": result.puzzle_id,
-        "data": result.data,
-        "captured_at": result.captured_at.isoformat(),
-        # What the bot posts, so the launcher can show it; None if the game's
-        # config is gone. The page has no role IDs, so the game's role mention
-        # carries its name instead.
-        "announcement": (
-            announce.render_result(game, result, game_mention=f"<@&{game.name}>")
-            if game
-            else None
-        ),
-    }
-
-
-def _results_for_query(query: str) -> list[dict[str, Any]]:
-    """GET /api/results?day=<YYYY-MM-DD>: that game day's results."""
+def _get_results(params: dict[str, str]) -> Reply:
+    """GET /api/results?day=YYYY-MM-DD: that game day's results."""
     # The page sends the viewer's local date; fall back to the server's.
-    day = _parse_day(_query_params(query).get("day")) or date.today()
-    return [_result_json(r) for r in results.on_day(day)]
+    day = _parse_day(params.get("day")) or date.today()
+    return 200, [_result_json(r) for r in results.on_day(day)]
 
 
-def _query_params(query: str) -> dict[str, str]:
-    return {key: values[0] for key, values in parse_qs(query).items()}
-
-
-def _is_discord_id(value: object) -> bool:
-    return isinstance(value, str) and value.isascii() and value.isdigit()
-
-
-def _subscriptions_for_query(query: str) -> dict[str, Any] | None:
-    """GET /api/subscriptions?discord_id=<id>: the games whose role they want."""
-    discord_id = _query_params(query).get("discord_id")
+def _get_subscriptions(params: dict[str, str]) -> Reply:
+    """GET /api/subscriptions?discord_id=ID: the games whose role they want."""
+    discord_id = params.get("discord_id")
     if not _is_discord_id(discord_id):
-        return None
-    return {"games": results.subscribed_games(cast(str, discord_id))}
+        return _error(400, "need a discord_id")
+    return 200, {"games": subscriptions.subscribed_games(discord_id)}
 
 
-def _parse_subscription(body: bytes) -> results.Subscription | None:
+def _get_admin(params: dict[str, str]) -> Reply:
+    """GET /api/admin?discord_id=ID: whether they may turn games on and off."""
+    discord_id = params.get("discord_id")
+    if not _is_discord_id(discord_id):
+        return _error(400, "need a discord_id")
+    return 200, {"admin": players.is_admin(discord_id)}
+
+
+def _post_subscription(body: bytes) -> Reply:
     """POST /api/subscriptions {"discord_id", "game", "subscribed"}."""
-    try:
-        payload: Any = json.loads(body)
-    except ValueError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    fields = cast(dict[str, Any], payload)
-    discord_id, game, subscribed = (
-        fields.get("discord_id"),
-        fields.get("game"),
-        fields.get("subscribed"),
-    )
-    if (
-        not _is_discord_id(discord_id)
-        or game not in GAMES_BY_NAME
-        or not isinstance(subscribed, bool)
-    ):
-        return None
-    return results.Subscription(cast(str, discord_id), cast(str, game), subscribed)
+    request = _player_game_flag(body, "subscribed")
+    if request is None:
+        return _error(400, "need discord_id, game and subscribed")
+    subscriptions.save(subscriptions.Subscription(*request))
+    return 200, {"ok": True}
 
 
-def _admin_for_query(query: str) -> dict[str, Any] | None:
-    """GET /api/admin?discord_id=<id>: whether they may turn games on and off."""
-    discord_id = _query_params(query).get("discord_id")
-    if not _is_discord_id(discord_id):
-        return None
-    return {"admin": results.is_admin(cast(str, discord_id))}
+def _post_game_toggle(body: bytes) -> Reply:
+    """POST /api/games {"discord_id", "game", "enabled"}: admins only."""
+    request = _player_game_flag(body, "enabled")
+    if request is None:
+        return _error(400, "need discord_id, game and enabled")
+    discord_id, game, enabled = request
+    if not players.is_admin(discord_id):
+        return _error(403, "only server admins can do that")
+    disabled_games.set_enabled(game, enabled)
+    # The page is static, so re-render it with the game shown or hidden.
+    write_launcher()
+    return 200, {"ok": True}
 
 
-def _parse_game_toggle(body: bytes) -> tuple[str, str, bool] | None:
-    """POST /api/games {"discord_id", "game", "enabled"}."""
-    try:
-        payload: Any = json.loads(body)
-    except ValueError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    fields = cast(dict[str, Any], payload)
-    discord_id, game, enabled = (
-        fields.get("discord_id"),
-        fields.get("game"),
-        fields.get("enabled"),
-    )
-    if (
-        not _is_discord_id(discord_id)
-        or game not in GAMES_BY_NAME
-        or not isinstance(enabled, bool)
-    ):
-        return None
-    return cast(str, discord_id), cast(str, game), enabled
+_GET_ROUTES: dict[str, Callable[[dict[str, str]], Reply]] = {
+    "/api/results": _get_results,
+    "/api/subscriptions": _get_subscriptions,
+    "/api/admin": _get_admin,
+}
+_POST_ROUTES: dict[str, Callable[[bytes], Reply]] = {
+    "/api/subscriptions": _post_subscription,
+    "/api/games": _post_game_toggle,
+}
 
 
 class _LauncherRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         url = urlsplit(self.path)
-        if url.path == RESULTS_API_PATH:
-            self._send_json(_results_for_query(url.query))
-        elif url.path == SUBSCRIPTIONS_API_PATH:
-            subscriptions = _subscriptions_for_query(url.query)
-            if subscriptions is None:
-                self._send_json({"error": "need a discord_id"}, 400)
-            else:
-                self._send_json(subscriptions)
-        elif url.path == ADMIN_API_PATH:
-            admin = _admin_for_query(url.query)
-            if admin is None:
-                self._send_json({"error": "need a discord_id"}, 400)
-            else:
-                self._send_json(admin)
-        else:
-            super().do_GET()
+        route = _GET_ROUTES.get(url.path)
+        if route is None:
+            super().do_GET()  # the page itself
+            return
+        params = {key: values[0] for key, values in parse_qs(url.query).items()}
+        self._send_json(*route(params))
 
     def do_POST(self) -> None:
-        path = urlsplit(self.path).path
+        route = _POST_ROUTES.get(urlsplit(self.path).path)
+        if route is None:
+            self._send_json(*_error(404, "not found"))
+            return
         length = int(self.headers.get("Content-Length") or 0)
-        body = self.rfile.read(length)
-        if path == SUBSCRIPTIONS_API_PATH:
-            self._post_subscription(body)
-        elif path == GAMES_API_PATH:
-            self._post_game_toggle(body)
-        else:
-            self._send_json({"error": "not found"}, 404)
+        self._send_json(*route(self.rfile.read(length)))
 
-    def _post_subscription(self, body: bytes) -> None:
-        sub = _parse_subscription(body)
-        if sub is None:
-            self._send_json({"error": "need discord_id, game and subscribed"}, 400)
-            return
-        results.set_subscription(sub)
-        self._send_json({"ok": True})
-
-    def _post_game_toggle(self, body: bytes) -> None:
-        toggle = _parse_game_toggle(body)
-        if toggle is None:
-            self._send_json({"error": "need discord_id, game and enabled"}, 400)
-            return
-        discord_id, game, enabled = toggle
-        if not results.is_admin(discord_id):
-            self._send_json({"error": "only server admins can do that"}, 403)
-            return
-        results.set_game_enabled(game, enabled)
-        # The page is static, so re-render it with the game shown or hidden.
-        write_launcher()
-        self._send_json({"ok": True})
-
-    def _send_json(self, body: Any, status: int = 200) -> None:
+    def _send_json(self, status: int, body: Any) -> None:
         encoded = json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -202,3 +120,62 @@ def serve_launcher(port: int = LAUNCHER_PORT) -> Generator[None]:
         yield
     finally:
         server.shutdown()
+
+
+def _result_json(result: results.StoredResult) -> dict[str, Any]:
+    game = GAMES_BY_NAME.get(result.game)
+    return {
+        "game": result.game,
+        "discord_id": result.discord_id,
+        "name": result.player_name,
+        "puzzle_id": result.puzzle_id,
+        "data": result.data,
+        "captured_at": result.captured_at.isoformat(),
+        # What the bot posts, or None if the game's config is gone. The page
+        # has no role IDs, so the role mention carries the game's name instead.
+        "announcement": (
+            announce.render_result(game, result, game_mention=f"<@&{game.name}>")
+            if game
+            else None
+        ),
+    }
+
+
+def _player_game_flag(body: bytes, flag: str) -> tuple[str, str, bool] | None:
+    """`discord_id`, `game` and the boolean `flag` from a JSON body, or None
+    if any is missing or invalid."""
+    try:
+        payload: Any = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    fields = cast(dict[str, Any], payload)
+    discord_id, game, value = (
+        fields.get("discord_id"),
+        fields.get("game"),
+        fields.get(flag),
+    )
+    if (
+        not _is_discord_id(discord_id)
+        or game not in GAMES_BY_NAME
+        or not isinstance(value, bool)
+    ):
+        return None
+    return discord_id, cast(str, game), value
+
+
+def _is_discord_id(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and value.isascii() and value.isdigit()
+
+
+def _parse_day(raw: str | None) -> date | None:
+    """A YYYY-MM-DD date, or None if it's missing or invalid."""
+    try:
+        return date.fromisoformat(raw or "")
+    except ValueError:
+        return None
+
+
+def _error(status: int, message: str) -> Reply:
+    return status, {"error": message}

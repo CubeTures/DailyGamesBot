@@ -10,9 +10,11 @@ from contextlib import suppress
 
 from src.launcher.server import serve_launcher
 from src.proxy.mitmdump import run_mitmdump
+from src.settings import configure_logging
 
 
 def main() -> None:
+    configure_logging()
     with suppress(KeyboardInterrupt), serve_launcher():
         asyncio.run(run_mitmdump())
 

@@ -14,7 +14,7 @@ uv run python3 -m src.proxy      # proxy + launcher only (no token needed)
 uv run python3 -m src.discord_bot      # Discord bot only
 uv run python3 -m src.games            # validate games/ and regenerate games/schema.json
 docker compose up --build        # everything, in Docker
-uv run pytest                    # offline checks (every game has a test driver)
+uv run pytest                    # offline unit tests + every game has a driver
 uv run pytest -m live            # play every game live and check its capture
 uv run pytest -m live -k wordle --headed   # one game, watching the browser
 ```
@@ -45,24 +45,32 @@ needs full type annotations. Its config is `[tool.pyright]` in
 
 ## Layout
 
-- `src/settings.py`: repo paths, launcher port, database path
+- `src/settings.py`: repo paths, launcher port, database path, `.env`
+  settings, logging setup
 - `src/games/`: game config models (`models.py`), loading and validation
   (`loader.py`), the loaded games (`registry.py`), schema generation
-  (`schema.py`)
+  (`schema.py`), and `game_day.js`, the JS `gameDay()` shared by the
+  capture script and the launcher (its Python twin is `Reset.day_at`)
+- `src/store/`: the SQLite store (`data/results.db`, override with
+  `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
+  `subscriptions.py`, `disabled_games.py`; `db.py` connects, creates the
+  tables and migrates old databases
 - `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads
   (`addon.py`), localhost rewrites (`rewrite.py`)
-- `src/proxy/capture/`: capture script building and injection (`script.py`,
-  `runtime.js`), the `/__dgb/` endpoints that save results (`endpoints.py`)
+- `src/proxy/capture/`: the `/__dgb/` paths (`__init__.py`), capture script
+  building and injection (`script.py`, `runtime.js`), the endpoints that
+  save results (`endpoints.py`)
 - `src/proxy/hooks/<game>.py`: optional per-game `request(flow)` /
-  `response(flow)` hooks (none exist yet; see `hooks/__init__.py`)
+  `response(flow)` hooks (see `hooks/__init__.py`); `route_foreign_hosts()`
+  builds them for games that fetch from other hosts
 - `src/launcher/`: page generation (`build.py`, `templates/`) and its HTTP
-  server with the results API (`server.py`)
-- `src/discord_bot/`: client and `/play` (`bot.py`), result posts
-  (`announcer.py`), username lookups (`player_names.py`), game roles
-  (`roles.py`), admin checks (`admins.py`)
+  server with the JSON API (`server.py`, one function per route)
+- `src/discord_bot/`: client, polling loops and `/play` (`bot.py`), result
+  posts (`announcer.py`), username lookups (`player_names.py`), game roles
+  (`roles.py`), admin checks (`admins.py`), channel lookups (`channels.py`)
 - `src/announce.py`: renders a result's `announcement.j2`
-- `src/results.py`: SQLite results store (`data/results.db`, override with
-  `DGB_DB_PATH`)
+- `tests/unit/`: offline tests of the store, rewrites, capture endpoints,
+  announcements and launcher API, each on a scratch database
 - `tests/e2e/`: live end-to-end tests of every game's capture; one driver per
   game in `tests/e2e/games/` (see `tests/README.md`)
 - `games/<name>/`: one directory per game (`config.toml`, `fields.js`,
@@ -79,10 +87,10 @@ needs full type annotations. Its config is `[tool.pyright]` in
   finished; `fields.js` says which result fields to extract. The proxy
   injects `capture/runtime.js` into the game's pages, which evaluates them
   and reports back; `capture/endpoints.py` saves results via
-  `src/results.py`, keyed on the player's Discord ID. When `fields.js` gives
+  `src/store/results.py`, keyed on the player's Discord ID. When `fields.js` gives
   no `time_secs`, `runtime.js` fills it in as the time since the game's
-  first page load that game day (a day starts at the config's `[reset]`),
-  kept in the game's localStorage under `__dgb_timer`.
+  first page load that game day (a day starts at the config's `[reset]`; see
+  `src/games/game_day.js`), kept in the game's localStorage under `__dgb_timer`.
 - **Launcher.** `launcher/index.html` is rendered from
   `src/launcher/templates/` and the game configs on every proxy start. It shows a card per game and a
   scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD` on the
@@ -91,10 +99,10 @@ needs full type annotations. Its config is `[tool.pyright]` in
   day the page loaded in, by the game's `[reset]`, as `game_day`. So a game
   resetting at Eastern midnight, played at 10pm Pacific, shows on the
   viewer's tomorrow. A card's "Done" state is for its game's current game
-  day (`currentGameDay()` in `app.js`, mirroring `runtime.js`). Cards of
+  day (`currentGameDay()` in `app.js`, using the shared `gameDay()`). Cards of
   games whose reset isn't `local` show its timezone (e.g. "EDT") in a
   pill, with a globe icon, beside their status. Each card is tinted with
-  its icon's dominant color (`tintCards()` in `app.js`). Clicking a result shows the
+  its icon's dominant color (`icon-color.js`). Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
   `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the
   player's game role via `GET`/`POST /api/subscriptions`. Cards are divs
@@ -129,14 +137,21 @@ needs full type annotations. Its config is `[tool.pyright]` in
 ## Gotchas
 
 - `launcher/index.html` is generated from `src/launcher/templates/` on
-  every proxy start, with the CSS and JS inlined. Edit the templates, not
+  every proxy start, with the CSS and JS (including `src/games/game_day.js`)
+  inlined. Edit the templates, not
   the output. It is gitignored, so don't commit it.
 - A new game's port must be added to `docker-compose.yml` `ports:` and the
   `Dockerfile` `EXPOSE`.
 - Each listener maps to one origin. If a game's JS fetches an absolute URL on
   a different host (separate API/CDN subdomain), that request bypasses the
-  proxy and may fail on CORS; fix it with a host-specific rewrite in
-  `src/proxy/rewrite.py`.
+  proxy and may fail on CORS; fix it with a hook calling
+  `route_foreign_hosts()` (see `src/proxy/hooks/dailyorbs.py`).
+- The store is shared across processes (the proxy runs inside mitmdump), so
+  the bot learns of new results, names and role picks by polling it, never
+  by being called. Call store functions from async code via
+  `asyncio.to_thread`.
+- Log with `logging.getLogger(__name__)`, not `print`; mitmproxy picks up
+  the proxy's logs, and the entry points call `configure_logging()`.
 - To add a game or fix its result capture, use the `/add-game` skill
   (`.claude/skills/add-game/SKILL.md`). Test against a scratch database by
   setting `DGB_DB_PATH`.

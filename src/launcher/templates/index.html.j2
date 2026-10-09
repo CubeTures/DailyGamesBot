@@ -108,7 +108,9 @@
 <script id="resets" type="application/json">{{ resets | tojson }}</script>
 <script id="higher-score-wins" type="application/json">{{ higher_score_wins | tojson }}</script>
 <script>
+{{ game_day_js | safe }}
 {% include "discord-markdown.js" %}
+{% include "icon-color.js" %}
 {% include "app.js" %}
 </script>
 </body>

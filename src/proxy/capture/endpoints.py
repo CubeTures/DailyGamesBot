@@ -6,24 +6,26 @@ cookies are shared across ports on localhost, unlike localStorage.
 """
 
 import json
+import logging
 from datetime import UTC, date, datetime
 from typing import Any, cast
 
-from mitmproxy import ctx, http
+from mitmproxy import http
 
-from src import results
 from src.games.models import Game
-from src.proxy.capture.script import SCRIPT_PATH, build_script
+from src.proxy.capture import PATH_PREFIX, RESULT_PATH, SCRIPT_PATH
+from src.proxy.capture.script import build_script
+from src.store import results
 
-PREFIX = "/__dgb/"
-RESULT_PATH = PREFIX + "result"
 DISCORD_ID_COOKIE = "dgb_discord_id"
 
 _NO_STORE = {"Cache-Control": "no-store"}
 
+log = logging.getLogger(__name__)
+
 
 def is_capture_path(path: str) -> bool:
-    return path.startswith(PREFIX)
+    return path.startswith(PATH_PREFIX)
 
 
 def strip_discord_id_cookie(request: http.Request) -> None:
@@ -33,34 +35,45 @@ def strip_discord_id_cookie(request: http.Request) -> None:
         del cookies[DISCORD_ID_COOKIE]
 
 
-def _json_response(status: int, body: dict[str, Any]) -> http.Response:
-    return http.Response.make(
-        status, json.dumps(body), {"Content-Type": "application/json", **_NO_STORE}
+def handle_capture_request(flow: http.HTTPFlow, game: Game) -> bool:
+    """Answer /__dgb/ requests locally. Returns True if the flow was handled."""
+    path = flow.request.path.split("?", 1)[0]
+    if not is_capture_path(path):
+        return False
+    if path == SCRIPT_PATH:
+        flow.response = http.Response.make(
+            200, build_script(game), {"Content-Type": "text/javascript", **_NO_STORE}
+        )
+    elif path == RESULT_PATH:
+        flow.response = _save_result(flow.request, game)
+    else:
+        flow.response = _error(404, "not found")
+    return True
+
+
+def _save_result(request: http.Request, game: Game) -> http.Response:
+    if request.method != "POST":
+        return _error(405, "POST only")
+    result = _parse_result(request, game)
+    if isinstance(result, str):
+        return _error(400, result)
+    status = "saved" if results.save(result) else "duplicate"
+    log.info(
+        "%s %s (%s) for %s: %s",
+        game.name,
+        result.puzzle_id,
+        result.game_day,
+        result.discord_id,
+        status,
     )
-
-
-def _error(status: int, message: str) -> http.Response:
-    return _json_response(status, {"error": message})
-
-
-def _game_day(raw: object, game: Game) -> date:
-    """The game day the page reported, or else today's by the game's reset
-    (in the server's timezone for "local" games)."""
-    if isinstance(raw, str):
-        try:
-            return date.fromisoformat(raw)
-        except ValueError:
-            pass
-    return game.reset.day_at(datetime.now(UTC))
+    return _json_response(200, {"status": status})
 
 
 def _parse_result(request: http.Request, game: Game) -> results.NewResult | str:
     """The result a POST reports, or why it can't be saved."""
     discord_id = request.cookies.get(DISCORD_ID_COOKIE)
     if not discord_id:
-        ctx.log.warn(
-            f"[capture] {game.name}: result with no {DISCORD_ID_COOKIE} cookie"
-        )
+        log.warning("%s: result with no %s cookie", game.name, DISCORD_ID_COOKIE)
         return "no discord id; open the /play link"
     try:
         body: Any = json.loads(request.get_text() or "")
@@ -85,31 +98,22 @@ def _parse_result(request: http.Request, game: Game) -> results.NewResult | str:
     )
 
 
-def _save_result(request: http.Request, game: Game) -> http.Response:
-    if request.method != "POST":
-        return _error(405, "POST only")
-    result = _parse_result(request, game)
-    if isinstance(result, str):
-        return _error(400, result)
-    status = "saved" if results.save(result) else "duplicate"
-    ctx.log.info(
-        f"[capture] {game.name} {result.puzzle_id} ({result.game_day})"
-        f" for {result.discord_id}: {status}"
+def _game_day(raw: object, game: Game) -> date:
+    """The game day the page reported, or else today's by the game's reset
+    (in the server's timezone for "local" games)."""
+    if isinstance(raw, str):
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            pass
+    return game.reset.day_at(datetime.now(UTC))
+
+
+def _json_response(status: int, body: dict[str, Any]) -> http.Response:
+    return http.Response.make(
+        status, json.dumps(body), {"Content-Type": "application/json", **_NO_STORE}
     )
-    return _json_response(200, {"status": status})
 
 
-def handle_capture_request(flow: http.HTTPFlow, game: Game) -> bool:
-    """Answer /__dgb/ requests locally. Returns True if the flow was handled."""
-    path = flow.request.path.split("?", 1)[0]
-    if not is_capture_path(path):
-        return False
-    if path == SCRIPT_PATH:
-        flow.response = http.Response.make(
-            200, build_script(game), {"Content-Type": "text/javascript", **_NO_STORE}
-        )
-    elif path == RESULT_PATH:
-        flow.response = _save_result(flow.request, game)
-    else:
-        flow.response = _error(404, "not found")
-    return True
+def _error(status: int, message: str) -> http.Response:
+    return _json_response(status, {"error": message})

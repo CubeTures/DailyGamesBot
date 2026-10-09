@@ -47,6 +47,25 @@
     return node;
   }
 
+  function pad(n) {
+    return (n < 10 ? "0" : "") + n;
+  }
+
+  function getJson(url) {
+    return fetch(url).then(function (res) { return res.json(); });
+  }
+
+  // Rejects unless the server accepted it.
+  function postJson(url, body) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (res) {
+      if (!res.ok) throw new Error(res.statusText);
+    });
+  }
+
   function showMessage(container, text, loading) {
     container.textContent = "";
     container.appendChild(el("p", loading ? "empty loading" : "empty", text));
@@ -87,7 +106,6 @@
   // Seconds as "1:05" or "1:02:03", like the announcements' `duration`.
   function formatTime(secs) {
     var total = Math.round(secs);
-    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
     var hours = Math.floor(total / 3600), minutes = Math.floor(total / 60) % 60;
     return (hours ? hours + ":" + pad(minutes) : String(minutes)) + ":" + pad(total % 60);
   }
@@ -120,7 +138,7 @@
   // game that resets in another timezone shows on the board of its puzzle's
   // date, which may be the viewer's tomorrow or yesterday.
   function fetchResults(day) {
-    return fetch("/api/results?day=" + dayKey(day)).then(function (res) { return res.json(); });
+    return getJson("/api/results?day=" + isoDate(day));
   }
 
   var dialog = document.getElementById("dialog");
@@ -341,9 +359,6 @@
     shownOnBoard = shown;
   }
 
-  // viewDay is a local midnight, or null to follow today (also across
-  // midnight). Kept in the URL hash as #day=YYYY-MM-DD so it can be linked.
-
   function today() {
     var now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -353,33 +368,23 @@
     return new Date(day.getFullYear(), day.getMonth(), day.getDate() + n);
   }
 
-  function dayKey(day) {
-    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-    return day.getFullYear() + "-" + pad(day.getMonth() + 1) + "-" + pad(day.getDate());
-  }
-
   function parseDayKey(key) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || "");
     return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
   }
 
-  // The game day a game's current puzzle belongs to, as a local midnight like
-  // today(): the date, in its reset timezone (the viewer's own if none), of
-  // its reset time before now. Mirrors gameDay() in proxy/capture/runtime.js.
+  // The game day a game's current puzzle belongs to, as a local midnight
+  // like today() (gameDay() is in src/games/game_day.js).
   function currentGameDay(game) {
-    var reset = RESETS[game];
-    var shifted = new Date(Date.now() - reset.minutes * 60000);
-    if (!reset.timezone) return new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate());
-    // en-CA formats dates as YYYY-MM-DD.
-    return parseDayKey(new Intl.DateTimeFormat("en-CA", {
-      timeZone: reset.timezone, year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(shifted));
+    return parseDayKey(gameDay(RESETS[game]));
   }
 
   function dayFromHash() {
     return parseDayKey((/^#day=(.*)$/.exec(location.hash) || [])[1]);
   }
 
+  // A local midnight, or null to follow today (also across midnight). Kept
+  // in the URL hash as #day=YYYY-MM-DD so it can be linked.
   var viewDay = null;
   var prevButton = document.getElementById("day-prev");
   var nextButton = document.getElementById("day-next");
@@ -394,7 +399,7 @@
     document.getElementById("boards").style.setProperty(
       "--dx", to < from ? "-16px" : to > from ? "16px" : "0px");
     if (!fromHash) {
-      var hash = viewDay ? "#day=" + dayKey(viewDay) : "";
+      var hash = viewDay ? "#day=" + isoDate(viewDay) : "";
       history.replaceState({}, "", location.pathname + location.search + hash);
     }
     showViewDay();
@@ -410,14 +415,14 @@
   // the scoreboard shows: a game that resets in an earlier timezone may
   // already be on the viewer's tomorrow. So fetch today plus any such day.
   function refreshToday() {
-    var todayKey = dayKey(today());
+    var todayKey = isoDate(today());
     var cardDays = {};
     var days = {};
     days[todayKey] = today();
     Object.keys(RESETS).forEach(function (game) {
       var day = currentGameDay(game);
-      cardDays[game] = dayKey(day);
-      days[dayKey(day)] = day;
+      cardDays[game] = isoDate(day);
+      days[isoDate(day)] = day;
     });
     var keys = Object.keys(days);
     Promise.all(keys.map(function (key) { return fetchResults(days[key]); })).then(function (lists) {
@@ -447,8 +452,8 @@
     var day = viewDay || today();
     nextButton.disabled = !viewDay;
     todayButton.hidden = !viewDay;
-    dayPicker.max = dayKey(today());
-    dayPicker.value = dayKey(day);
+    dayPicker.max = isoDate(today());
+    dayPicker.value = isoDate(day);
     var title = document.getElementById("scores-title");
     title.textContent = viewDay
       ? "Scores · " + day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
@@ -475,44 +480,13 @@
   }
   labelResets();
 
-  // Each card and scoreboard is tinted with its icon's dominant color: the icon is drawn
-  // small, its opaque and not-too-grey pixels are binned by hue (weighted by
-  // saturation), and the heaviest bin's pixels are averaged. The CSS mixes
-  // --tint into their surfaces, so it stays muted in either theme.
-  function dominantColor(img) {
-    var size = 32, canvas = document.createElement("canvas");
-    canvas.width = canvas.height = size;
-    var ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, size, size);
-    var pixels = ctx.getImageData(0, 0, size, size).data;
-    var bins = [];
-    for (var i = 0; i < pixels.length; i += 4) {
-      var r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-      if (pixels[i + 3] < 128) continue;
-      var max = Math.max(r, g, b), min = Math.min(r, g, b), chroma = max - min;
-      if (chroma < 40 || max < 40) continue;
-      var hue = max === r ? (g - b) / chroma : max === g ? 2 + (b - r) / chroma : 4 + (r - g) / chroma;
-      var bin = bins[Math.floor(((hue + 6) % 6) * 2)] ||
-        (bins[Math.floor(((hue + 6) % 6) * 2)] = { weight: 0, r: 0, g: 0, b: 0 });
-      var weight = chroma / max;
-      bin.weight += weight; bin.r += r * weight; bin.g += g * weight; bin.b += b * weight;
-    }
-    var best = bins.reduce(function (a, c) { return c && (!a || c.weight > a.weight) ? c : a; }, null);
-    if (!best) return null;
-    // Keep the hue and saturation but fix the lightness, so pale and dark
-    // icons tint equally.
-    var r = best.r / best.weight, g = best.g / best.weight, b = best.b / best.weight;
-    var max = Math.max(r, g, b), min = Math.min(r, g, b), chroma = max - min;
-    var hue = max === r ? (g - b) / chroma : max === g ? 2 + (b - r) / chroma : 4 + (r - g) / chroma;
-    var sat = chroma / (255 - Math.abs(max + min - 255));
-    return "hsl(" + Math.round(((hue + 6) % 6) * 60) + " " + Math.round(sat * 100) + "% 50%)";
-  }
-
+  // Each card and scoreboard is tinted with its icon's dominant color. The
+  // CSS mixes --tint into their surfaces, so it stays muted in either theme.
   function tintCards() {
     document.querySelectorAll(".card img.icon").forEach(function (img) {
       function tint() {
         try {
-          var color = dominantColor(img);
+          var color = iconColor.dominant(img);
           if (!color) return;
           var game = img.closest(".card").dataset.game;
           TINTS[game] = color;
@@ -542,19 +516,11 @@
         var pinged = button.getAttribute("aria-pressed") !== "true";
         setPinged(button, pinged);
         if (pinged) replay(button, "rung");
-        fetch("/api/subscriptions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ discord_id: discordId, game: game, subscribed: pinged }),
-        }).then(function (res) {
-          if (!res.ok) throw new Error(res.statusText);
-        }).catch(function () {
-          setPinged(button, !pinged);
-        });
+        postJson("/api/subscriptions", { discord_id: discordId, game: game, subscribed: pinged })
+          .catch(function () { setPinged(button, !pinged); });
       });
     });
-    fetch("/api/subscriptions?discord_id=" + encodeURIComponent(discordId))
-      .then(function (res) { return res.json(); })
+    getJson("/api/subscriptions?discord_id=" + encodeURIComponent(discordId))
       .then(function (body) {
         buttons.forEach(function (button) {
           setPinged(button, body.games.indexOf(button.closest(".card").dataset.game) !== -1);
@@ -586,15 +552,9 @@
     function toggle(button) {
       var visible = button.getAttribute("aria-pressed") !== "true";
       setVisible(button, visible);
-      fetch("/api/games", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discord_id: discordId, game: button.closest(".card").dataset.game, enabled: visible }),
-      }).then(function (res) {
-        if (!res.ok) throw new Error(res.statusText);
-      }).catch(function () {
-        setVisible(button, !visible);
-      });
+      var game = button.closest(".card").dataset.game;
+      postJson("/api/games", { discord_id: discordId, game: game, enabled: visible })
+        .catch(function () { setVisible(button, !visible); });
     }
 
     buttons.forEach(function (button) {
@@ -611,8 +571,7 @@
       editButton.title = editing ? "Done choosing games" : "Choose which games are shown";
       note.hidden = !editing;
     });
-    fetch("/api/admin?discord_id=" + encodeURIComponent(discordId))
-      .then(function (res) { return res.json(); })
+    getJson("/api/admin?discord_id=" + encodeURIComponent(discordId))
       .then(function (body) { editButton.hidden = !body.admin; })
       .catch(function () {});
   }

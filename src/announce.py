@@ -7,6 +7,7 @@ Preview one against made-up fields with:
     uv run python3 -m src.announce wordle '{"won": true, "score": 3, ...}'
 """
 
+import logging
 import re
 from collections import Counter
 from typing import Any, cast
@@ -15,9 +16,11 @@ from jinja2 import TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 
 from src.games.models import Game
-from src.results import StoredResult
+from src.store.results import StoredResult
 
 DISCORD_MAX_LENGTH = 2000
+
+log = logging.getLogger(__name__)
 
 # Always in scope (None when the game doesn't report them), so templates can
 # test `score is not none` without first checking it's defined.
@@ -91,6 +94,11 @@ def mention(discord_id: str) -> str:
     return f"<@{discord_id}>"
 
 
+def truncate(text: str, limit: int = DISCORD_MAX_LENGTH) -> str:
+    """`text` cut to `limit` characters, ending in "…" if it was cut."""
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def _render_first_working(
     templates: list[str], context: dict[str, Any], game_title: str
 ) -> str:
@@ -98,7 +106,7 @@ def _render_first_working(
         try:
             return _env.from_string(template).render(context).strip()
         except Exception as e:
-            print(f"Announcement template for {game_title} failed: {e!r}")
+            log.warning("Announcement template for %s failed: %r", game_title, e)
     return ""
 
 
@@ -127,10 +135,7 @@ def render(
         [game.announcement_template] if game.announcement_template is not None else []
     )
     text = _render_first_working([*templates, DEFAULT_TEMPLATE], context, game.title)
-    text = text or f"{player} finished **{game_name}**"
-    if len(text) > DISCORD_MAX_LENGTH:
-        text = text[: DISCORD_MAX_LENGTH - 1] + "…"
-    return text
+    return truncate(text or f"{player} finished **{game_name}**")
 
 
 def render_result(

@@ -16,10 +16,29 @@ _SECURE_PREFIXES = (b"__Secure-", b"__Host-")
 _TEXT_CONTENT_TYPES = ("html", "javascript", "json", "css", "text/")
 
 
+def replace_in_body(
+    response: http.Response,
+    replacements: list[tuple[bytes, bytes]],
+    content_types: tuple[str, ...] = _TEXT_CONTENT_TYPES,
+) -> None:
+    """Apply byte replacements to a response whose Content-Type contains one
+    of `content_types`."""
+    content_type = cast(str, response.headers.get("content-type", ""))
+    if not any(t in content_type for t in content_types):
+        return
+    original = content = response.content
+    if not content:
+        return
+    for old, new in replacements:
+        content = content.replace(old, new)
+    if content != original:
+        response.content = content
+
+
 def drop_cache_validators(request: http.Request) -> None:
-    # Force a full response instead of a bodyless 304: the client's cache
-    # validators were earned against whatever it loaded last through this
-    # proxy, and a 304 here can leave the page with no body to render.
+    """Force a full response instead of a bodyless 304: the client's cache
+    validators were earned against whatever it last loaded through this
+    proxy, and a 304 can leave the page with no body to render."""
     request.headers.pop("if-none-match", None)
     request.headers.pop("if-modified-since", None)
 
@@ -65,23 +84,18 @@ class OriginRewriter:
         ]
 
     def apply(self, response: http.Response) -> None:
-        # Redirects to the real origin (e.g. an old path moved) would take the
-        # player off the proxy.
+        self._rewrite_redirect(response)
+        replace_in_body(response, self._replacements)
+
+    def _rewrite_redirect(self, response: http.Response) -> None:
+        """Keep redirects to the real origin (e.g. an old path moved) from
+        taking the player off the proxy."""
         location = cast(str | None, response.headers.get("location"))
-        if location is not None:
-            real, local = (r.decode() for r in self._replacements[0])
-            if location == real or location.startswith((real + "/", real + "?")):
-                response.headers["location"] = local + location.removeprefix(real)
-        content_type = cast(str, response.headers.get("content-type", ""))
-        if not any(t in content_type for t in _TEXT_CONTENT_TYPES):
+        if location is None:
             return
-        original = content = response.content
-        if not content:
-            return
-        for real, local in self._replacements:
-            content = content.replace(real, local)
-        if content != original:
-            response.content = content
+        real, local = (r.decode() for r in self._replacements[0])
+        if location == real or location.startswith((real + "/", real + "?")):
+            response.headers["location"] = local + location.removeprefix(real)
 
 
 class ForeignHostRouter:
@@ -90,8 +104,8 @@ class ForeignHostRouter:
     A game whose JS fetches an absolute URL on a separate API/CDN host is
     blocked by CORS from localhost. This rewrites those URLs in text responses
     to `<local origin>/__host/<host>/...`, and `route` sends requests for that
-    prefix on to the real host. Use it from a game's hooks
-    (`src/proxy/hooks/<game>.py`).
+    prefix on to the real host. Games use it through
+    `src.proxy.hooks.route_foreign_hosts`.
     """
 
     PREFIX = "/__host/"

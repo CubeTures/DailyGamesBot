@@ -1,12 +1,17 @@
 # Tests
 
 ```sh
-uv run pytest                              # offline: every captured game has a driver
+uv run pytest                              # offline: unit tests, every captured game has a driver
 uv run pytest -m live                      # every game, every outcome, live (~15 min)
 uv run pytest -m live -k wordle --headed   # one game, watching the browser
 uv run pytest -m live -k "chess and lose"  # one scenario
 uv run pytest -m live --keep-artifacts     # keep traces for passing tests too
 ```
+
+The offline unit tests (`tests/unit/`) cover the pieces with no browser:
+the store, the proxy's rewrites, the capture endpoints and script (each
+game's built script is checked with `node --check`), announcements, and the
+launcher's API. Each test gets its own scratch database.
 
 The live tests (`tests/e2e/`) play each game on its real site, through the
 proxy, and check the result the capture script saved. They're how a

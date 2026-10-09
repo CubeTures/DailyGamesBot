@@ -1,13 +1,11 @@
 // Daily Games Bot result capture runtime, injected at the top of every HTML
-// page a game with triggers serves (see capture/script.py).
+// page of a game with triggers (see capture/script.py, which fills in the
+// __DGB_*__ placeholders).
 //
-// The placeholders are filled with the game's name, its reset time and its
-// triggers. Each
-// trigger's `when` and `fields` is a function(req, res, event) that runs the
-// game's vars.js and returns `when` / the fields object. They're compiled into
-// this scope so they can use the helpers below (ls, ss, text, texts, exists,
-// cookie, today). A solve timer fills in time_secs for games that don't
-// report one.
+// Each trigger's `when` and `fields` is a function(req, res, event) that runs
+// the game's vars.js first. They're compiled into this scope so they can use
+// the helpers below (ls, ss, text, texts, exists, cookie, today). A solve
+// timer fills in time_secs for games that don't report one.
 //
 // Debug from devtools: window.__dgb.status(), .dryRun(), .testNetwork(...)
 (function () {
@@ -15,7 +13,8 @@
   if (window.__dgb) return;
 
   var GAME = __DGB_GAME__;
-  var RESULT_ENDPOINT = "/__dgb/result";
+  var RESET = __DGB_RESET__;
+  var RESULT_ENDPOINT = __DGB_RESULT_PATH__;
   var MAX_LOG_ENTRIES = 50;
   // Captured before wrapping, so reporting a result doesn't trip triggers.
   var originalFetch = window.fetch ? window.fetch.bind(window) : null;
@@ -41,11 +40,9 @@
     var match = document.cookie.match(new RegExp("(?:^|; )" + escaped + "=([^;]*)"));
     return match ? decodeURIComponent(match[1]) : null;
   }
-  function today() {
-    var d = new Date();
-    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-  }
+  __DGB_GAME_DAY_JS__;
+
+  function today() { return isoDate(new Date()); }
 
   var TRIGGERS = __DGB_TRIGGERS__;
 
@@ -81,22 +78,7 @@
   // runs from the game's reset time (config.toml [reset]). The time is only
   // reported if the player has clicked or typed since the start, so a puzzle
   // already finished elsewhere, whose result fires on load, gets none.
-  var RESET = __DGB_RESET__;
   var TIMER_KEY = "__dgb_timer";
-
-  // The current game day, as YYYY-MM-DD: the date, in the reset timezone
-  // (the player's own if none), of RESET.minutes before now.
-  function gameDay() {
-    var shifted = new Date(Date.now() - RESET.minutes * 60000);
-    if (!RESET.timezone) {
-      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-      return shifted.getFullYear() + "-" + pad(shifted.getMonth() + 1) + "-" + pad(shifted.getDate());
-    }
-    // en-CA formats dates as YYYY-MM-DD.
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: RESET.timezone, year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(shifted);
-  }
 
   function saveTimer(timer) {
     // Through the prototype, so the setItem wrapper below doesn't schedule a check.
@@ -106,7 +88,7 @@
   // {day, start (epoch ms), played (input seen since)} for today's game day,
   // started now if there isn't one yet.
   function currentTimer() {
-    var day = gameDay();
+    var day = gameDay(RESET);
     var timer = ls(TIMER_KEY);
     if (!timer || timer.day !== day || typeof timer.start !== "number") {
       timer = { day: day, start: Date.now(), played: false };
@@ -124,7 +106,7 @@
   // The game day this page's puzzle belongs to, reported with its result so
   // the launcher files it under the right day. Taken at load, so a puzzle
   // started before the reset and finished after it keeps its own day.
-  var PAGE_DAY = gameDay();
+  var PAGE_DAY = gameDay(RESET);
   ["pointerdown", "keydown"].forEach(function (name) {
     window.addEventListener(name, function (event) {
       var timer = currentTimer();
@@ -185,7 +167,7 @@
       : Promise.reject(new Error("no fetch"));
     sending.catch(function (e) {
       entry.status = "error " + e;
-      delete state.sent[payload.puzzle_id]; // let a later check retry
+      delete state.sent[payload.puzzle_id]; // so a later check retries
     });
   }
 

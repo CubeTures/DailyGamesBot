@@ -12,7 +12,10 @@ from typing import cast
 
 from mitmproxy import http
 
-HookFn = Callable[[http.HTTPFlow], None]
+from src.games.registry import GAMES_BY_NAME
+from src.proxy.rewrite import ForeignHostRouter
+
+Hook = Callable[[http.HTTPFlow], None]
 
 
 def _no_op(flow: http.HTTPFlow) -> None:
@@ -21,8 +24,8 @@ def _no_op(flow: http.HTTPFlow) -> None:
 
 @dataclass(frozen=True)
 class GameHooks:
-    request: HookFn = _no_op
-    response: HookFn = _no_op
+    request: Hook = _no_op
+    response: Hook = _no_op
 
 
 def load_hooks(game_name: str) -> GameHooks:
@@ -34,6 +37,22 @@ def load_hooks(game_name: str) -> GameHooks:
             raise
         return GameHooks()
     return GameHooks(
-        request=cast(HookFn, getattr(module, "request", _no_op)),
-        response=cast(HookFn, getattr(module, "response", _no_op)),
+        request=cast(Hook, getattr(module, "request", _no_op)),
+        response=cast(Hook, getattr(module, "response", _no_op)),
     )
+
+
+def route_foreign_hosts(game_name: str, hosts: list[str]) -> tuple[Hook, Hook]:
+    """`request` and `response` hooks serving `hosts`, which the game's JS
+    fetches from, under the game's own port (see ForeignHostRouter)."""
+    game = GAMES_BY_NAME[game_name]
+    router = ForeignHostRouter(game.origin, game.local_origin, hosts)
+
+    def request(flow: http.HTTPFlow) -> None:
+        router.route(flow.request)
+
+    def response(flow: http.HTTPFlow) -> None:
+        if flow.response is not None:
+            router.apply(flow.response)
+
+    return request, response

@@ -1,35 +1,21 @@
 """Game roles: one per game, named after it, in the results channel's server.
 Players pick theirs on the launcher, and results for a game ping its role.
 
-The launcher saves picks in the results store (it can't reach the bot), so
-the bot polls for unsynced ones and gives or takes the role. The bot needs
-the Manage Roles permission.
+The launcher saves picks in the store (it can't reach the bot), so the bot
+polls for unsynced ones and gives or takes the role. The bot needs the
+Manage Roles permission.
 """
 
 import asyncio
+import logging
 
 import discord
 
-from src import results
 from src.games.models import Game
 from src.games.registry import GAMES_BY_NAME
+from src.store import subscriptions
 
-
-async def results_guild(
-    client: discord.Client, channel_id: int
-) -> discord.Guild | None:
-    """The server the results channel is in."""
-    channel = client.get_channel(channel_id)
-    if channel is None:
-        try:
-            channel = await client.fetch_channel(channel_id)
-        except discord.HTTPException as e:
-            print(f"Can't open results channel {channel_id}: {e}")
-            return None
-    if not isinstance(channel, discord.abc.GuildChannel):
-        print(f"Results channel {channel_id} isn't in a server; no game roles")
-        return None
-    return channel.guild
+log = logging.getLogger(__name__)
 
 
 async def game_role(guild: discord.Guild, game: Game) -> discord.Role | None:
@@ -44,7 +30,7 @@ async def game_role(guild: discord.Guild, game: Game) -> discord.Role | None:
             reason=f"Pinged when someone finishes {game.title}",
         )
     except discord.HTTPException as e:
-        print(f"Couldn't create the {game.title} role: {e}")
+        log.warning("Couldn't create the %s role: %s", game.title, e)
         return None
 
 
@@ -53,7 +39,14 @@ async def create_game_roles(guild: discord.Guild) -> None:
         await game_role(guild, game)
 
 
-async def _apply(guild: discord.Guild, sub: results.Subscription) -> bool:
+async def sync_subscriptions(guild: discord.Guild) -> None:
+    for sub in await asyncio.to_thread(subscriptions.unsynced):
+        if not await _apply(guild, sub):
+            return  # Try again next loop.
+        await asyncio.to_thread(subscriptions.mark_synced, sub)
+
+
+async def _apply(guild: discord.Guild, sub: subscriptions.Subscription) -> bool:
     """Give or take the role; False if it should be retried later."""
     game = GAMES_BY_NAME.get(sub.game)
     if game is None:
@@ -70,13 +63,6 @@ async def _apply(guild: discord.Guild, sub: results.Subscription) -> bool:
     except discord.NotFound:
         return True  # Not in the server.
     except discord.HTTPException as e:
-        print(f"Couldn't update {sub.discord_id}'s {game.title} role: {e}")
+        log.warning("Couldn't update %s's %s role: %s", sub.discord_id, game.title, e)
         return False
     return True
-
-
-async def sync_subscriptions(guild: discord.Guild) -> None:
-    for sub in await asyncio.to_thread(results.unsynced_subscriptions):
-        if not await _apply(guild, sub):
-            return  # Try again next loop.
-        await asyncio.to_thread(results.mark_subscription_synced, sub)

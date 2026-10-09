@@ -8,28 +8,19 @@ left over at production as a fallback. The production API already allows a
 localhost origin over CORS.
 """
 
-from typing import cast
-
 from mitmproxy import http
 
-_LOCAL_CHECK = b"document.location.host.includes(`localhost`)||!!document.location.port"
-_STAGING_HOSTS = [
-    (f"{name}-staging.puzzmo.com".encode(), f"{name}.puzzmo.com".encode())
-    for name in ("api", "live", "studio", "thumbnails")
+from src.proxy.rewrite import replace_in_body
+
+_REPLACEMENTS = [
+    (b"document.location.host.includes(`localhost`)||!!document.location.port", b"!1"),
+    *(
+        (f"{name}-staging.puzzmo.com".encode(), f"{name}.puzzmo.com".encode())
+        for name in ("api", "live", "studio", "thumbnails")
+    ),
 ]
 
 
 def response(flow: http.HTTPFlow) -> None:
-    response = flow.response
-    if response is None:
-        return
-    if "javascript" not in cast(str, response.headers.get("content-type", "")):
-        return
-    original = content = response.content
-    if not content:
-        return
-    content = content.replace(_LOCAL_CHECK, b"!1")
-    for staging, production in _STAGING_HOSTS:
-        content = content.replace(staging, production)
-    if content != original:
-        response.content = content
+    if flow.response is not None:
+        replace_in_body(flow.response, _REPLACEMENTS, content_types=("javascript",))

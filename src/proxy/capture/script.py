@@ -13,10 +13,10 @@ from src.games.models import (
     NetworkTrigger,
     Trigger,
 )
+from src.proxy.capture import RESULT_PATH, SCRIPT_PATH
 
-SCRIPT_PATH = "/__dgb/capture.js"
-
-_RUNTIME = (Path(__file__).parent / "runtime.js").read_text()
+_RUNTIME_JS = (Path(__file__).parent / "runtime.js").read_text()
+_GAME_DAY_JS = (Path(__file__).parents[2] / "games" / "game_day.js").read_text()
 _HEAD_TAG_RE = re.compile(rb"<head\b[^>]*>", re.IGNORECASE)
 _HTML_TAG_RE = re.compile(rb"<html\b[^>]*>", re.IGNORECASE)
 _SCRIPT_TAG = f'<script src="{SCRIPT_PATH}"></script>'.encode()
@@ -48,11 +48,17 @@ def _js_trigger(trigger: Trigger, game: Game) -> str:
 
 def build_script(game: Game) -> str:
     triggers = ",\n".join(_js_trigger(t, game) for t in game.triggers)
-    return (
-        _RUNTIME.replace("__DGB_GAME__", json.dumps(game.name))
-        .replace("__DGB_RESET__", json.dumps(game.reset.js_config()))
-        .replace("__DGB_TRIGGERS__", f"[\n{triggers}\n]")
-    )
+    placeholders = {
+        "__DGB_GAME__": json.dumps(game.name),
+        "__DGB_RESET__": json.dumps(game.reset.js_config()),
+        "__DGB_RESULT_PATH__": json.dumps(RESULT_PATH),
+        "__DGB_GAME_DAY_JS__;": _GAME_DAY_JS,
+        "__DGB_TRIGGERS__": f"[\n{triggers}\n]",
+    }
+    script = _RUNTIME_JS
+    for placeholder, value in placeholders.items():
+        script = script.replace(placeholder, value)
+    return script
 
 
 def inject_script_tag(response: http.Response, game: Game) -> None:

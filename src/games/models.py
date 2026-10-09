@@ -26,6 +26,8 @@ ICON_MIME_TYPES = {
 # swaps this for `return` to run it as a function body.
 FIELDS_EXPORT_RE = re.compile(r"^export\s+default\s*", re.MULTILINE)
 
+LOCAL_TIMEZONE = "local"
+
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1)]
 
 JsExpr = Annotated[
@@ -57,9 +59,6 @@ class _StrictModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
 
-LOCAL_TIMEZONE = "local"
-
-
 class Reset(_StrictModel):
     """When the game's daily puzzle changes. The solve timer starts afresh
     each game day."""
@@ -83,19 +82,20 @@ class Reset(_StrictModel):
         hours, minutes = self.time.split(":")
         return int(hours) * 60 + int(minutes)
 
+    @property
+    def zone_name(self) -> str | None:
+        """The IANA timezone, or None for the player's own."""
+        return None if self.timezone == LOCAL_TIMEZONE else self.timezone
+
     def js_config(self) -> dict[str, int | str | None]:
-        """What gameDay() in proxy/capture/runtime.js and the launcher's
-        currentGameDay() take; a null timezone is the player's own."""
-        return {
-            "minutes": self.minutes,
-            "timezone": None if self.timezone == LOCAL_TIMEZONE else self.timezone,
-        }
+        """The argument gameDay() in src/games/game_day.js takes."""
+        return {"minutes": self.minutes, "timezone": self.zone_name}
 
     def day_at(self, time: datetime) -> date:
         """The game day `time` falls in: the date, in the reset timezone (the
-        server's own for "local"), of `minutes` before it. Mirrors gameDay()
-        in proxy/capture/runtime.js, which uses the player's timezone."""
-        zone = None if self.timezone == LOCAL_TIMEZONE else ZoneInfo(self.timezone)
+        server's own for "local"), of `minutes` before it. The Python twin of
+        gameDay() in src/games/game_day.js."""
+        zone = ZoneInfo(self.zone_name) if self.zone_name else None
         return (time.astimezone(zone) - timedelta(minutes=self.minutes)).date()
 
 
@@ -218,8 +218,7 @@ class Game(GameConfig):
     vars_js: str = ""
     fields_js: str = ""
     icon_path: Path | None = None
-    # None uses announce.DEFAULT_TEMPLATE.
-    announcement_template: str | None = None
+    announcement_template: str | None = None  # None: announce.DEFAULT_TEMPLATE
 
     @property
     def local_origin(self) -> str:

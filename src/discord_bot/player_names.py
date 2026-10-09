@@ -1,10 +1,13 @@
 """Keeps players' Discord usernames current for the launcher's scoreboard."""
 
 import asyncio
+import logging
 
 import discord
 
-from src import results
+from src.store import players
+
+log = logging.getLogger(__name__)
 
 
 async def refresh_player_name(client: discord.Client, discord_id: str) -> None:
@@ -12,14 +15,14 @@ async def refresh_player_name(client: discord.Client, discord_id: str) -> None:
         user = await client.fetch_user(int(discord_id))
     except discord.NotFound:
         # Don't retry a deleted account every loop; keep any old name.
-        results.set_player_name(discord_id, None)
+        await asyncio.to_thread(players.set_name, discord_id, None)
         return
     except discord.HTTPException as e:
-        print(f"Couldn't look up Discord user {discord_id}: {e}")
+        log.warning("Couldn't look up Discord user %s: %s", discord_id, e)
         return
-    results.set_player_name(discord_id, user.name)
+    await asyncio.to_thread(players.set_name, discord_id, user.name)
 
 
 async def refresh_stale_names(client: discord.Client) -> None:
-    for discord_id in await asyncio.to_thread(results.stale_player_ids):
+    for discord_id in await asyncio.to_thread(players.stale_name_ids):
         await refresh_player_name(client, discord_id)
