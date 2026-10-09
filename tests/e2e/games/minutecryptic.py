@@ -23,7 +23,11 @@ def _start(player: Player) -> None:
 
 
 def _cell(player: Player, index: int) -> Locator:
-    return player.page.locator(f'[aria-label^="Letter {index + 1} of "]')
+    """The answer's index-th letter cell, across words: cells are labelled
+    "Letter 1 of 9, ..." or, for answers of several words, "Word 2, letter
+    1 of 2, ..."."""
+    answer = player.page.get_by_role("group", name="Puzzle answer")
+    return answer.locator('[aria-label*="letter " i][aria-label*=" of "]').nth(index)
 
 
 def _key(player: Player, letter: str) -> None:

@@ -198,6 +198,8 @@
     if (oldIcon) oldIcon.remove();
     dialogHead.insertBefore(smallIcon(game), dialogTitle);
     dialogTitle.textContent = title;
+    if (TINTS[game]) dialog.style.setProperty("--tint", TINTS[game]);
+    else dialog.style.removeProperty("--tint");
     dialogBack = back || null;
     backButton.hidden = !back;
     message.hidden = showList;
@@ -243,12 +245,11 @@
       // Celebrate a result that arrives while the page is open.
       if (cardsRendered && mine && !card.classList.contains("done")) replay(card, "just-done");
       card.classList.toggle("done", !!mine);
-      card.querySelector(".status").textContent = mine ? "Done" : "Not played";
       if (mine) {
         // A loss is stamped "Done", not "Cleared", and has no score line.
         var score = formatScore(mine.data);
-        card.querySelector(".stamp-word").textContent = lost(mine.data) ? "Done" : "Cleared";
-        card.querySelector(".stamp-score").textContent = score === "–" ? "" : score;
+        card.querySelector(".stamp-word").textContent = "Cleared";
+        card.querySelector(".stamp-score").textContent = score === "–" ? "---" : score;
       }
       card.querySelector(".play").textContent = mine ? "Open" : "Play";
     });
@@ -574,7 +575,7 @@
   }
   labelResets();
 
-  // Each card and scoreboard is tinted with its icon's dominant color. The
+  // Each card, scoreboard and the dialog showing its game is tinted with its icon's dominant color. The
   // CSS mixes --tint into their surfaces, so it stays muted in either theme.
   function tintCards() {
     document.querySelectorAll(".card img.icon").forEach(function (img) {

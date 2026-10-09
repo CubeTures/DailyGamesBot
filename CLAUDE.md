@@ -114,7 +114,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   viewer's tomorrow. A card's "Done" state is for its game's current game
   day (`currentGameDay()` in `app.js`, using the shared `gameDay()`). Cards of
   games whose reset isn't `local` show its timezone (e.g. "EDT") in a
-  pill, with a globe icon, beside their status. Each card is tinted with
+  pill, with a globe icon, in their footer. Each card is tinted with
   its icon's dominant color (`icon-color.js`). Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
   `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the

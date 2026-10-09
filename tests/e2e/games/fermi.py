@@ -28,7 +28,8 @@ def _guess(player: Player, n: int, guess: float) -> float:
     page = player.page
     if n:
         page.get_by_role("button", name=f"Question {n + 1} →").click()
-    page.get_by_role("textbox", name="your guess").fill(f"{guess:g}")
+    # Typed out in full: the box won't take exponents ("1.64e+08").
+    page.get_by_role("textbox", name="your guess").fill(f"{guess:.15g}")
     page.get_by_role("button", name=re.compile("Lock it in")).click()
     answer = page.locator(".score-card.target .score-num")
     answer.wait_for()

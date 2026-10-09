@@ -129,7 +129,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   border-color: color-mix(in oklab, var(--tint, var(--border-strong)) 18%, var(--border-strong));
 }
 .card .card-foot { border-top-color: color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border)); }
-.card[style*="--tint"] :is(.status, .reset) {
+.card[style*="--tint"] .reset {
   background: color-mix(in oklab, var(--tint) var(--tint-pill-amount), var(--tint-pill-base));
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
@@ -223,11 +223,11 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .tags { display: flex; align-items: center; gap: 6px; }
 /* .reset names the timezone of a game that resets in a fixed one, not the
    player's own. */
-.status, .reset {
+.reset {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
+  gap: 4px;
+  padding: 3px 10px 3px 8px;
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--muted);
@@ -236,7 +236,6 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font-variant-numeric: tabular-nums;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
-.reset { gap: 4px; padding-left: 8px; }
 .reset svg {
   width: 12px;
   height: 12px;
@@ -394,13 +393,25 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font: inherit;
   font-size: 0.92rem;
   text-align: left;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
+.ranks .row .name, .ranks .row .medal { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .ranks button.row { cursor: pointer; }
-.ranks button.row:hover { background: var(--surface-2); }
+/* A hovered row lifts like a slip of the board's paper, in its tint. */
+.ranks button.row:hover {
+  background-color: color-mix(in oklab, var(--tint, var(--muted)) 13%, var(--surface));
+  background-image: var(--sheen), var(--grain);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tint, var(--muted)) 28%, transparent), var(--shadow);
+}
+.ranks button.row:hover .name { transform: translateX(3px); }
+.ranks button.row:hover .medal { transform: rotate(-12deg) scale(1.15); }
 .ranks button.row:active { transform: scale(0.98); }
 .ranks button.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .ranks li.me .row { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ranks li.me button.row:hover {
+  background-color: color-mix(in oklab, var(--accent) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent), var(--shadow);
+}
 .ranks .rank { color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
 .ranks .medal { font-size: 1.05rem; }
 .ranks .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -409,12 +420,14 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 /* A fixed width keeps scores lined up whether or not a row has a time. */
 .ranks .time { min-width: 3.2em; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; font-weight: 500; text-align: right; }
 
+/* app.js sets --tint to the shown game's, like its card and board. */
 dialog {
   width: min(460px, calc(100vw - 32px));
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border));
   border-radius: 16px;
-  background: var(--surface);
+  background: color-mix(in oklab, var(--tint, var(--surface)) var(--tint-amount), var(--surface));
+  background-image: var(--sheen), var(--grain);
   color: var(--text);
   box-shadow: var(--shadow-hover);
 }
@@ -433,7 +446,7 @@ dialog.closing::backdrop { animation: fade-out 0.15s ease forwards; }
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border));
 }
 .dialog-head h3 { margin: 0; font-size: 1rem; flex: 1; }
 .close, .back {
@@ -465,6 +478,9 @@ dialog.closing::backdrop { animation: fade-out 0.15s ease forwards; }
   background: var(--surface-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+dialog[style*="--tint"] .message {
+  background: color-mix(in oklab, var(--tint) var(--tint-pill-amount), var(--tint-pill-base));
 }
 .message .mention {
   padding: 0 3px;
