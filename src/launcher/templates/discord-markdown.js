@@ -18,7 +18,7 @@ var discordMarkdown = (function () {
     dart: "🎯", eyes: "👀", ring_buoy: "🛟", camera_with_flash: "📸",
     steam_locomotive: "🚂", house: "🏠", classical_building: "🏛️",
     police_officer: "👮", medal: "🏅", briefcase: "💼", crown: "👑",
-    crystal_ball: "🔮"
+    crystal_ball: "🔮", zap: "⚡"
   };
 
   var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };

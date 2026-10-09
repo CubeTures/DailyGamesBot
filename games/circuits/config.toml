@@ -1,0 +1,21 @@
+#:schema ../schema.json
+
+name = "circuits"
+title = "Circuits"
+description = "Fill each box with a word that forms compound terms with every box it's wired to."
+icon = "icon.png"
+origin = "https://www.puzzmo.com"
+port = 8092
+landing_path = "/game/circuits/"
+higher_score_wins = true
+
+# Puzzmo's dailies change at midnight Central (its todayDateKey).
+[reset]
+time = "00:00"
+timezone = "America/Chicago"
+
+[[triggers]]
+name = "completion-data"
+type = "network"
+url = "api\\.puzzmo\\.com/graphql\\?useCompletionDataV2Query"
+when = "finished"

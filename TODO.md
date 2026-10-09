@@ -11,15 +11,13 @@
 
 ## Games
 
-- https://www.puzzmo.com/game/circuits/
 - https://dailyorbs.com/
+
 - https://googlefeud.com/feudle/
 - https://framed.wtf/
 - https://www.lyricle.app/
 - https://www.cinenerdle.app/
-- https://www.chess.com/daily-chess-puzzle
 - https://www.thewikipediagame.com/
-
 - https://www.vulture.com/article/daily-movie-grid-trivia-game-cinematrix.html
 - https://originle.io/mattias/?day=3
 
