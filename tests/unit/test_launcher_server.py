@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from src.launcher import build, server
-from src.store import disabled_games, players, results
+from src.store import hidden_games, results
 
 
 @pytest.fixture
@@ -75,16 +75,17 @@ def test_subscriptions_api(launcher: str) -> None:
     )
 
 
-def test_admin_api(launcher: str) -> None:
-    toggle = {"discord_id": "7", "game": "wordle", "enabled": False}
-    assert _get(f"{launcher}/api/admin?discord_id=7") == (200, {"admin": False})
-    assert _post(f"{launcher}/api/games", toggle)[0] == 403
-    assert _post(f"{launcher}/api/games", {**toggle, "game": "nope"})[0] == 400
-    players.add("7")
-    players.set_admin("7", True)
-    assert _get(f"{launcher}/api/admin?discord_id=7") == (200, {"admin": True})
-    assert _post(f"{launcher}/api/games", toggle) == (200, {"ok": True})
-    assert disabled_games.names() == {"wordle"}
+def test_hidden_api(launcher: str) -> None:
+    hide = {"discord_id": "7", "game": "wordle", "level": "all"}
+    assert _get(f"{launcher}/api/hidden?discord_id=7") == (200, {"games": {}})
+    assert _post(f"{launcher}/api/hidden", {**hide, "game": "nope"})[0] == 400
+    assert _post(f"{launcher}/api/hidden", {**hide, "level": "some"})[0] == 400
+    assert _post(f"{launcher}/api/hidden", hide) == (200, {"ok": True})
+    assert _get(f"{launcher}/api/hidden?discord_id=7") == (
+        200,
+        {"games": {"wordle": "all"}},
+    )
+    assert hidden_games.levels("8") == {}
 
 
 def test_unknown_post_is_404(launcher: str) -> None:

@@ -2,7 +2,7 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from src.store import disabled_games, players, results, subscriptions
+from src.store import hidden_games, players, results, subscriptions
 
 
 def _result(puzzle_id: str = "p1", discord_id: str = "1") -> results.NewResult:
@@ -35,12 +35,9 @@ def test_announcing() -> None:
     assert [r.id for r in results.unannounced()] == [second.id]
 
 
-def test_players_and_admins() -> None:
+def test_players() -> None:
     assert players.add("1")
     assert not players.add("1")
-    assert not players.is_admin("1")
-    players.set_admin("1", True)
-    assert players.is_admin("1")
     players.set_name("1", None)
     assert players.all_ids() == ["1"]
 
@@ -58,12 +55,14 @@ def test_subscriptions_sync_only_the_latest_choice() -> None:
     assert subscriptions.subscribed_games("1") == []
 
 
-def test_disabled_games() -> None:
-    disabled_games.set_enabled("wordle", False)
-    disabled_games.set_enabled("wordle", False)
-    assert disabled_games.names() == {"wordle"}
-    disabled_games.set_enabled("wordle", True)
-    assert disabled_games.names() == set()
+def test_hidden_games_are_per_player() -> None:
+    hidden_games.set_level("1", "wordle", "card")
+    hidden_games.set_level("1", "wordle", "all")
+    hidden_games.set_level("1", "connections", "card")
+    assert hidden_games.levels("1") == {"wordle": "all", "connections": "card"}
+    assert hidden_games.levels("2") == {}
+    hidden_games.set_level("1", "wordle", "shown")
+    assert hidden_games.levels("1") == {"connections": "card"}
 
 
 def test_migrates_old_databases(scratch_db: Path) -> None:
@@ -92,4 +91,4 @@ def test_migrates_old_databases(scratch_db: Path) -> None:
     assert results.unannounced() == []  # old results count as announced
     assert [r.puzzle_id for r in results.on_day(date(2026, 1, 2))] == ["2026-01-02"]
     assert [r.puzzle_id for r in results.on_day(date(2026, 1, 3))] == ["77"]
-    assert not players.is_admin("1")
+    assert players.all_ids() == ["1"]

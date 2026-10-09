@@ -17,8 +17,8 @@ Or with Docker: `docker compose up --build`.
 Open http://localhost:8090 for the launcher, or run `/play` in Discord to get
 your personal link so your scores count. On the launcher you can also pick
 which games' Discord roles you want, to get pinged when someone finishes them.
-Discord server admins get a pencil beside "Games" to hide games from
-everyone; hidden games can't be played, but their past scores stay.
+The pencil beside "Games" lets you hide games you don't play: click a game
+once to hide its card, twice to hide its scoreboard too.
 
 ## Adding games
 

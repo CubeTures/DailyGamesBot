@@ -10,6 +10,9 @@
   var discordId = rememberDiscordId();
   // Each game's icon color, by game name, once tintCards() has found it.
   var TINTS = {};
+  // Games the viewer has hidden, by name: "card" hides just its card, "all"
+  // its scoreboard too. See setUpHiding().
+  var hiddenGames = loadHiddenGames();
 
   function rememberDiscordId() {
     var params = new URLSearchParams(location.search);
@@ -335,13 +338,20 @@
     return container;
   }
 
+  // What renderBoards() last drew, to redraw when the viewer hides a board.
+  var lastBoards = null;
+
   function renderBoards(byGame, emptyText) {
+    lastBoards = { byGame: byGame, emptyText: emptyText };
     var boards = document.getElementById("boards");
-    var games = Object.keys(byGame).sort(function (a, b) {
+    var played = Object.keys(byGame);
+    var games = played.filter(function (game) {
+      return hiddenGames[game] !== "all";
+    }).sort(function (a, b) {
       return gameTitle(a).localeCompare(gameTitle(b));
     });
     if (!games.length) {
-      showMessage(boards, emptyText);
+      showMessage(boards, played.length ? "Only games you've hidden have scores." : emptyText);
       shownOnBoard = {};
       return;
     }
@@ -529,56 +539,88 @@
       }).catch(function () {});
   }
 
-  // Server admins (as the bot saw on their last /play) get a pencil that
-  // shows every card with an eye to turn the game on or off for everyone.
-  // A turned-off game's card is hidden and the proxy stops serving it; its
-  // past scores stay on the scoreboard.
-  function setVisible(button, visible) {
-    var card = button.closest(".card");
-    var title = gameTitle(card.dataset.game);
-    button.setAttribute("aria-pressed", String(visible));
-    button.setAttribute("aria-label", visible ? "Hide " + title + " from everyone" : "Show " + title + " to everyone");
-    button.title = visible ? "Shown to everyone" : "Hidden from everyone";
-    card.classList.toggle("off", !visible);
+  // The pencil beside "Games" lets players choose which games they see.
+  // While editing, every card shows, and a click on one cycles it through
+  // shown, card hidden, and card and scoreboard hidden. The choice is saved
+  // for the player on the server, and cached here so hidden cards don't
+  // flash on load.
+  var HIDE_CYCLE = ["shown", "card", "all"];
+  var HIDE_LABELS = { shown: "Shown", card: "Hidden", all: "Invisible" };
+
+  function loadHiddenGames() {
+    try {
+      return JSON.parse(localStorage.getItem("hidden_games")) || {};
+    } catch (e) {
+      return {};
+    }
   }
 
-  function setUpAdmin() {
+  function showHideLevel(card, level) {
+    var title = gameTitle(card.dataset.game);
+    card.dataset.hide = level;
+    card.querySelector(".hide-level").textContent = HIDE_LABELS[level];
+    var button = card.querySelector(".visibility");
+    button.title = HIDE_LABELS[level];
+    button.setAttribute("aria-label", level === "shown" ? "Hide " + title
+      : level === "card" ? "Hide " + title + "'s scores too" : "Show " + title);
+  }
+
+  function applyHiddenGames() {
+    document.querySelectorAll(".card").forEach(function (card) {
+      showHideLevel(card, hiddenGames[card.dataset.game] || "shown");
+    });
+    try {
+      localStorage.setItem("hidden_games", JSON.stringify(hiddenGames));
+    } catch (e) { /* only costs a flash on the next load */ }
+    if (lastBoards) renderBoards(lastBoards.byGame, lastBoards.emptyText);
+  }
+
+  function setUpHiding() {
+    applyHiddenGames();
     if (!discordId) return;
     var games = document.getElementById("games");
     var editButton = document.getElementById("edit-games");
     var note = document.getElementById("edit-note");
-    var buttons = document.querySelectorAll(".card .visibility");
 
-    function toggle(button) {
-      var visible = button.getAttribute("aria-pressed") !== "true";
-      setVisible(button, visible);
-      var game = button.closest(".card").dataset.game;
-      postJson("/api/games", { discord_id: discordId, game: game, enabled: visible })
-        .catch(function () { setVisible(button, !visible); });
+    function setLevel(game, level) {
+      if (level === "shown") delete hiddenGames[game];
+      else hiddenGames[game] = level;
+      applyHiddenGames();
     }
 
-    buttons.forEach(function (button) {
-      setVisible(button, button.getAttribute("aria-pressed") === "true");
-      button.addEventListener("click", function () { toggle(button); });
-      // While editing, a click anywhere on the card toggles it too.
-      button.closest(".card").addEventListener("click", function (e) {
-        if (games.classList.contains("editing") && !e.target.closest("button")) toggle(button);
+    function cycle(card) {
+      var game = card.dataset.game;
+      var from = hiddenGames[game] || "shown";
+      var to = HIDE_CYCLE[(HIDE_CYCLE.indexOf(from) + 1) % HIDE_CYCLE.length];
+      setLevel(game, to);
+      postJson("/api/hidden", { discord_id: discordId, game: game, level: to })
+        .catch(function () { setLevel(game, from); });
+    }
+
+    document.querySelectorAll(".card").forEach(function (card) {
+      card.querySelector(".visibility").addEventListener("click", function () { cycle(card); });
+      // While editing, a click anywhere on the card cycles it too.
+      card.addEventListener("click", function (e) {
+        if (games.classList.contains("editing") && !e.target.closest("button")) cycle(card);
       });
     });
+    editButton.hidden = false;
     editButton.addEventListener("click", function () {
       var editing = games.classList.toggle("editing");
       editButton.setAttribute("aria-pressed", String(editing));
-      editButton.title = editing ? "Done choosing games" : "Choose which games are shown";
+      editButton.title = editing ? "Done choosing games" : "Choose which games you see";
       note.hidden = !editing;
     });
-    getJson("/api/admin?discord_id=" + encodeURIComponent(discordId))
-      .then(function (body) { editButton.hidden = !body.admin; })
-      .catch(function () {});
+    getJson("/api/hidden?discord_id=" + encodeURIComponent(discordId))
+      .then(function (body) {
+        hiddenGames = body.games;
+        applyHiddenGames();
+      }).catch(function () {});
   }
 
   if (!discordId) document.getElementById("warning").style.display = "flex";
   setUpPings();
-  setUpAdmin();
+  setUpHiding();
 
   prevButton.addEventListener("click", function () {
     setViewDay(addDays(viewDay || today(), -1));

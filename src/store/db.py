@@ -26,8 +26,7 @@ CREATE TABLE IF NOT EXISTS results (
 CREATE TABLE IF NOT EXISTS players (
     discord_id  TEXT PRIMARY KEY,
     name        TEXT,
-    name_stale  INTEGER NOT NULL DEFAULT 0,
-    is_admin    INTEGER NOT NULL DEFAULT 0
+    name_stale  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS subscriptions (
     discord_id  TEXT NOT NULL,
@@ -36,9 +35,14 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     synced      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (discord_id, game)
 );
-CREATE TABLE IF NOT EXISTS disabled_games (
-    game        TEXT PRIMARY KEY
+CREATE TABLE IF NOT EXISTS hidden_games (
+    discord_id  TEXT NOT NULL,
+    game        TEXT NOT NULL,
+    level       TEXT NOT NULL,  -- "card", or "all" to hide its scoreboard too
+    PRIMARY KEY (discord_id, game)
 );
+-- Left over from when admins turned games off for everyone.
+DROP TABLE IF EXISTS disabled_games;
 """
 
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -77,7 +81,6 @@ def _prepare(conn: sqlite3.Connection) -> None:
         "game_day TEXT NOT NULL DEFAULT ''",
         backfill=lambda: _backfill_game_days(conn),
     )
-    _add_column(conn, "players", "is_admin INTEGER NOT NULL DEFAULT 0")
 
 
 def _add_column(

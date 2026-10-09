@@ -10,7 +10,6 @@ import jinja2
 from src.games.models import ICON_MIME_TYPES, Game
 from src.games.registry import GAMES_BY_PORT
 from src.settings import LAUNCHER_DIR, results_channel_id
-from src.store import disabled_games
 
 TEMPLATES_DIR = Path(__file__).with_name("templates")
 GAME_DAY_JS = Path(__file__).parents[1] / "games" / "game_day.js"
@@ -31,14 +30,13 @@ def write_launcher() -> None:
 
 def render_launcher() -> str:
     games = sorted(GAMES_BY_PORT.values(), key=lambda game: game.title.casefold())
-    disabled = disabled_games.names()
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,
         keep_trailing_newline=True,
     )
     return env.get_template("index.html.j2").render(
-        games=[_card(game, game.name in disabled) for game in games],
+        games=[_card(game) for game in games],
         game_titles={game.name: game.title for game in games},
         resets={game.name: game.reset.js_config() for game in games},
         higher_score_wins=[game.name for game in games if game.higher_score_wins],
@@ -48,7 +46,7 @@ def render_launcher() -> str:
     )
 
 
-def _card(game: Game, disabled: bool) -> dict[str, Any]:
+def _card(game: Game) -> dict[str, Any]:
     return {
         "name": game.name,
         "title": game.title,
@@ -56,7 +54,6 @@ def _card(game: Game, disabled: bool) -> dict[str, Any]:
         "icon": _icon_data_uri(game),
         "url": game.local_origin + game.landing_path,
         "reset_timezone": game.reset.zone_name,
-        "disabled": disabled,
     }
 
 

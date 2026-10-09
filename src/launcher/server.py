@@ -1,6 +1,6 @@
 """Serves the launcher page and its JSON API: the results its scoreboard
-reads, the role subscriptions its bells toggle, and the admin calls that turn
-games on and off.
+reads, the role subscriptions its bells toggle, and the games each player has
+hidden.
 
 Players are identified by the unauthenticated `discord_id` the page sends.
 """
@@ -19,7 +19,7 @@ from src import announce
 from src.games.registry import GAMES_BY_NAME
 from src.launcher.build import write_launcher
 from src.settings import LAUNCHER_DIR, LAUNCHER_PORT
-from src.store import disabled_games, players, results, subscriptions
+from src.store import hidden_games, results, subscriptions
 
 Reply = tuple[int, Any]
 
@@ -39,12 +39,13 @@ def _get_subscriptions(params: dict[str, str]) -> Reply:
     return 200, {"games": subscriptions.subscribed_games(discord_id)}
 
 
-def _get_admin(params: dict[str, str]) -> Reply:
-    """GET /api/admin?discord_id=ID: whether they may turn games on and off."""
+def _get_hidden(params: dict[str, str]) -> Reply:
+    """GET /api/hidden?discord_id=ID: {game: "card" | "all"} for the games
+    they've hidden."""
     discord_id = params.get("discord_id")
     if not _is_discord_id(discord_id):
         return _error(400, "need a discord_id")
-    return 200, {"admin": players.is_admin(discord_id)}
+    return 200, {"games": hidden_games.levels(discord_id)}
 
 
 def _post_subscription(body: bytes) -> Reply:
@@ -56,28 +57,27 @@ def _post_subscription(body: bytes) -> Reply:
     return 200, {"ok": True}
 
 
-def _post_game_toggle(body: bytes) -> Reply:
-    """POST /api/games {"discord_id", "game", "enabled"}: admins only."""
-    request = _player_game_flag(body, "enabled")
+def _post_hidden(body: bytes) -> Reply:
+    """POST /api/hidden {"discord_id", "game", "level"}, where level is
+    "shown", "card" or "all"."""
+    request = _player_game_value(body, "level")
     if request is None:
-        return _error(400, "need discord_id, game and enabled")
-    discord_id, game, enabled = request
-    if not players.is_admin(discord_id):
-        return _error(403, "only server admins can do that")
-    disabled_games.set_enabled(game, enabled)
-    # The page is static, so re-render it with the game shown or hidden.
-    write_launcher()
+        return _error(400, "need discord_id, game and level")
+    discord_id, game, level = request
+    if not hidden_games.is_hide_level(level):
+        return _error(400, "level must be shown, card or all")
+    hidden_games.set_level(discord_id, game, level)
     return 200, {"ok": True}
 
 
 _GET_ROUTES: dict[str, Callable[[dict[str, str]], Reply]] = {
     "/api/results": _get_results,
     "/api/subscriptions": _get_subscriptions,
-    "/api/admin": _get_admin,
+    "/api/hidden": _get_hidden,
 }
 _POST_ROUTES: dict[str, Callable[[bytes], Reply]] = {
     "/api/subscriptions": _post_subscription,
-    "/api/games": _post_game_toggle,
+    "/api/hidden": _post_hidden,
 }
 
 
@@ -144,6 +144,15 @@ def _result_json(result: results.StoredResult) -> dict[str, Any]:
 def _player_game_flag(body: bytes, flag: str) -> tuple[str, str, bool] | None:
     """`discord_id`, `game` and the boolean `flag` from a JSON body, or None
     if any is missing or invalid."""
+    request = _player_game_value(body, flag)
+    if request is None or not isinstance(request[2], bool):
+        return None
+    return request[0], request[1], request[2]
+
+
+def _player_game_value(body: bytes, key: str) -> tuple[str, str, object] | None:
+    """`discord_id`, `game` and the value of `key` from a JSON body, or None
+    if the body, player or game is invalid."""
     try:
         payload: Any = json.loads(body)
     except ValueError:
@@ -154,13 +163,9 @@ def _player_game_flag(body: bytes, flag: str) -> tuple[str, str, bool] | None:
     discord_id, game, value = (
         fields.get("discord_id"),
         fields.get("game"),
-        fields.get(flag),
+        fields.get(key),
     )
-    if (
-        not _is_discord_id(discord_id)
-        or game not in GAMES_BY_NAME
-        or not isinstance(value, bool)
-    ):
+    if not _is_discord_id(discord_id) or game not in GAMES_BY_NAME:
         return None
     return discord_id, cast(str, game), value
 

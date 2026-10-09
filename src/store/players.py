@@ -1,5 +1,4 @@
-"""Players: their Discord usernames for the scoreboard, and whether they're
-admins of the bot's server (who may turn games on and off)."""
+"""Players: their Discord usernames for the scoreboard."""
 
 from src.store.db import connect
 
@@ -36,20 +35,3 @@ def set_name(discord_id: str, name: str | None) -> None:
             " WHERE discord_id = ?",
             (name, discord_id),
         )
-
-
-def set_admin(discord_id: str, is_admin: bool) -> None:
-    """Record whether a known player (see `add`) is an admin."""
-    with connect() as conn:
-        conn.execute(
-            "UPDATE players SET is_admin = ? WHERE discord_id = ?",
-            (is_admin, discord_id),
-        )
-
-
-def is_admin(discord_id: str) -> bool:
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT is_admin FROM players WHERE discord_id = ?", (discord_id,)
-        ).fetchone()
-    return bool(row and row[0])

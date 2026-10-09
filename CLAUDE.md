@@ -53,7 +53,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   capture script and the launcher (its Python twin is `Reset.day_at`)
 - `src/store/`: the SQLite store (`data/results.db`, override with
   `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
-  `subscriptions.py`, `disabled_games.py`; `db.py` connects, creates the
+  `subscriptions.py`, `hidden_games.py`; `db.py` connects, creates the
   tables and migrates old databases
 - `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads
   (`addon.py`), localhost rewrites (`rewrite.py`)
@@ -67,7 +67,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   server with the JSON API (`server.py`, one function per route)
 - `src/discord_bot/`: client, polling loops and `/play` (`bot.py`), result
   posts (`announcer.py`), username lookups (`player_names.py`), game roles
-  (`roles.py`), admin checks (`admins.py`), channel lookups (`channels.py`)
+  (`roles.py`), channel lookups (`channels.py`)
 - `src/announce.py`: renders a result's `announcement.j2`
 - `tests/unit/`: offline tests of the store, rewrites, capture endpoints,
   announcements and launcher API, each on a scratch database
@@ -122,17 +122,14 @@ needs full type annotations. Its config is `[tool.pyright]` in
   picks from the launcher are saved in the `subscriptions` table and the bot
   polls every 15s to give or take the role. The table is the source of
   truth: roles changed by hand in Discord aren't reflected on the launcher.
-- **Turning games off.** The bot records whether each player has
-  Administrator in the results channel's server as `players.is_admin`: for
-  every known player at startup and every 5 minutes, and on each `/play`
-  (with no results channel, only then, for the server `/play` ran in). The launcher
-  asks `GET /api/admin` and shows admins a pencil beside "Games"; in edit
-  mode every card shows an eye, and `POST /api/games` (refused unless
-  `is_admin`) saves the game in `disabled_games` and re-renders the
-  launcher, which leaves turned-off cards out unless editing. The proxy
-  answers a turned-off game's requests with a 410 page (re-checking the
-  table every 5s). Results and scoreboards are untouched. Admin rights
-  rest on the unauthenticated `discord_id`, like the rest of the launcher.
+- **Hiding games.** Each player chooses which games they see. The pencil
+  beside "Games" puts the launcher in edit mode, where every card shows
+  with an eye; each click cycles the game through shown, card hidden
+  (`card`) and card and scoreboard hidden (`all`). Choices are saved per
+  `discord_id` in `hidden_games` via `GET`/`POST /api/hidden` (and cached
+  in `localStorage` so hidden cards don't flash on load). It's only the
+  player's view: the game is still proxied and its results are kept and
+  announced.
 
 ## Gotchas
 
