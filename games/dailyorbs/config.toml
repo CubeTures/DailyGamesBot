@@ -5,7 +5,6 @@ title = "Orbs"
 description = "Four trivia puzzles a day, three orbs each. Collect six orbs to win the day."
 icon = "icon.png"
 origin = "https://dailyorbs.com"
-port = 8093
 landing_path = "/"
 higher_score_wins = true
 

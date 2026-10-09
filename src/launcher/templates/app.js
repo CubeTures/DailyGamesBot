@@ -25,14 +25,19 @@
     } else {
       id = localStorage.getItem("discord_id");
     }
-    if (id) {
-      // Games run on other localhost ports, which can't read this page's
-      // localStorage but do share its cookies; the proxy reads this one when
-      // a game reports a result.
-      document.cookie = "dgb_discord_id=" + encodeURIComponent(id) +
-        "; path=/; max-age=31536000; SameSite=Lax";
-    }
+    if (id) tagGameLinks(id);
     return id;
+  }
+
+  // Games run on their own subdomains, which can't read this page's storage
+  // or cookies. Their links go through the proxy's /__dgb/enter, which sets
+  // the cookie the proxy reads when a game reports a result.
+  function tagGameLinks(id) {
+    document.querySelectorAll("a.card-link").forEach(function (link) {
+      var url = new URL(link.href);
+      url.searchParams.set("discord_id", id);
+      link.href = url.toString();
+    });
   }
 
   function gameTitle(game) {

@@ -43,14 +43,19 @@ class Player:
     console: list[str] = field(default_factory=lambda: [])
 
     def url(self, path: str | None = None) -> str:
-        return f"http://localhost:{self.game.port}{path or self.game.landing_path}"
+        return self.game.local_origin + (path or self.game.landing_path)
 
     def open(self, path: str | None = None) -> Page:
-        """Visit the launcher as this player (setting the dgb_discord_id
-        cookie, as a /play link does), then the game."""
+        """Visit the launcher as this player, as a /play link does, then the
+        game through its card's link, which sets the dgb_discord_id cookie on
+        the game's subdomain."""
         self.page.goto(f"{LAUNCHER_URL}/?discord_id={self.discord_id}")
-        self.page.wait_for_function("document.cookie.includes('dgb_discord_id=')")
-        self.page.goto(self.url(path), wait_until="domcontentloaded")
+        card_link = self.page.locator(f'a.card-link[href^="{self.game.local_origin}/"]')
+        enter_url = card_link.get_attribute("href") or ""
+        assert f"discord_id={self.discord_id}" in enter_url, enter_url
+        self.page.goto(enter_url, wait_until="domcontentloaded")
+        if path is not None:
+            self.page.goto(self.url(path), wait_until="domcontentloaded")
         return self.page
 
     def dismiss(self, *locators: Locator) -> None:

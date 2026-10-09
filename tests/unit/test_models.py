@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from src.games.models import GameConfig, Reset
 
-BASE = {"name": "demo", "origin": "https://example.com/", "port": 8099}
+BASE = {"name": "demo", "origin": "https://example.com/"}
 
 
 def test_reset_day_at_shifts_by_reset_time_in_its_timezone() -> None:
@@ -33,7 +33,8 @@ def test_config_defaults() -> None:
 @pytest.mark.parametrize(
     "override",
     [
-        {"port": "8099"},
+        {"higher_score_wins": "true"},
+        {"name": "has_underscore"},
         {"reset": {"timezone": "Mars/Olympus"}},
         {"reset": {"time": "24:00"}},
         {

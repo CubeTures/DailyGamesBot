@@ -1,6 +1,7 @@
 import json
 import shutil
 import subprocess
+from typing import cast
 
 import pytest
 from mitmproxy import http
@@ -76,6 +77,35 @@ def test_serves_script_and_404s_unknown_paths() -> None:
     flow = tflow.tflow()
     flow.request.path = "/index.html"
     assert not handle_capture_request(flow, WORDLE)
+
+
+@pytest.mark.parametrize(
+    ("query", "location", "cookie"),
+    [
+        (
+            "?discord_id=42&to=/games/wordle/index.html",
+            "/games/wordle/index.html",
+            "dgb_discord_id=42; Path=/;",
+        ),
+        ("?to=/x", "/x", None),
+        ("?discord_id=4;2&to=//evil.com", "/games/wordle/index.html", None),
+        ("?to=https://evil.com", "/games/wordle/index.html", None),
+    ],
+)
+def test_enter_sets_cookie_and_redirects_within_game(
+    query: str, location: str, cookie: str | None
+) -> None:
+    flow = tflow.tflow()
+    flow.request.path = "/__dgb/enter" + query
+    assert handle_capture_request(flow, WORDLE)
+    assert flow.response is not None
+    assert flow.response.status_code == 302
+    assert flow.response.headers["location"] == location
+    set_cookie = cast(str | None, flow.response.headers.get("set-cookie"))
+    if cookie is None:
+        assert set_cookie is None
+    else:
+        assert set_cookie is not None and set_cookie.startswith(cookie)
 
 
 def test_injects_script_tag_into_head() -> None:

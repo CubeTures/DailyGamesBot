@@ -156,7 +156,7 @@
   "properties": {
     "name": {
       "description": "Must match the game's directory name.",
-      "pattern": "^[a-z][a-z0-9_]*$",
+      "pattern": "^[a-z][a-z0-9]*$",
       "title": "Name",
       "type": "string"
     },
@@ -199,13 +199,6 @@
       "pattern": "^https?://",
       "title": "Origin",
       "type": "string"
-    },
-    "port": {
-      "description": "Unique local port (8090 is the launcher's).",
-      "maximum": 65535,
-      "minimum": 1024,
-      "title": "Port",
-      "type": "integer"
     },
     "landing_path": {
       "default": "/",
@@ -284,8 +277,7 @@
   },
   "required": [
     "name",
-    "origin",
-    "port"
+    "origin"
   ],
   "title": "Game config",
   "type": "object"

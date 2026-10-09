@@ -5,8 +5,7 @@ import sys
 from src.games.loader import load_games
 from src.games.models import Game
 
-GAMES_BY_PORT = load_games()
-GAMES_BY_NAME = {game.name: game for game in GAMES_BY_PORT.values()}
+GAMES_BY_NAME = load_games()
 
 
 def game_from_argv(module: str, *arg_names: str) -> tuple[Game, list[str]]:

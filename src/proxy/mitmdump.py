@@ -1,12 +1,15 @@
-"""Runs mitmdump with one reverse-proxy listener per game."""
+"""Runs mitmdump: one reverse-proxy listener for the launcher and every game.
+
+Requests go to the launcher by default; the addon sends those for a game's
+subdomain on to the game's real origin instead.
+"""
 
 import asyncio
 import os
 import signal
 from pathlib import Path
 
-from src.games.registry import GAMES_BY_PORT
-from src.settings import REPO_ROOT
+from src.settings import LAUNCHER_PORT, PROXY_PORT, REPO_ROOT
 
 ADDON_PATH = Path(__file__).with_name("addon.py")
 
@@ -22,10 +25,13 @@ def _env_with_repo_importable() -> dict[str, str]:
 
 
 def _listener_args() -> list[str]:
-    args: list[str] = []
-    for port, game in sorted(GAMES_BY_PORT.items()):
-        args += ["--mode", f"reverse:{game.origin}@{port}"]
-    return args
+    return [
+        "--mode",
+        f"reverse:http://127.0.0.1:{LAUNCHER_PORT}@{PROXY_PORT}",
+        # The addon picks the game by the Host the browser sent.
+        "--set",
+        "keep_host_header=true",
+    ]
 
 
 async def run_mitmdump() -> None:

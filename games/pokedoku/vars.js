@@ -1,5 +1,5 @@
 // PokeDoku keeps no game state in the browser; it all comes from
-// api.pokedoku.com (fetched at /__host/api.pokedoku.com/... on this port):
+// api.pokedoku.com (fetched at /__host/api.pokedoku.com/... on this game's subdomain):
 //   GET  /api/puzzle/current         today's grid: {"id": 1726, "date": "2026-10-08", ...}
 //   GET  /api/pokemon/all            [{"id": 604, "name": "eelektross", ...}, ...]
 //   GET  /api/puzzle/1726/solution   the player's grid so far (on page load)

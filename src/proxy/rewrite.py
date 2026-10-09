@@ -99,7 +99,7 @@ class OriginRewriter:
 
 
 class ForeignHostRouter:
-    """Serves other hosts a game's JS fetches from under the game's own port.
+    """Serves other hosts a game's JS fetches from under the game's own origin.
 
     A game whose JS fetches an absolute URL on a separate API/CDN host is
     blocked by CORS from localhost. This rewrites those URLs in text responses

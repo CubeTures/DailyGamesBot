@@ -4,11 +4,13 @@ import base64
 from pathlib import Path
 from threading import Lock
 from typing import Any
+from urllib.parse import quote
 
 import jinja2
 
 from src.games.models import ICON_MIME_TYPES, Game
-from src.games.registry import GAMES_BY_PORT
+from src.games.registry import GAMES_BY_NAME
+from src.proxy.capture import ENTER_PATH
 from src.settings import LAUNCHER_DIR, results_channel_id
 
 TEMPLATES_DIR = Path(__file__).with_name("templates")
@@ -29,7 +31,7 @@ def write_launcher() -> None:
 
 
 def render_launcher() -> str:
-    games = sorted(GAMES_BY_PORT.values(), key=lambda game: game.title.casefold())
+    games = sorted(GAMES_BY_NAME.values(), key=lambda game: game.title.casefold())
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,
@@ -52,7 +54,8 @@ def _card(game: Game) -> dict[str, Any]:
         "title": game.title,
         "description": game.description,
         "icon": _icon_data_uri(game),
-        "url": game.local_origin + game.landing_path,
+        # Through /__dgb/enter, which app.js tags with the player's ID.
+        "url": f"{game.local_origin}{ENTER_PATH}?to={quote(game.landing_path)}",
         "reset_timezone": game.reset.zone_name,
     }
 

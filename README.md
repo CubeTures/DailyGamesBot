@@ -14,7 +14,9 @@ uv run python3 -m src
 
 Or with Docker: `docker compose up --build`.
 
-Open http://localhost:8090 for the launcher, or run `/play` in Discord to get
+Open http://localhost:8080 for the launcher (games open on its subdomains,
+e.g. http://wordle.localhost:8080; use Chrome or Firefox, which resolve them
+without any setup), or run `/play` in Discord to get
 your personal link so your scores count. On the launcher you can also pick
 which games' Discord roles you want, to get pinged when someone finishes them.
 The pencil beside "Games" lets you hide games you don't play: click a game

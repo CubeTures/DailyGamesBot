@@ -5,7 +5,6 @@ title = "Connections"
 description = "Sort sixteen words into four groups that share a common thread."
 icon = "icon.svg"
 origin = "https://www.nytimes.com"
-port = 8085
 landing_path = "/games/connections"
 higher_score_wins = true
 

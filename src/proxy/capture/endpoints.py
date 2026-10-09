@@ -1,23 +1,30 @@
 """Answers the capture script's /__dgb/ requests, which never reach the real
 game server.
 
-The player is identified by the dgb_discord_id cookie the launcher sets:
-cookies are shared across ports on localhost, unlike localStorage.
+The player is identified by the dgb_discord_id cookie. Each game is on its
+own subdomain, so the launcher's cookies don't reach it: the launcher's game
+links go through /__dgb/enter?discord_id=ID&to=PATH, which sets the cookie on
+the game's subdomain and redirects to the game.
 """
 
 import json
 import logging
+import re
 from datetime import UTC, date, datetime
 from typing import Any, cast
+from urllib.parse import parse_qs, urlsplit
 
 from mitmproxy import http
 
 from src.games.models import Game
-from src.proxy.capture import PATH_PREFIX, RESULT_PATH, SCRIPT_PATH
+from src.proxy.capture import ENTER_PATH, PATH_PREFIX, RESULT_PATH, SCRIPT_PATH
 from src.proxy.capture.script import build_script
 from src.store import results
 
 DISCORD_ID_COOKIE = "dgb_discord_id"
+_COOKIE_MAX_AGE_SECS = 365 * 24 * 60 * 60
+# Discord IDs are digits; tests use IDs like "dgb-test".
+_COOKIE_VALUE_RE = re.compile(r"[\w-]+", re.ASCII)
 
 _NO_STORE = {"Cache-Control": "no-store"}
 
@@ -46,9 +53,28 @@ def handle_capture_request(flow: http.HTTPFlow, game: Game) -> bool:
         )
     elif path == RESULT_PATH:
         flow.response = _save_result(flow.request, game)
+    elif path == ENTER_PATH:
+        flow.response = _enter(flow.request, game)
     else:
         flow.response = _error(404, "not found")
     return True
+
+
+def _enter(request: http.Request, game: Game) -> http.Response:
+    """Remember the player on this game's subdomain, then go to the game."""
+    params = {k: v[0] for k, v in parse_qs(urlsplit(request.path).query).items()}
+    to = params.get("to", "")
+    # Only a path on this game, not another site.
+    if not to.startswith("/") or to.startswith("//") or "\\" in to:
+        to = game.landing_path
+    headers = {"Location": to, **_NO_STORE}
+    discord_id = params.get("discord_id", "")
+    if _COOKIE_VALUE_RE.fullmatch(discord_id):
+        headers["Set-Cookie"] = (
+            f"{DISCORD_ID_COOKIE}={discord_id}; Path=/;"
+            f" Max-Age={_COOKIE_MAX_AGE_SECS}; SameSite=Lax"
+        )
+    return http.Response.make(302, b"", headers)
 
 
 def _save_result(request: http.Request, game: Game) -> http.Response:

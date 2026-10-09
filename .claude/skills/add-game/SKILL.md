@@ -23,12 +23,11 @@ A finished game touches:
 
 | file | what |
 |------|------|
-| `games/<name>/config.toml` | metadata (`title`, `description`, `icon`, `origin`, `port`, `landing_path`) and `[[triggers]]` |
+| `games/<name>/config.toml` | metadata (`title`, `description`, `icon`, `origin`, `landing_path`) and `[[triggers]]` |
 | `games/<name>/icon.png` | launcher icon, square, at most 128px |
 | `games/<name>/vars.js` | commented lookups shared by `when` and the fields |
 | `games/<name>/fields.js` | the result: `puzzle_id` plus standard and game-specific fields |
 | `games/<name>/announcement.j2` | the Discord / launcher message |
-| `docker-compose.yml`, `Dockerfile` | the new port (new games only) |
 
 Paths below are relative to the repo root. `$SCRATCH` is your scratchpad dir.
 Playwright tools are the `mcp__plugin_playwright_playwright__*` MCP tools.
@@ -37,13 +36,12 @@ Playwright tools are the `mcp__plugin_playwright_playwright__*` MCP tools.
 
 - **Existing game** (argument is a name in `games/`): read the files in `games/<name>/` and skip to step 2.
 - **New game** (argument is a URL):
-  - Run `uv run python3 -m src.games` to see the existing games and the next free port.
+  - Run `uv run python3 -m src.games` to see the existing games.
   - Split the URL into `origin` (scheme + host) and `landing_path` (path + query).
-  - Derive `name` from the host, e.g. `www.minutecryptic.com` becomes `minutecryptic`. It must be lowercase `[a-z0-9_]`.
-  - Write `games/<name>/config.toml` starting with a `#:schema ../schema.json` line, then `name`, `title`, `description`, `icon`, `origin`, `port` and `landing_path`, and no triggers yet. Use the game's own spelling for `title` (`Minute Cryptic`, not `Minutecryptic`).
+  - Derive `name` from the host, e.g. `www.minutecryptic.com` becomes `minutecryptic`. It must be lowercase `[a-z0-9]`; it's also the game's subdomain, `http://<name>.localhost:8080`.
+  - Write `games/<name>/config.toml` starting with a `#:schema ../schema.json` line, then `name`, `title`, `description`, `icon`, `origin` and `landing_path`, and no triggers yet. Use the game's own spelling for `title` (`Minute Cryptic`, not `Minutecryptic`).
   - For `description`, write one short sentence on how the game plays, based on the site's `<meta name="description">` or `og:description`.
   - For `icon`, save the site's largest square icon as `games/<name>/icon.png` and set `icon = "icon.png"`. Look for `apple-touch-icon` or a `<link rel="icon">` of 128px or more, and fall back to `/favicon.ico`. Convert an `.ico` to PNG by extracting its largest frame, and downscale anything over 128px to 128px, e.g. `uv run --no-project --with pillow python -I -c ...`. View the result to make sure it's the logo and not a blank or placeholder image.
-  - Add the port to `docker-compose.yml` `ports:` and to the Dockerfile's `EXPOSE`.
   - Run the config command again to validate.
 
 ## 2. Start the proxy (no Discord bot needed)
@@ -55,7 +53,7 @@ Use a scratch DB so test results never reach the real one. Run it with
 DGB_DB_PATH=$SCRATCH/add-game.db uv run python3 -m src.proxy
 ```
 
-Wait until `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/`
+Wait until `curl -s -o /dev/null -w '%{http_code}' http://<name>.localhost:8080/`
 answers, retrying if the connection is refused. If the ports are already taken,
 an earlier proxy is still running: stop it as in step 8.
 
@@ -63,8 +61,8 @@ an earlier proxy is still running: stop it as in step 8.
 
 1. If you already used the browser in this session, call `browser_close` first. Init scripts stack up per context.
 2. Install the recorder: call `browser_run_code_unsafe` with `filename` set to the **absolute** path of `.claude/skills/add-game/install-recorder.js`. It records fetch, XHR and sendBeacon calls with bodies, plus storage writes, cookie writes, dispatched DOM events, postMessage, history changes and dataLayer pushes. The log persists across reloads.
-3. Call `browser_navigate` to `http://localhost:8090/?discord_id=dgb-test`. The launcher sets the `dgb_discord_id` cookie that results are keyed on. For a new game, take a `browser_snapshot` and check its card shows the right title, description and icon.
-4. Call `browser_navigate` to `http://localhost:<port><landing_path>`. Take a `browser_snapshot` to confirm the game actually renders and is playable.
+3. Call `browser_navigate` to `http://localhost:8080/?discord_id=dgb-test`. For a new game, take a `browser_snapshot` and check its card shows the right title, description and icon.
+4. Call `browser_navigate` to `http://<name>.localhost:8080/__dgb/enter?discord_id=dgb-test&to=<landing_path>` (what the card's link does). It sets the `dgb_discord_id` cookie that results are keyed on, on the game's subdomain, and redirects to the game. Take a `browser_snapshot` to confirm the game actually renders and is playable.
    - If it's broken, check `browser_console_messages` and `browser_network_requests`. Typical causes are absolute URLs to another host (see "Known limitation" in `README.md`) or the game living in a cross-origin iframe. In the iframe case, the config's `origin` should probably be the iframe's origin.
    - Fix the problem or report it before involving the user.
 5. Check whether today's puzzle already shows as finished in this browser profile. If it does, tell the user. Ideally they play from a fresh state.
@@ -135,15 +133,15 @@ silently miss losses, so get a real one where the game has it.
 3. Otherwise start a fresh session for the game. Today's puzzle is already finished in this browser, and the Playwright profile persists, so `browser_close` alone isn't enough. Wipe the game origin's storage (cookies, local/sessionStorage, IndexedDB, cache, service workers) with `browser_run_code_unsafe`:
    ```js
    async (page) => {
-     const origin = "http://localhost:<port>";
+     const origin = "http://<name>.localhost:8080";
      const cdp = await page.context().newCDPSession(page);
      await cdp.send("Storage.clearDataForOrigin", { origin, storageTypes: "all" });
      await cdp.detach();
      return "cleared";
    }
    ```
-   This also removes the `dgb_discord_id` cookie (cookies on `localhost` are shared across ports) and the recorder's log. The recorder itself stays installed.
-4. Call `browser_navigate` to `http://localhost:8090/?discord_id=dgb-test` again, then to the game.
+   This also removes the game's `dgb_discord_id` cookie and the recorder's log. The recorder itself stays installed.
+4. Call `browser_navigate` to the `/__dgb/enter` URL from step 3 again.
 5. Take a `browser_snapshot` to confirm today's puzzle is **unplayed** again. If it still shows finished, the game keeps state server-side (by account or IP), so a second run isn't possible this way. In that case:
    - Say so.
    - Skip the run and treat the losing path as unverified.
@@ -218,7 +216,7 @@ change:
 
 ```sh
 pkill -TERM -f -- '-m [s]rc\.proxy$'   # bracket keeps pkill from matching its own shell
-ss -ltn | grep -E ':(8090|<port>)\b' || echo free
+ss -ltn | grep -E ':(8080|8090)\b' || echo free
 ```
 
 Then start it again as in step 2.
@@ -248,7 +246,7 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
      const ctx = await page.context().browser().newContext();
      try {
        const p = await ctx.newPage();
-       await p.goto("http://localhost:<port><landing_path>");
+       await p.goto("http://<name>.localhost:8080<landing_path>");
        await p.waitForTimeout(4000);
        return await p.evaluate(() => ({ dry: __dgb.dryRun(), log: __dgb.state.log, errors: __dgb.state.errors }));
      } finally { await ctx.close(); }
@@ -256,7 +254,7 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
    ```
    Every `dry[].fired` must be `false` and `log` must be empty. A 400 entry in `log` means something fired.
 5. If a mode the config must ignore (archive, practice) can't be derived from the runs, consider asking the user to start one. That checks `when` stays false there.
-6. **Launcher.** The launcher reads the same scratch DB. Call `browser_navigate` to `http://localhost:8090/`, find the `dgb-test` row for the game on today's scoreboard (shown as `Player …test`), click it and `browser_snapshot` the dialog. The announcement must render as intended: no raw `:shortcode:` or `**` left over, no `None`, the outcome reads right. The mention shows as a literal `<@dgb-test>` because the test ID isn't numeric; that's expected.
+6. **Launcher.** The launcher reads the same scratch DB. Call `browser_navigate` to `http://localhost:8080/`, find the `dgb-test` row for the game on today's scoreboard (shown as `Player …test`), click it and `browser_snapshot` the dialog. The announcement must render as intended: no raw `:shortcode:` or `**` left over, no `None`, the outcome reads right. The mention shows as a literal `<@dgb-test>` because the test ID isn't numeric; that's expected.
 
 ## 10. Clean up and report
 

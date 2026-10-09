@@ -5,7 +5,6 @@ title = "Bracket City"
 description = "Solve nested clues, innermost first, to reveal a fact about this day in history."
 icon = "icon.png"
 origin = "https://www.theatlantic.com"
-port = 8086
 landing_path = "/games/bracket-city/"
 higher_score_wins = true
 

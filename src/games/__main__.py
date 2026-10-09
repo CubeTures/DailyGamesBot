@@ -5,7 +5,7 @@ import sys
 
 from src.games.loader import ConfigError, load_games
 from src.games.schema import SCHEMA_PATH, write_schema
-from src.settings import LAUNCHER_PORT, REPO_ROOT
+from src.settings import REPO_ROOT
 
 
 def main() -> None:
@@ -17,13 +17,11 @@ def main() -> None:
         games = load_games()
     except ConfigError as e:
         sys.exit(str(e))
-    for port, game in sorted(games.items()):
+    for game in games.values():
         triggers = ", ".join(f"{t.name} ({t.type})" for t in game.triggers) or "none"
-        print(f"{port}  {game.name:<16} {game.origin}  triggers: {triggers}")
-    port = max(games, default=8080) + 1
-    if port == LAUNCHER_PORT:
-        port += 1
-    print(f"next free port: {port}")
+        print(
+            f"{game.name:<16} {game.local_origin} -> {game.origin}  triggers: {triggers}"
+        )
 
 
 if __name__ == "__main__":

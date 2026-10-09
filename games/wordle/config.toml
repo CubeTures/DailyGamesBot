@@ -5,7 +5,6 @@ title = "Wordle"
 description = "Guess the hidden five-letter word in six tries."
 icon = "icon.png"
 origin = "https://www.nytimes.com"
-port = 8081
 landing_path = "/games/wordle/index.html"
 
 [reset]

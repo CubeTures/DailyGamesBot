@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from src import announce
 from src.games.models import FIELDS_EXPORT_RE, Game, GameConfig
-from src.settings import GAMES_DIR, LAUNCHER_PORT
+from src.settings import GAMES_DIR
 
 CONFIG_FILE = "config.toml"
 VARS_FILE = "vars.js"
@@ -113,19 +113,7 @@ def load_game(game_dir: Path) -> Game:
     )
 
 
-def load_games(games_dir: Path = GAMES_DIR) -> dict[int, Game]:
-    """Every game in `games_dir`, keyed by local port."""
-    games: dict[int, Game] = {}
-    for game_dir in sorted(p for p in games_dir.iterdir() if p.is_dir()):
-        game = load_game(game_dir)
-        if game.port == LAUNCHER_PORT:
-            raise ConfigError(
-                f"{game_dir.name}/: port {LAUNCHER_PORT} is the launcher's"
-            )
-        if game.port in games:
-            raise ConfigError(
-                f"{game_dir.name}/: port {game.port} already used by"
-                f" {games[game.port].name}"
-            )
-        games[game.port] = game
-    return games
+def load_games(games_dir: Path = GAMES_DIR) -> dict[str, Game]:
+    """Every game in `games_dir`, keyed by name."""
+    games = (load_game(p) for p in sorted(games_dir.iterdir()) if p.is_dir())
+    return {game.name: game for game in games}

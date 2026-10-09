@@ -5,7 +5,6 @@ title = "Circuits"
 description = "Fill each box with a word that forms compound terms with every box it's wired to."
 icon = "icon.png"
 origin = "https://www.puzzmo.com"
-port = 8092
 landing_path = "/game/circuits/"
 higher_score_wins = true
 

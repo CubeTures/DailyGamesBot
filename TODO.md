@@ -1,5 +1,5 @@
-- Nginx docker container so many ports can be opened
 - Let players download their own results
+- Custom ID mapping to discord ID for security
 
 ## To Test
 

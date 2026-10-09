@@ -5,7 +5,6 @@ title = "Costcodle"
 description = "Guess the price of a Costco product in six tries."
 icon = "icon.png"
 origin = "https://costcodle.com"
-port = 8087
 landing_path = "/"
 
 [[triggers]]

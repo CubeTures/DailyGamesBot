@@ -44,7 +44,7 @@ def load_hooks(game_name: str) -> GameHooks:
 
 def route_foreign_hosts(game_name: str, hosts: list[str]) -> tuple[Hook, Hook]:
     """`request` and `response` hooks serving `hosts`, which the game's JS
-    fetches from, under the game's own port (see ForeignHostRouter)."""
+    fetches from, under the game's own subdomain (see ForeignHostRouter)."""
     game = GAMES_BY_NAME[game_name]
     router = ForeignHostRouter(game.origin, game.local_origin, hosts)
 

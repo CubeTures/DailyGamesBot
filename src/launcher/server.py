@@ -111,10 +111,11 @@ class _LauncherRequestHandler(SimpleHTTPRequestHandler):
 
 @contextmanager
 def serve_launcher(port: int = LAUNCHER_PORT) -> Generator[None]:
-    """Regenerate the launcher page and serve it in a background thread."""
+    """Regenerate the launcher page and serve it in a background thread, for
+    the proxy to pass requests on to."""
     write_launcher()
     handler = partial(_LauncherRequestHandler, directory=str(LAUNCHER_DIR))
-    server = ThreadingHTTPServer(("0.0.0.0", port), handler)
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     Thread(target=server.serve_forever, daemon=True).start()
     try:
         yield

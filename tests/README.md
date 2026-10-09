@@ -18,7 +18,7 @@ proxy, and check the result the capture script saved. They're how a
 regression in recording results shows up: a site changing its storage, a
 trigger that no longer fires, a field that comes out wrong.
 
-They need the proxy's ports free (stop a running `src.proxy` first) and use
+They need ports 8080 and 8090 free (stop a running `src.proxy` first) and use
 the system Chrome. The session starts its own proxy on a temporary database,
 so the real `data/results.db` is never touched.
 

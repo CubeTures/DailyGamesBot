@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
-from src.settings import LAUNCHER_PORT
+from src.settings import game_origin
 
 ICON_MIME_TYPES = {
     ".png": "image/png",
@@ -55,7 +55,7 @@ def _valid_timezone(name: str) -> str:
 
 
 class _StrictModel(BaseModel):
-    # strict: TOML is typed, so "8081" for a port is a mistake, not a coercion.
+    # strict: TOML is typed, so "true" for a flag is a mistake, not a coercion.
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
 
@@ -161,7 +161,8 @@ class GameConfig(_StrictModel):
     model_config = ConfigDict(title="Game config")
 
     name: str = Field(
-        pattern=r"^[a-z][a-z0-9_]*$",
+        # It's also the game's subdomain and its hooks module's name.
+        pattern=r"^[a-z][a-z0-9]*$",
         description="Must match the game's directory name.",
     )
     title: NonEmptyStr = Field(
@@ -185,11 +186,6 @@ class GameConfig(_StrictModel):
         StringConstraints(pattern=r"^https?://"),
         AfterValidator(lambda s: s.rstrip("/")),
     ] = Field(description="The real site, proxied 1:1.")
-    port: int = Field(
-        ge=1024,
-        le=65535,
-        description=f"Unique local port ({LAUNCHER_PORT} is the launcher's).",
-    )
     landing_path: str = Field(default="/", pattern=r"^/")
     higher_score_wins: bool = Field(
         default=False,
@@ -222,4 +218,4 @@ class Game(GameConfig):
 
     @property
     def local_origin(self) -> str:
-        return f"http://localhost:{self.port}"
+        return game_origin(self.name)

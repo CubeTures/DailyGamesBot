@@ -38,12 +38,11 @@ skill's `node --check` step.
 ```toml
 #:schema ../schema.json
 
-name = "wordle"                      # must match the directory; [a-z0-9_]
+name = "wordle"                      # must match the directory; [a-z0-9]; served at wordle.localhost:8080
 title = "Wordle"                     # shown on the launcher (default: name)
 description = "Guess the hidden five-letter word in six tries."  # on the launcher
 icon = "icon.png"                    # image in this directory; png/svg/webp/jpg
 origin = "https://www.nytimes.com"   # real site; proxied 1:1
-port = 8081                          # unique local port (8090 is the launcher)
 landing_path = "/games/wordle/index.html"   # default "/"
 # higher_score_wins = true           # scoreboard ranks highest score first (default: lowest)
 

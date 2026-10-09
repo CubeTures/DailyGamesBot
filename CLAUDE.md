@@ -20,7 +20,8 @@ uv run pytest -m live -k wordle --headed   # one game, watching the browser
 ```
 
 `.env` (from `.env.example`) holds `DISCORD_BOT_TOKEN` and, optionally,
-`DISCORD_RESULTS_CHANNEL_ID` (the channel results are announced in).
+`DISCORD_RESULTS_CHANNEL_ID` (the channel results are announced in) and
+`DGB_PUBLIC_URL` / `DGB_PROXY_PORT` (where it's served; see below).
 
 ## Before finishing any change
 
@@ -45,8 +46,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
 
 ## Layout
 
-- `src/settings.py`: repo paths, launcher port, database path, `.env`
-  settings, logging setup
+- `src/settings.py`: repo paths, public URL and ports, database path,
+  `.env` settings, logging setup
 - `src/games/`: game config models (`models.py`), loading and validation
   (`loader.py`), the loaded games (`registry.py`), schema generation
   (`schema.py`), and `game_day.js`, the JS `gameDay()` shared by the
@@ -55,8 +56,9 @@ needs full type annotations. Its config is `[tool.pyright]` in
   `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
   `subscriptions.py`, `hidden_games.py`; `db.py` connects, creates the
   tables and migrates old databases
-- `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads
-  (`addon.py`), localhost rewrites (`rewrite.py`)
+- `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads and
+  that routes each subdomain to its game (`addon.py`), localhost rewrites
+  (`rewrite.py`)
 - `src/proxy/capture/`: the `/__dgb/` paths (`__init__.py`), capture script
   building and injection (`script.py`, `runtime.js`), the endpoints that
   save results (`endpoints.py`)
@@ -78,16 +80,23 @@ needs full type annotations. Its config is `[tool.pyright]` in
 
 ## How it works
 
-- **Proxy.** Each game gets its own local port (8081+), reverse-proxied 1:1
-  to its real origin; the launcher is on 8090. `rewrite.py` strips
+- **Proxy.** Everything is served through one mitmproxy listener on 8080
+  (`DGB_PUBLIC_URL`, default `http://localhost:8080`). Each game has its own
+  subdomain of it (`http://wordle.localhost:8080`), so its own origin and
+  storage; the addon picks the game by the Host header and reverse-proxies it
+  1:1 to its real origin. Any other host goes to the launcher's server, on
+  127.0.0.1:8090. Chrome and Firefox resolve `*.localhost` themselves; in
+  production, put a TLS-terminating reverse proxy with wildcard DNS in front
+  and forward every host, keeping the Host header. `rewrite.py` strips
   `X-Frame-Options`/CSP/HSTS and rewrites cookies so games work from a
   `localhost` origin over plain HTTP. Absolute URLs back to the game's own
-  origin are rewritten to the local port in text responses.
+  origin are rewritten to its subdomain in text responses.
 - **Capture.** A game's `config.toml` `[[triggers]]` say when the player has
   finished; `fields.js` says which result fields to extract. The proxy
   injects `capture/runtime.js` into the game's pages, which evaluates them
   and reports back; `capture/endpoints.py` saves results via
-  `src/store/results.py`, keyed on the player's Discord ID. When `fields.js` gives
+  `src/store/results.py`, keyed on the player's Discord ID (the
+  `dgb_discord_id` cookie; see the Discord bot below). When `fields.js` gives
   no `time_secs`, `runtime.js` fills it in as the time since the game's
   first page load that game day (a day starts at the config's `[reset]`; see
   `src/games/game_day.js`), kept in the game's localStorage under `__dgb_timer`.
@@ -113,9 +122,11 @@ needs full type annotations. Its config is `[tool.pyright]` in
   whose title link stretches over the whole card, so the bell can be a
   button inside it.
 - **Discord bot.** `/play` replies ephemerally with a launcher link tagged
-  `?discord_id=...`; the launcher stores it in `localStorage` and a
-  `dgb_discord_id` cookie (shared across localhost ports so games can send
-  it) and strips it from the URL. The bot records usernames for the
+  `?discord_id=...`; the launcher stores it in `localStorage` and strips it
+  from the URL. Game subdomains can't see the launcher's storage or cookies,
+  so its card links go through the game's `/__dgb/enter?discord_id=...&to=`,
+  which sets a `dgb_discord_id` cookie on that subdomain and redirects to the
+  game. The bot records usernames for the
   scoreboard on first `/play` and after each result. With
   `DISCORD_RESULTS_CHANNEL_ID` set, it polls every 15s for unannounced
   results and posts them using the game's `announcement.j2`; player mentions
@@ -141,9 +152,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   every proxy start, with the CSS and JS (including `src/games/game_day.js`)
   inlined. Edit the templates, not
   the output. It is gitignored, so don't commit it.
-- A new game's port must be added to `docker-compose.yml` `ports:` and the
-  `Dockerfile` `EXPOSE`.
-- Each listener maps to one origin. If a game's JS fetches an absolute URL on
+- Each game's subdomain maps to one origin. If a game's JS fetches an absolute URL on
   a different host (separate API/CDN subdomain), that request bypasses the
   proxy and may fail on CORS; fix it with a hook calling
   `route_foreign_hosts()` (see `src/proxy/hooks/dailyorbs.py`).

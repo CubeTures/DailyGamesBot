@@ -22,8 +22,8 @@ from typing import cast
 import pytest
 from playwright.sync_api import Browser, sync_playwright
 
-from src.games.registry import GAMES_BY_NAME, GAMES_BY_PORT
-from src.settings import LAUNCHER_PORT, REPO_ROOT
+from src.games.registry import GAMES_BY_NAME
+from src.settings import LAUNCHER_PORT, PROXY_PORT, REPO_ROOT
 from tests.e2e.harness import Player
 
 ARTIFACTS_DIR = Path(__file__).with_name(".artifacts")
@@ -46,8 +46,8 @@ def db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="session")
 def proxy(db_path: Path) -> Generator[None]:
-    """`python -m src.proxy` on every game's port, saving to `db_path`."""
-    ports = [LAUNCHER_PORT, *GAMES_BY_PORT]
+    """`python -m src.proxy`, saving to `db_path`."""
+    ports = [LAUNCHER_PORT, PROXY_PORT]
     if busy := [p for p in ports if _port_open(p)]:
         pytest.exit(
             f"ports {busy} are in use; stop the running proxy first"
