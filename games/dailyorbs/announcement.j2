@@ -1,0 +1,3 @@
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{{ score }} orb{{ "s" if score != 1 }}, {{ hearts_lost }} mistake{{ "s" if hearts_lost != 1 }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{{ row }}

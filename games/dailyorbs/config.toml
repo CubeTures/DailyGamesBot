@@ -1,0 +1,20 @@
+#:schema ../schema.json
+
+name = "dailyorbs"
+title = "Orbs"
+description = "Four trivia puzzles a day, three orbs each. Collect six orbs to win the day."
+icon = "icon.png"
+origin = "https://dailyorbs.com"
+port = 8093
+landing_path = "/"
+higher_score_wins = true
+
+# The server's game day rolls over at 09:00 UTC (nextRollover in /api/game-day).
+[reset]
+time = "09:00"
+timezone = "UTC"
+
+[[triggers]]
+name = "day-state"
+type = "page"
+when = "finished"
