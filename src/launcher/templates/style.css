@@ -16,6 +16,10 @@
   --tint-amount: 5%;
   --tint-pill-amount: 11%;
   --tint-pill-base: var(--surface);
+  /* Paper grain and a soft top-lit sheen on cards and boards. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.12 0 0 0 -0.1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 45%);
+  --ink-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.8 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -35,6 +39,8 @@
     --tint-amount: 5%;
     --tint-pill-amount: 7%;
     --tint-pill-base: var(--surface-2);
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.12 0 0 0 -0.045'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+    --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 45%);
   }
 }
 
@@ -109,6 +115,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   border: 1px solid var(--border);
   border-radius: 16px;
   background: color-mix(in oklab, var(--tint, var(--surface)) var(--tint-amount), var(--surface));
+  background-image: var(--sheen), var(--grain);
   box-shadow: var(--shadow);
   color: inherit;
   text-decoration: none;
@@ -130,7 +137,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .card .icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .card:hover .icon { transform: rotate(-4deg) scale(1.06); }
 .card.just-done { animation: card-done 0.9s ease; }
-.card.just-done .status { animation: status-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.card.just-done .stamp-body { animation: stamp 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.card.just-done .stamp-body::before { animation: fade-in 0.3s 0.1s ease both; }
 .card:has(.card-link:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* The title link covers the whole card, under the ping button. */
 .card-link { color: inherit; text-decoration: none; outline: none; }
@@ -174,7 +182,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 /* Edit mode (#edit-games): every card shows, with an eye that cycles what
    the viewer hides of the game (data-hide). Hidden cards are left out
    otherwise; app.js leaves out boards hidden with "all". */
-.games-head { align-items: center; }
+.games-head { align-items: bottom; }
 .games-head .note { animation: fade-in 0.2s ease both; }
 .games-head .note[hidden] { display: none; }
 #edit-games { margin-left: auto; }
@@ -238,7 +246,56 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.card.done .status { background: var(--done-soft); color: var(--done); }
+/* A finished card gets a big tilted ink stamp across its middle. The halo
+   (::before) blurs and lightens the text it covers so the ink reads; it's
+   outside .stamp so the ink's mask doesn't cut it. No mix-blend-mode on the
+   ink: it stops the halo's backdrop-filter from blurring. */
+.card:not(.done) .stamp-body { display: none; }
+.stamp-body {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  pointer-events: none;
+}
+.stamp-body::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  background: color-mix(in oklab, color-mix(in oklab, var(--tint, var(--surface)) var(--tint-amount), var(--surface)) 60%, transparent);
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
+  /* A rectangle feathered on every side, so the halo reaches the stamp's
+     corners and still fades out without an edge. */
+  --feather: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent),
+    linear-gradient(transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  -webkit-mask-image: var(--feather);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--feather);
+  mask-composite: intersect;
+}
+.stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 22px 5px;
+  border: 6px double var(--done);
+  border-radius: 12px;
+  color: var(--done);
+  font-weight: 800;
+  line-height: 1.05;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+  /* Patchy ink: the stamp shows through a noise mask. */
+  -webkit-mask-image: var(--ink-mask);
+  mask-image: var(--ink-mask);
+}
+.stamp b { font-size: 2rem; }
+.stamp span { font-size: 1.3rem; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+.stamp span:empty { display: none; }
 .play { color: var(--accent); font-size: 0.9rem; font-weight: 600; }
 .play::after { content: " \2192"; display: inline-block; transition: transform 0.15s ease; }
 .card:hover .play::after { transform: translateX(3px); }
@@ -273,6 +330,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   border: 1px solid color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border));
   border-radius: 16px;
   background: color-mix(in oklab, var(--tint, var(--surface)) var(--tint-amount), var(--surface));
+  background-image: var(--sheen), var(--grain);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -495,7 +553,10 @@ code {
 }
 @keyframes count-fresh { from, 25% { background-color: var(--accent-soft); color: var(--accent); } }
 @keyframes ring { 20% { transform: rotate(14deg); } 45% { transform: rotate(-10deg); } 70% { transform: rotate(5deg); } }
-@keyframes status-pop { 40% { transform: scale(1.15); } }
+@keyframes stamp {
+  from { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(2); }
+  60% { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(0.95); }
+}
 @keyframes card-done {
   from { box-shadow: var(--shadow), 0 0 0 0 var(--done-soft); border-color: var(--done); }
   50% { box-shadow: var(--shadow), 0 0 0 8px var(--done-soft); border-color: var(--done); }

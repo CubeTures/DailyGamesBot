@@ -1,7 +1,7 @@
 #:schema ../schema.json
 
 name = "chess"
-title = "Chess.com"
+title = "Chess Puzzle"
 description = "Find the winning moves in one chess puzzle a day, getting harder through the week."
 icon = "icon.png"
 origin = "https://www.chess.com"

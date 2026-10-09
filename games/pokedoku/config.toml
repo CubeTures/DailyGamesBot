@@ -19,5 +19,5 @@ timezone = "America/New_York"
 [[triggers]]
 name = "solution-stats"
 type = "network"
-url = "/__host/api\\.pokedoku\\.com/api/(puzzle/current|pokemon/all|puzzle/solution/guess|puzzle/\\d+/solution(/stats)?)$"
+url = "/__host/api\\.pokedoku\\.com/api/(puzzle/current|pokemon/all|puzzle/solution/guess|puzzle/giveup/\\d+|puzzle/\\d+/solution(/stats)?)$"
 when = "finished"

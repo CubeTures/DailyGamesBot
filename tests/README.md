@@ -59,7 +59,8 @@ and the one that learned the solution:
 
 Puzzles change daily, so drivers learn each day's answers once and cache them
 in `tests/e2e/.solutions/<game>/<game day>.json`: from the game's own API
-(Wordle, Connections, Chess.com, PokeDoku's answer stats), its page state
+(Wordle, Connections, Chess.com, PokeDoku's answer stats, the board Circuits
+is sent), its page state
 (Costcodle, Minute Cryptic, Clues by Sam's cards and hints), or by revealing
 everything in a throwaway play (Bracket City, Fermi). Krillion's answers are
 free text with no list, so its expectations come from the server's own
@@ -71,11 +72,8 @@ A scenario is skipped if its game's puzzle resets within 10 minutes.
 
 A driver's `known_failures` maps a scenario to a capture bug it exposes. It
 runs as a strict xfail: it's reported as `xfail` while the bug is there, and
-fails as `XPASS` once it's fixed, so the entry can be removed. Currently:
-
-- `pokedoku-give_up`: after "Give up" the game refetches the solution but not
-  `/solution/stats`, which the trigger waits for, so nothing is saved until
-  the page is reloaded.
+fails as `XPASS` once it's fixed, so the entry can be removed. There are
+none currently.
 
 ## Adding a game
 

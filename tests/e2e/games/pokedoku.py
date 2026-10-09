@@ -178,11 +178,4 @@ DRIVER = Driver(
     name="pokedoku",
     learn=learn,
     scenarios={"win": win, "lose": lose, "mixed": mixed, "give_up": give_up},
-    known_failures={
-        "give_up": (
-            "games/pokedoku: after Give up the game refetches the solution but"
-            " not /solution/stats, which the trigger waits for, so nothing is"
-            " saved until the page is reloaded"
-        ),
-    },
 )

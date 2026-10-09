@@ -238,8 +238,13 @@
       // Celebrate a result that arrives while the page is open.
       if (cardsRendered && mine && !card.classList.contains("done")) replay(card, "just-done");
       card.classList.toggle("done", !!mine);
-      card.querySelector(".status").textContent =
-        mine ? "✓ Done · " + formatScore(mine.data) : "Not played";
+      card.querySelector(".status").textContent = mine ? "Done" : "Not played";
+      if (mine) {
+        // A loss is stamped "Done", not "Cleared", and has no score line.
+        var score = formatScore(mine.data);
+        card.querySelector(".stamp-word").textContent = lost(mine.data) ? "Done" : "Cleared";
+        card.querySelector(".stamp-score").textContent = score === "–" ? "" : score;
+      }
       card.querySelector(".play").textContent = mine ? "Open" : "Play";
     });
     cardsRendered = true;
@@ -389,46 +394,89 @@
     return parseDayKey(gameDay(RESETS[game]));
   }
 
+  function sameDay(a, b) {
+    return a.getTime() === b.getTime();
+  }
+
+  // The last day with a puzzle out: tomorrow while a game that resets in an
+  // earlier timezone is already on it, otherwise today.
+  function latestDay() {
+    return Object.keys(RESETS).reduce(function (latest, game) {
+      var day = currentGameDay(game);
+      return day > latest ? day : latest;
+    }, today());
+  }
+
   function dayFromHash() {
     return parseDayKey((/^#day=(.*)$/.exec(location.hash) || [])[1]);
   }
 
-  // A local midnight, or null to follow today (also across midnight). Kept
-  // in the URL hash as #day=YYYY-MM-DD so it can be linked.
+  // The scoreboard's home day, where it opens and where "Today" goes: the
+  // latest day the viewer has a result on if that's ahead of today (they've
+  // moved on to puzzles that reset before their midnight), otherwise today.
+  // Null until refreshToday() has first looked.
+  var homeDay = null;
+
+  function home() {
+    return homeDay && homeDay >= today() ? homeDay : today();
+  }
+
+  // A local midnight, or null to follow the home day (also across midnight).
+  // Kept in the URL hash as #day=YYYY-MM-DD so it can be linked.
   var viewDay = null;
   var prevButton = document.getElementById("day-prev");
   var nextButton = document.getElementById("day-next");
   var todayButton = document.getElementById("day-today");
   var dayPicker = document.getElementById("day-pick");
 
-  function setViewDay(day, fromHash) {
-    var from = viewDay || today();
-    viewDay = day && day < today() ? day : null;
-    var to = viewDay || today();
-    // New boards slide in from the side the viewer moved towards.
+  function shownDay() {
+    return viewDay || home();
+  }
+
+  function writeHash() {
+    var hash = viewDay ? "#day=" + isoDate(viewDay) : "";
+    history.replaceState({}, "", location.pathname + location.search + hash);
+  }
+
+  // New boards slide in from the side the viewer moved towards.
+  function slideFrom(from, to) {
     document.getElementById("boards").style.setProperty(
       "--dx", to < from ? "-16px" : to > from ? "16px" : "0px");
-    if (!fromHash) {
-      var hash = viewDay ? "#day=" + isoDate(viewDay) : "";
-      history.replaceState({}, "", location.pathname + location.search + hash);
-    }
+  }
+
+  function setViewDay(day, fromHash) {
+    var from = shownDay();
+    viewDay = day && day <= latestDay() && !(homeDay && sameDay(day, home())) ? day : null;
+    slideFrom(from, shownDay());
+    if (!fromHash) writeHash();
     showViewDay();
   }
 
-  // Today's results drive the scoreboard while it's on today.
-  function renderToday(results) {
-    if (viewDay) return;
-    renderBoards(groupByGame(results), "Nobody has finished a game yet today. Be the first!");
+  function dayTitle(day) {
+    if (sameDay(day, today())) return "Today's Scores";
+    if (sameDay(day, addDays(today(), 1))) return "Tomorrow's Scores";
+    return "Scores · " + day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  function emptyText(day) {
+    if (sameDay(day, today())) return "Nobody has finished a game yet today. Be the first!";
+    if (day > today()) return "Nobody has finished one of tomorrow's games yet. Be the first!";
+    return "Nobody finished a game that day.";
+  }
+
+  function hasMine(results) {
+    return results.some(function (r) { return r.discord_id === discordId; });
   }
 
   // Each card's "Done" state is for its game's current puzzle, whatever day
   // the scoreboard shows: a game that resets in an earlier timezone may
   // already be on the viewer's tomorrow. So fetch today plus any such day.
+  // That's also every day the home day can be, and the scoreboard follows
+  // the home day forward when the viewer's first result on tomorrow lands.
   function refreshToday() {
-    var todayKey = isoDate(today());
-    var cardDays = {};
     var days = {};
-    days[todayKey] = today();
+    days[isoDate(today())] = today();
+    var cardDays = {};
     Object.keys(RESETS).forEach(function (game) {
       var day = currentGameDay(game);
       cardDays[game] = isoDate(day);
@@ -437,41 +485,72 @@
     var keys = Object.keys(days);
     Promise.all(keys.map(function (key) { return fetchResults(days[key]); })).then(function (lists) {
       var byDay = {};
-      keys.forEach(function (key, i) { byDay[key] = groupByGame(lists[i]); });
+      var newHome = today();
+      keys.forEach(function (key, i) {
+        byDay[key] = groupByGame(lists[i]);
+        if (days[key] > newHome && hasMine(lists[i])) newHome = days[key];
+      });
       var current = {};
       Object.keys(cardDays).forEach(function (game) {
         current[game] = byDay[cardDays[game]][game];
       });
       renderCards(current);
-      renderToday(lists[keys.indexOf(todayKey)]);
+
+      var oldHome = homeDay && home();
+      homeDay = newHome;
+      if (viewDay && sameDay(viewDay, newHome)) {
+        viewDay = null;
+        writeHash();
+      }
+      if (!viewDay && !(oldHome && sameDay(oldHome, newHome))) {
+        slideFrom(oldHome || newHome, newHome);
+        showNav();
+      } else {
+        updateNavButtons();
+      }
+      var shown = shownDay();
+      if (byDay[isoDate(shown)]) renderBoards(byDay[isoDate(shown)], emptyText(shown));
     }).catch(function () {});
   }
 
-  var pastDayRequest = 0;
-  function showPastDay(day) {
-    var request = ++pastDayRequest;
+  var dayRequest = 0;
+  function showDay(day) {
+    var request = ++dayRequest;
     showMessage(document.getElementById("boards"), "Loading…", true);
     fetchResults(day).then(function (results) {
       // Ignore a slow answer for a day the viewer has already left.
-      if (request !== pastDayRequest || !viewDay || viewDay.getTime() !== day.getTime()) return;
-      renderBoards(groupByGame(results), "Nobody finished a game that day.");
+      if (request !== dayRequest || !viewDay || !sameDay(viewDay, day)) return;
+      renderBoards(groupByGame(results), emptyText(day));
     }).catch(function () {});
   }
 
-  function showViewDay() {
-    var day = viewDay || today();
-    nextButton.disabled = !viewDay;
+  function updateNavButtons() {
+    var latest = latestDay();
+    nextButton.disabled = shownDay() >= latest;
     todayButton.hidden = !viewDay;
-    dayPicker.max = isoDate(today());
+    // It goes to the home day, so it's named after it.
+    todayButton.textContent = sameDay(home(), today()) ? "Today" : "Tomorrow";
+    dayPicker.max = isoDate(latest);
+  }
+
+  function showNav() {
+    var day = shownDay();
+    updateNavButtons();
     dayPicker.value = isoDate(day);
-    var title = document.getElementById("scores-title");
-    title.textContent = viewDay
-      ? "Scores · " + day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
-      : "Today's Scores";
-    replay(title, "swap");
+    // Until the home day is known, keep the page's own title rather than
+    // flash today's before moving on to tomorrow's.
+    if (viewDay || homeDay) {
+      var title = document.getElementById("scores-title");
+      title.textContent = dayTitle(day);
+      replay(title, "swap");
+    }
     document.getElementById("updated").textContent = "";
     shownOnBoard = null;
-    if (viewDay) showPastDay(day);
+  }
+
+  function showViewDay() {
+    showNav();
+    if (viewDay) showDay(viewDay);
     else refreshToday();
   }
 
@@ -623,10 +702,10 @@
   setUpHiding();
 
   prevButton.addEventListener("click", function () {
-    setViewDay(addDays(viewDay || today(), -1));
+    setViewDay(addDays(shownDay(), -1));
   });
   nextButton.addEventListener("click", function () {
-    if (viewDay) setViewDay(addDays(viewDay, 1));
+    setViewDay(addDays(shownDay(), 1));
   });
   todayButton.addEventListener("click", function () { setViewDay(null); });
   dayPicker.addEventListener("change", function () {

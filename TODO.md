@@ -1,10 +1,9 @@
 - Nginx docker container so many ports can be opened
 - Let players download their own results
-- Game "favorites" list that promote in sorting order the ones you played yesterday
 
 ## To Test
 
-- Timezoned games
+- Make sure e2e tests run successfully on new day
 
 ## Games
 

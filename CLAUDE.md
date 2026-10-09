@@ -95,6 +95,10 @@ needs full type annotations. Its config is `[tool.pyright]` in
   `src/launcher/templates/` and the game configs on every proxy start. It shows a card per game and a
   scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD` on the
   launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
+  The board can go forward to tomorrow while some game is already on it.
+  It opens on the home day: tomorrow once the viewer has a result on it,
+  otherwise today. The button back to it is labelled with that day. A view following the home day
+  moves to tomorrow on its own when that first result lands.
   Results are filed by game day, not capture time: `runtime.js` reports the
   day the page loaded in, by the game's `[reset]`, as `game_day`. So a game
   resetting at Eastern midnight, played at 10pm Pacific, shows on the
