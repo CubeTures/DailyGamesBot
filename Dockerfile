@@ -14,4 +14,4 @@ RUN uv sync --locked --no-dev
 
 EXPOSE 8080
 
-CMD ["uv", "run", "python3", "-m", "src"]
+CMD ["uv", "run", "--no-sync", "python3", "-m", "src"]

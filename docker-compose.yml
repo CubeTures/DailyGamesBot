@@ -6,4 +6,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/app/data
+      - dgb-data:/app/data
+
+volumes:
+  dgb-data:

@@ -1,10 +1,6 @@
 - Let players download their own results
 - Custom ID mapping to discord ID for security
 
-## To Test
-
-- Make sure e2e tests run successfully on new day
-
 ## Games
 
 - https://googlefeud.com/feudle/
