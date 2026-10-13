@@ -22,7 +22,8 @@ uv run pytest -m live -k wordle --headed   # one game, watching the browser
 
 `.env` (from `.env.example`) holds `DISCORD_BOT_TOKEN` and, optionally,
 `DISCORD_RESULTS_CHANNEL_ID` (the channel results are announced in) and
-`DGB_PUBLIC_URL` / `DGB_PROXY_PORT` (where it's served; see below).
+`DGB_PUBLIC_URL` / `DGB_PROXY_PORT` / `DGB_GAME_HOST` (where it's served; see
+below).
 
 ## Before finishing any change
 
@@ -84,7 +85,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
 - **Proxy.** Everything is served through one mitmproxy listener on 8080
   (`DGB_PUBLIC_URL`, default `http://localhost:8080`). Each game has its own
   subdomain of it (`http://wordle.localhost:8080`), so its own origin and
-  storage; the addon picks the game by the Host header and reverse-proxies it
+  storage (`DGB_GAME_HOST`, e.g. `{game}-daily.example.com`, overrides the
+  host when nested subdomains can't get a certificate); the addon picks the game by the Host header and reverse-proxies it
   1:1 to its real origin. Any other host goes to the launcher's server, on
   127.0.0.1:8090. Chrome and Firefox resolve `*.localhost` themselves; in
   production, put a TLS-terminating reverse proxy with wildcard DNS in front

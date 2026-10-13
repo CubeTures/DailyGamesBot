@@ -21,12 +21,14 @@ from src.proxy.capture.endpoints import (
 )
 from src.proxy.capture.script import inject_script_tag
 from src.proxy.hooks import load_hooks
-from src.settings import PUBLIC_HOST
 
 log = logging.getLogger(__name__)
 
 
-_GAMES_BY_HOST = {f"{name}.{PUBLIC_HOST}": game for name, game in GAMES_BY_NAME.items()}
+_GAMES_BY_HOST = {
+    (urlsplit(game.local_origin).hostname or "").lower(): game
+    for game in GAMES_BY_NAME.values()
+}
 _hooks = {name: load_hooks(name) for name in GAMES_BY_NAME}
 _origin_rewriters = {
     name: rewrite.OriginRewriter(game.origin, game.local_origin)
@@ -66,7 +68,7 @@ def response(flow: http.HTTPFlow) -> None:
 
 
 def _hostname(host_header: str | None) -> str:
-    return urlsplit(f"//{host_header or ''}").hostname or ""
+    return (urlsplit(f"//{host_header or ''}").hostname or "").lower()
 
 
 def _route_to_origin(request: http.Request, game: Game) -> None:

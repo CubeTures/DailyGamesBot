@@ -18,25 +18,32 @@ load_dotenv(REPO_ROOT / ".env")
 # of it (http://wordle.localhost:8080), all through the proxy on this one
 # port. Browsers resolve *.localhost themselves; in production, point this at
 # a domain with wildcard DNS behind a TLS-terminating reverse proxy.
-PUBLIC_URL = os.environ.get("DGB_PUBLIC_URL", "http://localhost:8080").rstrip("/")
+PUBLIC_URL = (
+    os.environ.get("DGB_PUBLIC_URL", "").strip() or "http://localhost:8080"
+).rstrip("/")
 _PUBLIC = urlsplit(PUBLIC_URL)
 PUBLIC_SCHEME = _PUBLIC.scheme
-PUBLIC_HOST = (_PUBLIC.hostname or "localhost").lower()
 # The port the proxy listens on. Set it when something in front of the proxy
 # (a reverse proxy, Docker) serves the public URL on a different port.
 PROXY_PORT = int(os.environ.get("DGB_PROXY_PORT") or _PUBLIC.port or 8080)
 # The launcher's own server, which only the proxy talks to.
 LAUNCHER_PORT = 8090
 LAUNCHER_URL = PUBLIC_URL
+# Each game's host (and port, if any), with {game} for its name. Default: a
+# subdomain of the public URL. Set it when those can't get a certificate, e.g.
+# behind Cloudflare, whose free one doesn't cover *.daily.example.com:
+# {game}-daily.example.com.
+GAME_HOST = os.environ.get("DGB_GAME_HOST", "").strip() or f"{{game}}.{_PUBLIC.netloc}"
 
 
 def game_origin(game_name: str) -> str:
-    """Where a game is served: its own subdomain of the public URL."""
-    return f"{PUBLIC_SCHEME}://{game_name}.{_PUBLIC.netloc}"
+    """Where a game is served: its own host, by default a subdomain of the
+    public URL."""
+    return f"{PUBLIC_SCHEME}://{GAME_HOST.format(game=game_name)}"
 
 
 def db_path() -> Path:
-    return Path(os.environ.get("DGB_DB_PATH", REPO_ROOT / "data" / "results.db"))
+    return Path(os.environ.get("DGB_DB_PATH") or REPO_ROOT / "data" / "results.db")
 
 
 def bot_token() -> str:
