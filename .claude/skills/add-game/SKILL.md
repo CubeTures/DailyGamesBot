@@ -54,7 +54,7 @@ DGB_DB_PATH=$SCRATCH/add-game.db uv run python3 -m src.proxy
 ```
 
 Wait until `curl -s -o /dev/null -w '%{http_code}' http://<name>.localhost:8080/`
-answers, retrying if the connection is refused. If the ports are already taken,
+answers (with a 404: there's no token cookie yet), retrying if the connection is refused. If the ports are already taken,
 an earlier proxy is still running: stop it as in step 8.
 
 ## 3. Open the game with the recorder
@@ -234,19 +234,19 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
      uv run python3 -c "import sqlite3; [print(r) for r in sqlite3.connect('$SCRATCH/add-game.db').execute('select game, discord_id, puzzle_id, data, trigger from results')]"
      ```
 2. **Positive, replayed.** The browser only holds the last run, so check the other saved run(s) by replaying them. Nothing gets sent.
-   - **Storage triggers.** In a fresh context with no discord cookie (as in check 4), write the run's saved `storage` values into `localStorage`/`sessionStorage`, then call `__dgb.dryRun()`. The trigger must fire, with fields matching that run's ground truth.
+   - **Storage triggers.** In a fresh context entered as a fresh player (as in check 4), write the run's saved `storage` values into `localStorage`/`sessionStorage`, then call `__dgb.dryRun()`. The trigger must fire, with fields matching that run's ground truth.
    - **Network triggers.** Replay the saved entries:
      ```js
      () => { const e = /* entry from run-N.json, or __dgbRec.get(i) */; return __dgb.testNetwork(e.method, e.url, e.req, e.res, e.status); }
      ```
 3. **Mid-game.** From the saved runs, derive an unfinished state, e.g. the storage value as it was after the first move (the timeline has each write). Replay it the same way and confirm nothing fires.
-4. **Negative (fresh player).** In a brand-new context with **no** discord cookie, nothing can be saved even if a trigger misfires. Use `browser_run_code_unsafe`:
+4. **Negative (fresh player).** A brand-new context, entered as a second test player who hasn't played. Without a working `dgb_token` cookie the proxy answers every game request with a 404, so get their token first: `DGB_DB_PATH=$SCRATCH/add-game.db uv run python3 -c "from src.store import players; print(players.token_for('dgb-fresh'))"`. Then use `browser_run_code_unsafe`:
    ```js
    async (page) => {
      const ctx = await page.context().browser().newContext();
      try {
        const p = await ctx.newPage();
-       await p.goto("http://<name>.localhost:8080<landing_path>");
+       await p.goto("http://<name>.localhost:8080/__dgb/enter?token=<fresh token>&to=<landing_path>");
        await p.waitForTimeout(4000);
        return await p.evaluate(() => ({ dry: __dgb.dryRun(), log: __dgb.state.log, errors: __dgb.state.errors }));
      } finally { await ctx.close(); }

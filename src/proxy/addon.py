@@ -2,9 +2,11 @@
 
 mitmdump loads this file as a script (see proxy/mitmdump.py). The subdomain
 a request was sent to says which game it's for; it's passed on to the game's
-real origin. Requests for the launcher's host go on to the launcher, and any
-other host gets a 404: in production every subdomain of the domain reaches
-the proxy (see SETUP.md).
+real origin, but only for a player: a request without their dgb_token cookie
+gets a 404, except the /__dgb/enter that sets it (see capture/endpoints.py).
+Requests for the launcher's host go on to the launcher, and any other host
+gets a 404: in production every subdomain of the domain reaches the proxy
+(see SETUP.md).
 """
 
 import logging
@@ -18,7 +20,10 @@ from src.games.registry import GAMES_BY_NAME
 from src.proxy import rewrite
 from src.proxy.capture.endpoints import (
     handle_capture_request,
+    has_working_token,
     is_capture_path,
+    is_enter_path,
+    not_found,
     strip_token_cookie,
 )
 from src.proxy.capture.script import inject_script_tag
@@ -52,9 +57,10 @@ def request(flow: http.HTTPFlow) -> None:
     game = _GAMES_BY_HOST.get(host)
     if game is None:
         if host != _LAUNCHER_HOST:
-            flow.response = http.Response.make(
-                404, b"Not found", {"content-type": "text/plain"}
-            )
+            flow.response = not_found()
+        return
+    if not is_enter_path(flow.request.path) and not has_working_token(flow.request):
+        flow.response = not_found()
         return
     flow.metadata[_GAME_KEY] = game
     if handle_capture_request(flow, game):

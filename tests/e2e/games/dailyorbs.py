@@ -66,7 +66,7 @@ def _puzzle(color: str, data: dict[str, Any]) -> Puzzle:
 
 
 def learn(player: Player) -> Solution:
-    response = player.context.request.get(player.url(f"{API}/game-day"))
+    response = player.fetch(f"{API}/game-day")
     assert response.ok, f"Daily Orbs API: {response.status}"
     data = response.json()
     puzzles = data["puzzles"]

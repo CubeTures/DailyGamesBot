@@ -5,12 +5,14 @@ The player is identified by the dgb_token cookie, holding the token from
 their /play link (see store/players.py). Each game is on its own
 subdomain, so the launcher's cookies don't reach it: the launcher's game links
 go through /__dgb/enter?token=TOKEN&to=PATH, which sets the cookie on the
-game's subdomain and redirects to the game.
+game's subdomain and redirects to the game. Without a working token, every
+request on a game's subdomain gets a 404 (see proxy/addon.py).
 """
 
 import json
 import logging
 import re
+import time
 from datetime import UTC, date, datetime
 from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
@@ -34,6 +36,12 @@ _COOKIE_VALUE_RE = re.compile(r"[\w-]+", re.ASCII)
 
 _NO_STORE = {"Cache-Control": "no-store"}
 
+# Tokens found working, with when to look them up again, so a game loading
+# dozens of files doesn't query the store for each. A reset token keeps
+# working on games for up to this long.
+_TOKEN_RECHECK_SECS = 60
+_working_tokens: dict[str, float] = {}
+
 log = logging.getLogger(__name__)
 
 
@@ -46,6 +54,30 @@ def strip_token_cookie(request: http.Request) -> None:
     cookies = request.cookies
     if TOKEN_COOKIE in cookies:
         del cookies[TOKEN_COOKIE]
+
+
+def is_enter_path(path: str) -> bool:
+    return path.split("?", 1)[0] == ENTER_PATH
+
+
+def has_working_token(request: http.Request) -> bool:
+    """Whether the request carries the cookie of a player's current token."""
+    return _is_working_token(request.cookies.get(TOKEN_COOKIE, ""))
+
+
+def not_found() -> http.Response:
+    return http.Response.make(404, b"Not found", {"Content-Type": "text/plain"})
+
+
+def _is_working_token(token: str) -> bool:
+    now = time.monotonic()
+    if _working_tokens.get(token, 0) > now:
+        return True
+    if players.discord_id_for(token) is None:
+        _working_tokens.pop(token, None)
+        return False
+    _working_tokens[token] = now + _TOKEN_RECHECK_SECS
+    return True
 
 
 def handle_capture_request(flow: http.HTTPFlow, game: Game) -> bool:
@@ -69,14 +101,14 @@ def handle_capture_request(flow: http.HTTPFlow, game: Game) -> bool:
 def _enter(request: http.Request, game: Game) -> http.Response:
     """Remember the player on this game's subdomain, then go to the game."""
     params = {k: v[0] for k, v in parse_qs(urlsplit(request.path).query).items()}
+    token = params.get("token", "")
+    if not _COOKIE_VALUE_RE.fullmatch(token) or not _is_working_token(token):
+        return not_found()
     to = params.get("to", "")
     # Only a path on this game, not another site.
     if not to.startswith("/") or to.startswith("//") or "\\" in to:
         to = game.landing_path
-    headers = {"Location": to, **_NO_STORE}
-    token = params.get("token", "")
-    if _COOKIE_VALUE_RE.fullmatch(token):
-        headers["Set-Cookie"] = token_cookie(token)
+    headers = {"Location": to, "Set-Cookie": token_cookie(token), **_NO_STORE}
     return http.Response.make(302, b"", headers)
 
 

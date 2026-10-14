@@ -10,9 +10,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import BrowserContext, Frame, Locator, Page
+from playwright.sync_api import APIResponse, BrowserContext, Frame, Locator, Page
 
 from src.games.models import Game
+from src.proxy.capture import ENTER_PATH
 from src.settings import LAUNCHER_URL
 
 # The day's solution, as a driver's learn() found it. Cached as JSON.
@@ -45,6 +46,14 @@ class Player:
 
     def url(self, path: str | None = None) -> str:
         return self.game.local_origin + (path or self.game.landing_path)
+
+    def fetch(self, path: str) -> APIResponse:
+        """GET a path on the game's subdomain outside the page (say, the
+        game's puzzle API). It enters the game first, for the dgb_token
+        cookie without which the proxy answers 404."""
+        enter = f"{self.game.local_origin}{ENTER_PATH}?token={self.token}&to=/"
+        self.context.request.get(enter, max_redirects=0)
+        return self.context.request.get(self.url(path))
 
     def open(self, path: str | None = None) -> Page:
         """Visit the launcher as this player, as a /play link does, then the

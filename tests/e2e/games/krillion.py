@@ -131,7 +131,7 @@ def _candidates(prompt: str) -> list[str]:
 
 
 def _today(player: Player) -> dict[str, Any]:
-    res = player.context.request.get(player.url("/api/today"))
+    res = player.fetch("/api/today")
     assert res.ok, f"Krillion /api/today: {res.status}"
     return res.json()
 

@@ -1,5 +1,6 @@
 - Let players download their own results
 - Statistics board: per game and per person
+- See if we can allow logins to accounts for saved progress
 
 ## Games
 
@@ -13,6 +14,8 @@
 
 - https://www.merriam-webster.com/games/blossom-word-game
 - https://www.britannica.com/quiz/tightrope
+- https://gauntle.com/
+- https://timeguessr.com/
 
 - https://listdle.com/
 

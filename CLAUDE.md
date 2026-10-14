@@ -139,7 +139,10 @@ needs full type annotations. Its config is `[tool.pyright]` in
   subdomains can't see the launcher's storage or cookies, so its card links
   go through the game's `/__dgb/enter?token=...&to=`, which sets an
   HttpOnly `dgb_token` cookie on that subdomain and redirects to the
-  game. The bot records usernames for the
+  game. Any other request to a game's subdomain without a working token
+  cookie gets a 404 (`has_working_token()` in `capture/endpoints.py`, which
+  caches a working token for 60s, so a reset takes up to a minute to lock
+  games). The bot records usernames for the
   scoreboard on first `/play` and after each result. With
   `DISCORD_RESULTS_CHANNEL_ID` set, it polls every 15s for unannounced
   results and posts them using the game's `announcement.j2`; player mentions

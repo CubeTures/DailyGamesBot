@@ -12,7 +12,7 @@ GREEN_ROW = ":green_square:" * 5
 
 def learn(player: Player) -> Solution:
     day = game_day(player.game)
-    puzzle = player.context.request.get(player.url(f"/svc/wordle/v2/{day}.json"))
+    puzzle = player.fetch(f"/svc/wordle/v2/{day}.json")
     assert puzzle.ok, f"Wordle API: {puzzle.status}"
     data = puzzle.json()
     return {"answer": data["solution"], "print_date": data["print_date"]}

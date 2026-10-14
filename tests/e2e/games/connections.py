@@ -7,7 +7,7 @@ from tests.e2e.solutions import game_day
 
 def learn(player: Player) -> Solution:
     day = game_day(player.game)
-    puzzle = player.context.request.get(player.url(f"/svc/connections/v2/{day}.json"))
+    puzzle = player.fetch(f"/svc/connections/v2/{day}.json")
     assert puzzle.ok, f"Connections API: {puzzle.status}"
     data = puzzle.json()
     return {

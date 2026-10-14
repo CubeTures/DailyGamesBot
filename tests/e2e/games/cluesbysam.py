@@ -6,6 +6,8 @@ order matters too. learn() gets that order from the game's own hint: after
 
 from typing import Any
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
 from tests.e2e.harness import Driver, Expected, Player, Solution
 from tests.e2e.solutions import game_day
 
@@ -34,7 +36,19 @@ def _start(player: Player) -> None:
 def _guess(player: Player, index: int, criminal: bool) -> None:
     page = player.page
     page.locator(".card").nth(index).click()
-    page.get_by_role("button", name="Criminal" if criminal else "Innocent").click()
+    verdict = page.get_by_role("button", name="Criminal" if criminal else "Innocent")
+    # The card's dialog ignores clicks for a moment after it opens; a verdict
+    # it takes, right or wrong, closes it.
+    page.wait_for_timeout(300)
+    for _ in range(5):
+        verdict.click()
+        try:
+            verdict.wait_for(state="hidden", timeout=1000)
+            break
+        except PlaywrightTimeoutError:
+            pass
+    else:
+        raise AssertionError(f"card {index}'s dialog didn't take the verdict")
     page.wait_for_timeout(700)
 
 

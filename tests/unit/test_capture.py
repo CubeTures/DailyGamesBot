@@ -91,33 +91,39 @@ def test_serves_script_and_404s_unknown_paths() -> None:
     assert not handle_capture_request(flow, WORDLE)
 
 
-@pytest.mark.parametrize(
-    ("query", "location", "cookie"),
-    [
-        (
-            "?token=ab-12&to=/games/wordle/index.html",
-            "/games/wordle/index.html",
-            "dgb_token=ab-12; Path=/; HttpOnly;",
-        ),
-        ("?to=/x", "/x", None),
-        ("?token=4;2&to=//evil.com", "/games/wordle/index.html", None),
-        ("?to=https://evil.com", "/games/wordle/index.html", None),
-    ],
-)
-def test_enter_sets_cookie_and_redirects_within_game(
-    query: str, location: str, cookie: str | None
-) -> None:
+def _enter(query: str) -> http.Response:
     flow = tflow.tflow()
     flow.request.path = "/__dgb/enter" + query
     assert handle_capture_request(flow, WORDLE)
     assert flow.response is not None
-    assert flow.response.status_code == 302
-    assert flow.response.headers["location"] == location
-    set_cookie = cast(str | None, flow.response.headers.get("set-cookie"))
-    if cookie is None:
-        assert set_cookie is None
-    else:
-        assert set_cookie is not None and set_cookie.startswith(cookie)
+    return flow.response
+
+
+@pytest.mark.parametrize(
+    ("to", "location"),
+    [
+        ("/games/wordle/index.html", "/games/wordle/index.html"),
+        ("/x", "/x"),
+        ("//evil.com", "/games/wordle/index.html"),
+        ("https://evil.com", "/games/wordle/index.html"),
+    ],
+)
+def test_enter_sets_cookie_and_redirects_within_game(to: str, location: str) -> None:
+    token = players.token_for("42")
+    response = _enter(f"?token={token}&to={to}")
+    assert response.status_code == 302
+    assert response.headers["location"] == location
+    set_cookie = cast(str, response.headers["set-cookie"])
+    assert set_cookie.startswith(f"dgb_token={token}; Path=/; HttpOnly;")
+
+
+def test_enter_404s_without_a_working_token() -> None:
+    old = players.token_for("7")
+    players.reset_token("7")
+    for query in ("?to=/x", "?token=x&to=/x", "?token=4;2&to=/x", f"?token={old}"):
+        response = _enter(query)
+        assert response.status_code == 404
+        assert "set-cookie" not in response.headers
 
 
 def test_injects_script_tag_into_head() -> None:

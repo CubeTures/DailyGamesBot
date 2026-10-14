@@ -52,8 +52,9 @@ def _solution(driver: Driver, game: Game, players: PlayerFactory) -> dict[str, A
     return solutions.cached(driver.name, solutions.game_day(game), run)
 
 
-def _launcher_results(day: str) -> list[dict[str, Any]]:
-    with urllib.request.urlopen(f"{LAUNCHER_URL}/api/results?day={day}") as r:
+def _launcher_results(day: str, token: str) -> list[dict[str, Any]]:
+    url = f"{LAUNCHER_URL}/api/results?day={day}&token={token}"
+    with urllib.request.urlopen(url) as r:
         return json.load(r)
 
 
@@ -78,7 +79,7 @@ def _check_row(player: Player, row: Row, expected: dict[str, Any]) -> None:
     # throws) doesn't.
     shown = [
         r
-        for r in _launcher_results(row.game_day)
+        for r in _launcher_results(row.game_day, player.token)
         if r["discord_id"] == player.discord_id and r["game"] == game.name
     ]
     announcement = shown[0]["announcement"] if shown else None
