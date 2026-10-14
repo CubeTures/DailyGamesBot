@@ -1,4 +1,5 @@
-"""Renders launcher/index.html from templates/ and the game configs."""
+"""Renders launcher/index.html from templates/ and the game configs, and the
+pages shown instead of it to visitors without a working /play link."""
 
 import base64
 from pathlib import Path
@@ -16,35 +17,53 @@ from src.settings import LAUNCHER_DIR, results_channel_id
 TEMPLATES_DIR = Path(__file__).with_name("templates")
 GAME_DAY_JS = Path(__file__).parents[1] / "games" / "game_day.js"
 OUTPUT_PATH = LAUNCHER_DIR / "index.html"
+# Where the launcher's server puts the viewer's token as it sends the page.
+TOKEN_PLACEHOLDER = "__DGB_TOKEN__"
 
 # The launcher's server re-renders the page from its request threads.
 _write_lock = Lock()
 
 
-def write_launcher() -> None:
-    """Write the page, swapping it in whole so it's never served half-written."""
+def write_launcher() -> str:
+    """Write the page, swapping it in whole so it's never read half-written,
+    and return it."""
+    page = render_launcher()
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     temp_path = OUTPUT_PATH.with_suffix(".tmp")
     with _write_lock:
-        temp_path.write_text(render_launcher())
+        temp_path.write_text(page)
         temp_path.replace(OUTPUT_PATH)
+    return page
 
 
 def render_launcher() -> str:
     games = sorted(GAMES_BY_NAME.values(), key=lambda game: game.title.casefold())
-    env = jinja2.Environment(
+    return (
+        _environment()
+        .get_template("index.html.j2")
+        .render(
+            token_placeholder=TOKEN_PLACEHOLDER,
+            games=[_card(game) for game in games],
+            game_titles={game.name: game.title for game in games},
+            resets={game.name: game.reset.js_config() for game in games},
+            higher_score_wins=[game.name for game in games if game.higher_score_wins],
+            # Game roles live in the results channel's server.
+            roles_enabled=results_channel_id() is not None,
+            game_day_js=GAME_DAY_JS.read_text(),
+        )
+    )
+
+
+def render_locked(expired: bool) -> str:
+    """The page for visitors without a token, or with one that's been reset."""
+    return _environment().get_template("locked.html.j2").render(expired=expired)
+
+
+def _environment() -> jinja2.Environment:
+    return jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,
         keep_trailing_newline=True,
-    )
-    return env.get_template("index.html.j2").render(
-        games=[_card(game) for game in games],
-        game_titles={game.name: game.title for game in games},
-        resets={game.name: game.reset.js_config() for game in games},
-        higher_score_wins=[game.name for game in games if game.higher_score_wins],
-        # Game roles live in the results channel's server.
-        roles_enabled=results_channel_id() is not None,
-        game_day_js=GAME_DAY_JS.read_text(),
     )
 
 

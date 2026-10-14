@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Games</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+<style>
+{% include "style.css" %}
+.warning { display: flex; }
+</style>
+</head>
+<body>
+  <div class="warning">
+    <div class="warning-card">
+      <div class="emoji" aria-hidden="true">🎲</div>
+      {%- if expired %}
+      <h2>Your link has expired</h2>
+      <p>Run <code>/play</code> in Discord for a new one.</p>
+      {%- else %}
+      <h2>Get your link first</h2>
+      <p>Run <code>/play</code> in Discord to get your personal link so we can attribute your scores.</p>
+      {%- endif %}
+    </div>
+  </div>
+<script>
+  // Before the server set a cookie, the page kept the token in localStorage:
+  // try it once, then forget it.
+  (function () {
+    try {
+      var token = localStorage.getItem("token");
+      if (new URLSearchParams(location.search).has("token")) {
+        localStorage.removeItem("token");
+        history.replaceState({}, "", location.pathname + location.hash);
+      } else if (token) {
+        location.replace("/?token=" + encodeURIComponent(token) + location.hash);
+      }
+    } catch (e) {}
+  })();
+</script>
+</body>
+</html>

@@ -17,7 +17,6 @@ from src.store import hidden_games, players, results
 def launcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[str]:
     """The launcher on a free port, writing its page under `tmp_path`."""
     monkeypatch.setattr(build, "OUTPUT_PATH", tmp_path / "index.html")
-    monkeypatch.setattr(server, "LAUNCHER_DIR", tmp_path)
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
@@ -55,13 +54,16 @@ def test_results_api(launcher: str) -> None:
             trigger="t",
         )
     )
-    status, body = _get(f"{launcher}/api/results?day=2026-10-08")
+    token = players.token_for("8")
+    status, body = _get(f"{launcher}/api/results?day=2026-10-08&token={token}")
     assert status == 200
     [row] = body
     assert row["game"] == "wordle"
     assert row["discord_id"] == "7"
     assert row["announcement"].startswith(":bee:")
-    assert _get(f"{launcher}/api/results?day=2026-10-09") == (200, [])
+    assert _get(f"{launcher}/api/results?day=2026-10-09&token={token}") == (200, [])
+    assert _get(f"{launcher}/api/results?day=2026-10-08")[0] == 401
+    assert _get(f"{launcher}/api/results?day=2026-10-08&token=x")[0] == 401
 
 
 def test_me_api(launcher: str) -> None:
@@ -107,8 +109,57 @@ def test_unknown_post_is_404(launcher: str) -> None:
     assert _post(f"{launcher}/api/nope", {})[0] == 404
 
 
-def test_serves_the_page(launcher: str) -> None:
-    with urllib.request.urlopen(f"{launcher}/") as response:
-        page = response.read().decode()
+def _get_page(url: str, cookie: str | None = None) -> tuple[int, str, str | None]:
+    """Status, body and Set-Cookie of a page."""
+    request = urllib.request.Request(url, headers={"Cookie": cookie} if cookie else {})
+    try:
+        with urllib.request.urlopen(request) as response:
+            return (
+                response.status,
+                response.read().decode(),
+                response.headers["Set-Cookie"],
+            )
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(), e.headers["Set-Cookie"]
+
+
+def test_serves_the_page_for_a_token_from_the_link(launcher: str) -> None:
+    token = players.token_for("7")
+    status, page, cookie = _get_page(f"{launcher}/?token={token}")
+    assert status == 200
     assert "function gameDay(reset)" in page
     assert 'data-game="wordle"' in page
+    assert f'<meta name="dgb-token" content="{token}">' in page
+    assert cookie is not None and cookie.startswith(f"dgb_token={token};")
+    assert "HttpOnly" in cookie
+
+
+def test_serves_the_page_for_a_token_from_the_cookie(launcher: str) -> None:
+    token = players.token_for("7")
+    status, page, cookie = _get_page(f"{launcher}/", f"dgb_token={token}")
+    assert status == 200
+    assert 'data-game="wordle"' in page
+    assert cookie is None
+
+
+def test_withholds_the_page_without_a_token(launcher: str) -> None:
+    status, page, cookie = _get_page(f"{launcher}/")
+    assert status == 401
+    assert "Get your link first" in page
+    assert "data-game=" not in page
+    assert cookie is None
+    assert _get_page(f"{launcher}/index.html")[0] == 401
+    assert _get(f"{launcher}/locked.html")[0] == 404
+
+
+def test_withholds_the_page_for_a_reset_token(launcher: str) -> None:
+    old = players.token_for("7")
+    players.reset_token("7")
+    status, page, _ = _get_page(f"{launcher}/?token={old}")
+    assert status == 401
+    assert "Your link has expired" in page
+    assert "data-game=" not in page
+    status, page, cookie = _get_page(f"{launcher}/", f"dgb_token={old}")
+    assert status == 401
+    assert "Your link has expired" in page
+    assert cookie is not None and "Max-Age=0" in cookie

@@ -105,7 +105,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   `src/games/game_day.js`), kept in the game's localStorage under `__dgb_timer`.
 - **Launcher.** `launcher/index.html` is rendered from
   `src/launcher/templates/` and the game configs on every proxy start. It shows a card per game and a
-  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD` on the
+  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD&token=...` on the
   launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
   The board can go forward to tomorrow while some game is already on it.
   It opens on the home day: tomorrow once the viewer has a result on it,
@@ -129,10 +129,13 @@ needs full type annotations. Its config is `[tool.pyright]` in
   player's Discord ID. It's made on their first `/play` and kept after
   that; if a link leaks, an admin runs
   `uv run python3 -m src.store reset-token DISCORD_ID` and the player's
-  next `/play` gets a new one. The launcher stores the token
-  in `localStorage`, strips it from the URL, and asks `GET /api/me` whose it
-  is (401 means expired: it shows the "run /play" warning). Every launcher
-  API that acts for a player takes the token, never a Discord ID. Game
+  next `/play` gets a new one. The launcher's server only sends the page
+  for a working token, from `?token=` or the HttpOnly `dgb_token` cookie it
+  sets on the launcher's host then; anyone else gets `locked.html.j2`
+  ("run /play", or "link expired" for a reset token) with a 401. It fills
+  the token into the page's `dgb-token` meta tag, and the page strips it
+  from the URL. Every launcher API, `/api/results` included, takes the
+  token, never a Discord ID; a 401 from `/api/me` reloads the page. Game
   subdomains can't see the launcher's storage or cookies, so its card links
   go through the game's `/__dgb/enter?token=...&to=`, which sets an
   HttpOnly `dgb_token` cookie on that subdomain and redirects to the

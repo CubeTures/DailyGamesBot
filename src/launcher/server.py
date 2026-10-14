@@ -2,8 +2,11 @@
 reads, the role subscriptions its bells toggle, and the games each player has
 hidden.
 
-Players are identified by the token from their /play link, which the
-page sends and the store maps to their Discord ID (see store/players.py).
+Players are identified by the token from their /play link, which the store
+maps to their Discord ID (see store/players.py). The page is only sent for a
+working token, from the link's ?token= or the cookie set when it was opened;
+anyone else gets a page telling them to run /play. The API takes the token as
+a parameter.
 """
 
 import json
@@ -11,22 +14,29 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import date
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.cookies import CookieError, SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 from src import announce
 from src.games.registry import GAMES_BY_NAME
-from src.launcher.build import write_launcher
-from src.settings import LAUNCHER_DIR, LAUNCHER_PORT
+from src.launcher.build import (
+    TOKEN_PLACEHOLDER,
+    render_locked,
+    write_launcher,
+)
+from src.proxy.capture import TOKEN_COOKIE, token_cookie
+from src.settings import LAUNCHER_PORT
 from src.store import hidden_games, players, results, subscriptions
 
 Reply = tuple[int, Any]
 
 
 def _get_results(params: dict[str, str]) -> Reply:
-    """GET /api/results?day=YYYY-MM-DD: that game day's results."""
+    """GET /api/results?day=YYYY-MM-DD&token=TOKEN: that game day's results."""
+    _player(params.get("token"))
     # The page sends the viewer's local date; fall back to the server's.
     day = _parse_day(params.get("day")) or date.today()
     return 200, [_result_json(r) for r in results.on_day(day)]
@@ -81,15 +91,24 @@ _POST_ROUTES: dict[str, Callable[[bytes], Reply]] = {
 }
 
 
-class _LauncherRequestHandler(SimpleHTTPRequestHandler):
+_PAGE_PATHS = {"/", "/index.html"}
+
+
+class _LauncherRequestHandler(BaseHTTPRequestHandler):
+    def __init__(self, *args: Any, page: str, **kwargs: Any) -> None:
+        self.page = page
+        super().__init__(*args, **kwargs)
+
     def do_GET(self) -> None:
         url = urlsplit(self.path)
-        route = _GET_ROUTES.get(url.path)
-        if route is None:
-            super().do_GET()  # the page itself
-            return
         params = {key: values[0] for key, values in parse_qs(url.query).items()}
-        self._send_json(*_answer(route, params))
+        route = _GET_ROUTES.get(url.path)
+        if route is not None:
+            self._send_json(*_answer(route, params))
+        elif url.path in _PAGE_PATHS:
+            self._send_page(params.get("token"))
+        else:
+            self._send_json(*_error(404, "not found"))
 
     def do_POST(self) -> None:
         route = _POST_ROUTES.get(urlsplit(self.path).path)
@@ -99,22 +118,55 @@ class _LauncherRequestHandler(SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         self._send_json(*_answer(route, self.rfile.read(length)))
 
+    def _send_page(self, link_token: str | None) -> None:
+        """The launcher for a working token from the link or cookie, else the
+        page telling the visitor to run /play."""
+        cookie_token = self._cookie_token()
+        token = link_token or cookie_token
+        if token is not None and players.discord_id_for(token) is not None:
+            # Opened from a /play link: remember it for visits without one.
+            cookie = token_cookie(token) if token != cookie_token else None
+            page = self.page.replace(TOKEN_PLACEHOLDER, token)
+            self._send(200, "text/html; charset=utf-8", page.encode(), cookie)
+        else:
+            # Drop a cookie whose token an admin has reset.
+            cookie = f"{TOKEN_COOKIE}=; Path=/; Max-Age=0" if cookie_token else None
+            page = render_locked(expired=token is not None)
+            self._send(401, "text/html; charset=utf-8", page.encode(), cookie)
+
+    def _cookie_token(self) -> str | None:
+        try:
+            cookies = SimpleCookie(self.headers.get("Cookie") or "")
+        except CookieError:
+            return None
+        morsel = cookies.get(TOKEN_COOKIE)
+        return morsel.value if morsel else None
+
     def _send_json(self, status: int, body: Any) -> None:
-        encoded = json.dumps(body).encode()
+        self._send(status, "application/json", json.dumps(body).encode())
+
+    def _send(
+        self,
+        status: int,
+        content_type: str,
+        body: bytes,
+        set_cookie: str | None = None,
+    ) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Content-Length", str(len(body)))
+        if set_cookie:
+            self.send_header("Set-Cookie", set_cookie)
         self.end_headers()
-        self.wfile.write(encoded)
+        self.wfile.write(body)
 
 
 @contextmanager
 def serve_launcher(port: int = LAUNCHER_PORT) -> Generator[None]:
     """Regenerate the launcher page and serve it in a background thread, for
     the proxy to pass requests on to."""
-    write_launcher()
-    handler = partial(_LauncherRequestHandler, directory=str(LAUNCHER_DIR))
+    handler = partial(_LauncherRequestHandler, page=write_launcher())
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     Thread(target=server.serve_forever, daemon=True).start()
     try:

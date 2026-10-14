@@ -19,32 +19,30 @@
   var hiddenGames = loadHiddenGames();
 
   function rememberToken() {
-    var params = new URLSearchParams(location.search);
-    var value = params.get("token");
-    // Left over from when links carried the Discord ID itself.
+    // The server only sends this page for a working token, from the /play
+    // link's ?token= or the cookie it set then, and fills it in here.
+    var value = document.querySelector('meta[name="dgb-token"]').content;
+    // Left over from when the page kept the token (and before it, the
+    // Discord ID) itself.
+    localStorage.removeItem("token");
     localStorage.removeItem("discord_id");
-    if (value) {
-      localStorage.setItem("token", value);
+    var params = new URLSearchParams(location.search);
+    if (params.has("token")) {
       params.delete("token");
       var query = params.toString();
       history.replaceState({}, "", location.pathname + (query ? "?" + query : "") + location.hash);
-    } else {
-      value = localStorage.getItem("token");
     }
-    if (value) tagGameLinks(value);
+    tagGameLinks(value);
     return value;
   }
 
-  // Resolves to the viewer's Discord ID, or null without a working link.
+  // Resolves to the viewer's Discord ID, or null if the server can't say.
   function identify() {
-    if (!token) return Promise.resolve(null);
     return fetch("/api/me?token=" + encodeURIComponent(token)).then(function (res) {
       if (res.status === 401) {
-        localStorage.removeItem("token");
-        var warning = document.getElementById("warning");
-        warning.querySelector("h2").textContent = "Your link has expired";
-        warning.querySelector("p").textContent =
-          "Run /play in Discord for a new one.";
+        // Reset by an admin since the page loaded: the server now sends the
+        // "link expired" page instead.
+        location.reload();
         return null;
       }
       return res.json().then(function (body) { return body.discord_id; });
@@ -168,7 +166,7 @@
   // game that resets in another timezone shows on the board of its puzzle's
   // date, which may be the viewer's tomorrow or yesterday.
   function fetchResults(day) {
-    return getJson("/api/results?day=" + isoDate(day));
+    return getJson("/api/results?day=" + isoDate(day) + "&token=" + encodeURIComponent(token));
   }
 
   var dialog = document.getElementById("dialog");
@@ -743,7 +741,6 @@
   // whether they've played tomorrow's games decides the day it opens on.
   identify().then(function (id) {
     discordId = id;
-    if (!discordId) document.getElementById("warning").style.display = "flex";
     setUpPings();
     setUpHiding();
     setViewDay(dayFromHash(), true);

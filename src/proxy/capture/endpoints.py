@@ -18,12 +18,17 @@ from urllib.parse import parse_qs, urlsplit
 from mitmproxy import http
 
 from src.games.models import Game
-from src.proxy.capture import ENTER_PATH, PATH_PREFIX, RESULT_PATH, SCRIPT_PATH
+from src.proxy.capture import (
+    ENTER_PATH,
+    PATH_PREFIX,
+    RESULT_PATH,
+    SCRIPT_PATH,
+    TOKEN_COOKIE,
+    token_cookie,
+)
 from src.proxy.capture.script import build_script
 from src.store import players, results
 
-TOKEN_COOKIE = "dgb_token"
-_COOKIE_MAX_AGE_SECS = 365 * 24 * 60 * 60
 # Tokens are UUIDs.
 _COOKIE_VALUE_RE = re.compile(r"[\w-]+", re.ASCII)
 
@@ -71,10 +76,7 @@ def _enter(request: http.Request, game: Game) -> http.Response:
     headers = {"Location": to, **_NO_STORE}
     token = params.get("token", "")
     if _COOKIE_VALUE_RE.fullmatch(token):
-        headers["Set-Cookie"] = (
-            f"{TOKEN_COOKIE}={token}; Path=/; HttpOnly;"
-            f" Max-Age={_COOKIE_MAX_AGE_SECS}; SameSite=Lax"
-        )
+        headers["Set-Cookie"] = token_cookie(token)
     return http.Response.make(302, b"", headers)
 
 
