@@ -2,7 +2,9 @@
 
 mitmdump loads this file as a script (see proxy/mitmdump.py). The subdomain
 a request was sent to says which game it's for; it's passed on to the game's
-real origin. Requests for any other host go on to the launcher.
+real origin. Requests for the launcher's host go on to the launcher, and any
+other host gets a 404: in production every subdomain of the domain reaches
+the proxy (see SETUP.md).
 """
 
 import logging
@@ -21,10 +23,12 @@ from src.proxy.capture.endpoints import (
 )
 from src.proxy.capture.script import inject_script_tag
 from src.proxy.hooks import load_hooks
+from src.settings import LAUNCHER_URL
 
 log = logging.getLogger(__name__)
 
 
+_LAUNCHER_HOST = (urlsplit(LAUNCHER_URL).hostname or "").lower()
 _GAMES_BY_HOST = {
     (urlsplit(game.local_origin).hostname or "").lower(): game
     for game in GAMES_BY_NAME.values()
@@ -44,8 +48,13 @@ def load(_loader: Loader) -> None:
 
 
 def request(flow: http.HTTPFlow) -> None:
-    game = _GAMES_BY_HOST.get(_hostname(flow.request.host_header))
+    host = _hostname(flow.request.host_header)
+    game = _GAMES_BY_HOST.get(host)
     if game is None:
+        if host != _LAUNCHER_HOST:
+            flow.response = http.Response.make(
+                404, b"Not found", {"content-type": "text/plain"}
+            )
         return
     flow.metadata[_GAME_KEY] = game
     if handle_capture_request(flow, game):

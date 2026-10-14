@@ -12,7 +12,8 @@ cp .env.example .env   # and fill it in
 uv run python3 -m src
 ```
 
-Or with Docker: `docker compose up --build`.
+Or with Docker: `docker compose up --build`. To deploy it behind a
+Cloudflare Tunnel, see [SETUP.md](SETUP.md).
 
 Open http://localhost:8080 for the launcher (games open on its subdomains,
 e.g. http://wordle.localhost:8080; use Chrome or Firefox, which resolve them

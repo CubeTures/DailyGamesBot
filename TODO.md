@@ -1,4 +1,6 @@
 - Let players download their own results
+- Statistics board: per game and per person
+- Better security: give no content unless the token passes
 
 ## Games
 

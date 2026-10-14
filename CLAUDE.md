@@ -2,8 +2,8 @@
 
 A mitmproxy reverse proxy that serves daily web games from `localhost` and
 captures each player's result, plus a Discord bot that hands out play links and
-announces results. `README.md` is the user-facing overview; the technical
-details live here.
+announces results. `README.md` is the user-facing overview, `SETUP.md` covers
+deploying behind Cloudflare Tunnel; the technical details live here.
 
 ## Commands
 
@@ -87,8 +87,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
   subdomain of it (`http://wordle.localhost:8080`), so its own origin and
   storage (`DGB_GAME_HOST`, e.g. `{game}-daily.example.com`, overrides the
   host when nested subdomains can't get a certificate); the addon picks the game by the Host header and reverse-proxies it
-  1:1 to its real origin. Any other host goes to the launcher's server, on
-  127.0.0.1:8090. Chrome and Firefox resolve `*.localhost` themselves; in
+  1:1 to its real origin. The launcher's host (`DGB_PUBLIC_URL`) goes to the
+  launcher's server, on 127.0.0.1:8090; any other host gets a 404. Chrome and Firefox resolve `*.localhost` themselves; in
   production, put a TLS-terminating reverse proxy with wildcard DNS in front
   and forward every host, keeping the Host header. `rewrite.py` strips
   `X-Frame-Options`/CSP/HSTS and rewrites cookies so games work from a

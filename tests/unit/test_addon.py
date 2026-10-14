@@ -33,8 +33,15 @@ def test_answers_capture_paths_on_game_subdomain() -> None:
     assert flow.request.host == "x"
 
 
-def test_leaves_other_hosts_to_the_launcher() -> None:
-    for host in ("localhost:8080", "nope.localhost:8080", "wordle.example.com"):
+def test_leaves_launcher_host_to_the_launcher() -> None:
+    for host in ("localhost:8080", "LOCALHOST:8080", "localhost"):
         flow = _request_to(host)
         assert flow.request.host == "x"
         assert flow.response is None
+
+
+def test_answers_unknown_hosts_with_404() -> None:
+    for host in ("nope.localhost:8080", "wordle.example.com", "127.0.0.1:8080", ""):
+        flow = _request_to(host)
+        assert flow.request.host == "x"
+        assert flow.response is not None and flow.response.status_code == 404
