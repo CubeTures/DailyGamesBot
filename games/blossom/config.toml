@@ -1,0 +1,18 @@
+#:schema ../schema.json
+
+name = "blossom"
+title = "Blossom"
+description = "Make 12 words from seven letters; longer words, bonus letters and pangrams score more."
+icon = "icon.png"
+origin = "https://www.merriam-webster.com"
+landing_path = "/games/blossom-word-game"
+higher_score_wins = true
+
+[reset]
+time = "00:00"
+timezone = "local"
+
+[[triggers]]
+name = "puzzle-state"
+type = "page"
+when = "finished"

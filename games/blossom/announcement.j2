@@ -1,0 +1,12 @@
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{{ score | plural("point") }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{% if pangrams %}
+:cherry_blossom: {{ pangrams | plural("pangram") }}
+{% endif %}
+{% if longest_word %}
+:straight_ruler: Longest word {{ longest_word }} letters
+{% endif %}
+{{ flowers }}
+{% for w in word_scores or [] %}
+{{ "||" if loop.first }}{{ w.word | md }} {{ w.points }}{{ "||" if loop.last }}
+{% endfor %}

@@ -20,7 +20,10 @@ var discordMarkdown = (function () {
     earth_americas: "🌎", date: "📅",
     steam_locomotive: "🚂", house: "🏠", classical_building: "🏛️",
     police_officer: "👮", medal: "🏅", briefcase: "💼", crown: "👑",
-    crystal_ball: "🔮", zap: "⚡"
+    crystal_ball: "🔮", zap: "⚡",
+    tulip: "🌷", cherry_blossom: "🌸", rose: "🌹", hibiscus: "🌺", sunflower: "🌻",
+    blossom: "🌼", rosette: "🏵️", white_flower: "💮", bouquet: "💐",
+    straight_ruler: "📏"
   };
 
   var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };

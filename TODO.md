@@ -2,7 +2,6 @@
 
 ## P0
 
-- https://www.merriam-webster.com/games/blossom-word-game
 - https://www.britannica.com/quiz/tightrope
 
 ## P1
@@ -38,4 +37,5 @@
 - https://www.thewikipediagame.com/
 - https://www.vulture.com/article/daily-movie-grid-trivia-game-cinematrix.html
 - https://originle.io/mattias/?day=3
+- https://playdaily.org/noillirk
 - https://listdle.com/
