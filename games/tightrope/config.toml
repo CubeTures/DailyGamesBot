@@ -1,0 +1,19 @@
+#:schema ../schema.json
+
+name = "tightrope"
+title = "Tightrope"
+description = "Answer nine trivia questions of rising difficulty; three wrong and you fall."
+icon = "icon.png"
+origin = "https://www.britannica.com"
+landing_path = "/quiz/tightrope"
+higher_score_wins = true
+
+# The daily quiz is fetched for the player's local date.
+[reset]
+time = "00:00"
+timezone = "local"
+
+[[triggers]]
+name = "game-session"
+type = "page"
+when = "finished"

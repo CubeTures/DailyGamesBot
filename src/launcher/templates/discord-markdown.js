@@ -13,7 +13,7 @@ var discordMarkdown = (function () {
     stopwatch: "⏱️", clock: "🕐", brain: "🧠", bulb: "💡", skull: "💀", sparkles: "✨",
     game_die: "🎲", puzzle_piece: "🧩", thinking: "🤔", heart: "❤️",
     green_heart: "💚", blue_heart: "💙", purple_heart: "💜", orange_heart: "🧡",
-    broken_heart: "💔",
+    broken_heart: "💔", face_with_head_bandage: "🤕",
     shrimp: "🦐", fish: "🐟", bubbles: "🫧", squid: "🦑", clown: "🤡",
     izakaya_lantern: "🏮", star2: "🌟", arrow_up: "⬆️", arrow_down: "⬇️",
     dart: "🎯", eyes: "👀", ring_buoy: "🛟", camera_with_flash: "📸",

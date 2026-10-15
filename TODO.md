@@ -1,9 +1,5 @@
 # TODO
 
-## P0
-
-- https://www.britannica.com/quiz/tightrope
-
 ## P1
 
 - Cross with friends

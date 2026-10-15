@@ -1,0 +1,11 @@
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{{ "{:,}".format(score) }} points{{ (" in %s" if won else " after %s") % (time_secs | duration) if time_secs }}
+{% if not won %}
+:broken_heart: Fell off the rope
+{% elif wrong %}
+:x: {{ wrong | plural("wrong answer") }}
+{% endif %}
+{% if rank %}
+:medal: {{ rank | replace("!", "") }}
+{% endif %}
+{{ bar }}
