@@ -3,7 +3,6 @@
 ## P0
 
 - Help button in top right to explain features
-- Overflow right issue on mobile views (only happens sometimes?)
 
 - https://www.merriam-webster.com/games/blossom-word-game
 - https://www.britannica.com/quiz/tightrope

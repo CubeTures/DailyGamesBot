@@ -53,6 +53,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 main { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; }
+/* Clip, not hide, so main isn't a scroll container: a done card's stamp
+   starts at twice its size and mustn't widen the page. */
+main { overflow-x: clip; }
 @media (max-width: 600px) { main { padding: 28px 16px 48px; } }
 
 header { margin-bottom: 36px; }
@@ -547,7 +550,7 @@ dialog[style*="--tint"] .message {
   font-size: 0.85rem;
   text-align: center;
 }
-.site-foot a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.site-foot a { color: var(--accent); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
 .site-foot a:hover { text-decoration: underline; }
 code {
   padding: 1px 6px;
