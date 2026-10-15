@@ -2,8 +2,6 @@
 
 ## P0
 
-- Fix the scoring of the orbs to be (orbs got - mistakes made)
-- Say time of reset instead of timezone, easier to understand and less ugly
 - Help button in top right to explain features
 - Overflow right issue on mobile views (only happens sometimes?)
 

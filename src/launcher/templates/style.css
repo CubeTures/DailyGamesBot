@@ -221,8 +221,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   border-top: 1px solid var(--border);
 }
 .tags { display: flex; align-items: center; gap: 6px; }
-/* .reset names the timezone of a game that resets in a fixed one, not the
-   player's own. */
+/* .reset shows when a game that resets in a fixed timezone, not the
+   player's own, gets its next puzzle, on the player's clock. */
 .reset {
   display: inline-flex;
   align-items: center;
@@ -236,12 +236,13 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font-variant-numeric: tabular-nums;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+.reset[hidden] { display: none; }
 .reset svg {
   width: 12px;
   height: 12px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

@@ -580,17 +580,40 @@
     else refreshToday();
   }
 
-  // Reset pills show the game's timezone abbreviated, e.g. "EDT"; the
-  // template's fallback text is the IANA name.
+  // Milliseconds `zone`'s wall clock is ahead of UTC at `at`.
+  function zoneOffset(zone, at) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric",
+      hour: "numeric", minute: "numeric",
+    }).formatToParts(at).forEach(function (part) { p[part.type] = +part.value; });
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Math.floor(at / 60000) * 60000;
+  }
+
+  // The next instant `reset` (an entry of RESETS with a timezone) comes round.
+  function nextReset(reset) {
+    var now = Date.now(), offset = zoneOffset(reset.timezone, now);
+    var wall = new Date(now + offset);
+    var target = Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate()) + reset.minutes * 60000;
+    if (target <= now + offset) target += 86400000;
+    // Use the offset at the reset itself, in case DST changes before it.
+    return new Date(target - zoneOffset(reset.timezone, target - offset));
+  }
+
+  // Reset pills on games that reset in a fixed timezone show when that is on
+  // the player's clock, e.g. "5 PM". They stay hidden when it's the same
+  // wall-clock time as the game's own reset, like local games.
   function labelResets() {
     document.querySelectorAll(".card .reset").forEach(function (tag) {
-      var zone = tag.dataset.timezone, label = zone;
+      var reset = RESETS[tag.closest(".card").dataset.game];
       try {
-        var part = new Intl.DateTimeFormat(undefined, { timeZone: zone, timeZoneName: "short" })
-          .formatToParts(new Date()).filter(function (p) { return p.type === "timeZoneName"; })[0];
-        if (part) label = part.value;
-      } catch (e) { /* keep the IANA name */ }
-      tag.querySelector(".zone").textContent = label;
+        var at = nextReset(reset);
+      } catch (e) { return; /* unknown timezone; leave the pill hidden */ }
+      var local = at.getHours() * 60 + at.getMinutes();
+      var label = at.toLocaleTimeString([], at.getMinutes() ? { hour: "numeric", minute: "2-digit" } : { hour: "numeric" });
+      tag.querySelector(".at").textContent = label;
+      tag.title = "New puzzle at " + label + " your time";
+      tag.hidden = local === reset.minutes;
     });
   }
   labelResets();

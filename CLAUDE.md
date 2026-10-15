@@ -116,8 +116,9 @@ needs full type annotations. Its config is `[tool.pyright]` in
   resetting at Eastern midnight, played at 10pm Pacific, shows on the
   viewer's tomorrow. A card's "Done" state is for its game's current game
   day (`currentGameDay()` in `app.js`, using the shared `gameDay()`). Cards of
-  games whose reset isn't `local` show its timezone (e.g. "EDT") in a
-  pill, with a globe icon, in their footer. Each card is tinted with
+  games whose reset isn't `local` show, in a pill in their footer, when
+  it next comes round on the viewer's clock (e.g. "5 PM"), unless that's
+  the same wall-clock time as the reset itself. Each card is tinted with
   its icon's dominant color (`icon-color.js`). Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
   `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the
