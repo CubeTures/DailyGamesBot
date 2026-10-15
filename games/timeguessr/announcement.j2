@@ -1,0 +1,8 @@
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{{ "{:,}".format(score) }} points{{ " in %s" % (time_secs | duration) if time_secs }}
+{% if exact_years %}
+:dart: {{ exact_years | plural("exact year") }}
+{% endif %}
+{% for row in rows %}
+{{ row }} {{ "{:,}".format(rounds[loop.index0].score) }}
+{% endfor %}

@@ -17,6 +17,7 @@ var discordMarkdown = (function () {
     shrimp: "🦐", fish: "🐟", bubbles: "🫧", squid: "🦑", clown: "🤡",
     izakaya_lantern: "🏮", star2: "🌟", arrow_up: "⬆️", arrow_down: "⬇️",
     dart: "🎯", eyes: "👀", ring_buoy: "🛟", camera_with_flash: "📸",
+    earth_americas: "🌎", date: "📅",
     steam_locomotive: "🚂", house: "🏠", classical_building: "🏛️",
     police_officer: "👮", medal: "🏅", briefcase: "💼", crown: "👑",
     crystal_ball: "🔮", zap: "⚡"

@@ -1,0 +1,19 @@
+#:schema ../schema.json
+
+name = "timeguessr"
+title = "TimeGuessr"
+description = "Guess where and when five historic photos were taken."
+icon = "icon.png"
+origin = "https://timeguessr.com"
+landing_path = "/play?mode=daily"
+higher_score_wins = true
+
+# The final screen's countdown ran out at 07:00 UTC in October (PDT).
+[reset]
+time = "00:00"
+timezone = "America/Los_Angeles"
+
+[[triggers]]
+name = "final-score"
+type = "page"
+when = "finished"

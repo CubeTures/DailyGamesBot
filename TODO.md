@@ -2,11 +2,8 @@
 
 ## P0
 
-- Help button in top right to explain features
-
 - https://www.merriam-webster.com/games/blossom-word-game
 - https://www.britannica.com/quiz/tightrope
-- https://timeguessr.com/
 
 ## P1
 
@@ -24,6 +21,7 @@
 - Let players download their own results
 - Statistics board: per game and per person
 - Send notifications when running out on time as a reminder to play
+- Help button in top right to explain features
 - See if we can allow logins to accounts for saved progress
 	- Try an un-man-in-the-middle strategy
 		- Redirect them to the actual site so they can login
