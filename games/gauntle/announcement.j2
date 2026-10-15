@@ -1,7 +1,10 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
-Ran it in **{{ total_time }}**{{ " :sparkles: FLAWLESS!" if flawless }}
+{{ total_time }} total time
 {% if game_count %}
-{{ flawless_count }}/{{ game_count }} flawless, {{ "%+d" % delta_secs }}s in bonuses and penalties
+:sparkles: {{ flawless_count }}/{{ game_count }} flawless
+{% endif %}
+{% if delta_secs %}
+:stopwatch: {{ "%+d" % delta_secs }}s in {{ "bonuses" if delta_secs < 0 else "penalties" }}
 {% endif %}
 {% for g in games %}
 {{ ":red_square:" if g.failed or g.skipped else ":green_square:" if g.flawless else ":yellow_square:" }} {{ g.name | md }}: {{ g.time }}

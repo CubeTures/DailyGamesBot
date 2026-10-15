@@ -1,6 +1,6 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% if won %}
-{{ "Perfect" if score == 0 else "Solved with %d mistake%s" % (score, "" if score == 1 else "s") }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{{ "Perfect" if score == 0 else score | plural("mistake") }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}
 Out of hearts{{ " after %s" % (time_secs | duration) if time_secs }}
 {% endif %}

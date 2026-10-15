@@ -1,6 +1,11 @@
-:bee: {{ player }} played **{{ game }}** {{ "#%s" % puzzle_number if puzzle_number else date or puzzle_id }}
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {{ "{:,}".format(score) if score is not none else "?" }} points{{ " in %s" % (time_secs | duration) if time_secs }}
-{{ submits }} submit{{ "s" if submits != 1 }}, {{ wrong }} wrong{{ ", %s :zap:" % bolts if bolts }}
+{% if wrong %}
+:x: {{ wrong | plural("wrong submit") }}
+{% endif %}
+{% if bolts %}
+:zap: {{ bolts | plural("bolt") }}
+{% endif %}
 {% for w in box_wrong %}
 {{- ":zap:" if box_bolts[loop.index0] else ":green_square:" if w == 0 else ":yellow_square:" }}
 {%- endfor %}

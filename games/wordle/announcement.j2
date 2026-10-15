@@ -1,8 +1,11 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% if won %}
-{{ score }} guesses{{ " in %s" % (time_secs | duration) if time_secs }}
+{{ score | plural("guess", "guesses") }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}
-ran out of guesses{{ " after %s" % (time_secs | duration) if time_secs }}
+Out of guesses{{ " after %s" % (time_secs | duration) if time_secs }}
+{% endif %}
+{% if hard_mode %}
+:fire: Hard mode
 {% endif %}
 {% for row in rows %}
 {{ row }}

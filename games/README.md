@@ -183,6 +183,14 @@ Wordle's:
 
 ```jinja
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{% if won %}
+{{ score | plural("guess", "guesses") }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{% else %}
+Out of guesses{{ " after %s" % (time_secs | duration) if time_secs }}
+{% endif %}
+{% if hard_mode %}
+:fire: Hard mode
+{% endif %}
 {% for row in rows %}
 {{ row }}
 {% endfor %}
@@ -192,20 +200,62 @@ which renders as:
 
 ```
 :bee: @player played **@Wordle** #1571
+2 guesses in 1:35
+:fire: Hard mode
 :white_large_square::yellow_square::white_large_square::white_large_square::white_large_square:
 :green_square::green_square::green_square::green_square::green_square:
 ```
 
 ### House style
 
-- Open with `:bee: {{ player }} played **{{ game }}** <puzzle>` (the
-  puzzle number, e.g. `#{{ puzzle_number }}`, or the date if it has none), then the result in the
-  game's own terms (par, guesses) followed by the time,
-  `{{ " in %s" % (time_secs | duration) if time_secs }}`, then a grid or row of emoji if the
-  game's share screen has one. See `minutecryptic/announcement.j2` for a
-  game with a score and a hint bar.
-- Cover every outcome: a loss or give-up should read as one, not as a
-  missing score.
+Every game's announcement has the same parts, in this order, so the
+channel reads as one system:
+
+```
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+<score> in <time>
+:emoji: <qualifier>
+:emoji: <qualifier>
+<emoji grid or bar>
+||<spoilers>||
+```
+
+- **Header.** Exactly `:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}`
+  (`{{ puzzle_id }}` in place of `#{{ puzzle_number }}` only if the game has
+  no number). Modes like hard mode are qualifiers, not part of it.
+- **Score line.** Only the primary score, the one the scoreboard ranks
+  by, then the time that breaks ties,
+  `{{ " in %s" % (time_secs | duration) if time_secs }}`, or `after` for a
+  loss or give-up. Nothing else goes on it.
+  - A numeric score starts with the number, in the game's own terms
+    (`3 guesses`, `4 groups`, `77 points`, `2 under par`,
+    `160 uniqueness`), and leaves off the maximum, which players know
+    (`3 guesses`, not `3/6 guesses`).
+  - Special outcomes are words in place of the number: a loss
+    (`Out of guesses after 5:00`), a give-up (`Gave up after 1:10`), a
+    zero-mistake solve (`Perfect in 0:40`) and par (`At par in 1:05`). A
+    loss in a game that ranks partial scores shows that instead
+    (`2 groups after 1:01`).
+  - When the time is the score, the line is just the time
+    (`9:10.11 total time`).
+- **Qualifiers.** Everything else worth knowing about the run gets a line
+  of its own: an emoji, then the qualifier in sentence case
+  (`:x: 3 mistakes`, `:bulb: 2 hints`, `:fire: Hard mode`,
+  `:police_officer: Chief of Police`, `:trophy: Top 29%`). Ranks and
+  bands the score earns go here. Only show counts that aren't zero, and
+  write them with `plural`. A fraction is fine here when its total isn't
+  otherwise known (`:white_check_mark: 9/9 correct`). Reuse the emoji
+  other games use for the same thing: `:x:` mistakes and wrong guesses,
+  `:bulb:` hints, `:eyes:` peeks and reveals, `:fire:` hard mode,
+  `:trophy:` a percentile, `:sparkles:` flawless.
+- **Emoji.** Then the game's share-screen grid or bar, if it has one.
+  Per-item breakdowns (Gauntle's games, Fermi's factors) go here, a line
+  each.
+- **Spoilers** (see below) come last.
+- Plain text everywhere except the game in the header: no bold, no
+  exclamations.
+
+See `bracketcity/announcement.j2` for a game with every part.
 - Never spell out the answer; others in the channel may not have played yet.
   What the player put is fine behind a spoiler when nobody could look it up
   later, because it's their own (Krillion's answers).
@@ -235,7 +285,9 @@ In scope:
   `tiles(answer)` (a guess scored against the answer as a 🟩🟨⬛ row; this
   uses the answer, so only reach for it when the game reports one), `md`
   (a value on one line with its markdown escaped, so text the player typed
-  shows as typed) and `spoiler` (the same, as a `||spoiler||`)
+  shows as typed), `spoiler` (the same, as a `||spoiler||`),
+  and `plural(noun, nouns=noun + "s")` (`2 | plural("guess", "guesses")` is
+  `2 guesses`)
 
 Blocks trim their own line, so put `{% ... %}` tags on lines of their own and
 use `{%-` to join onto the previous line. Without `announcement.j2`, a generic

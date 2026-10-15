@@ -59,6 +59,11 @@ def tiles(guess: str, answer: str) -> str:
     return "".join(row)
 
 
+def plural(count: float, noun: str, nouns: str | None = None) -> str:
+    """`count` and `noun`, plural unless it's 1: "1 hint", "3 guesses"."""
+    return f"{count} {noun if count == 1 else nouns or noun + 's'}"
+
+
 # Characters Discord reads as markdown, mentions or emoji shortcodes.
 _MARKDOWN_RE = re.compile(r"([\\*_~`|<>:\[\]])")
 
@@ -78,7 +83,11 @@ def spoiler(value: object) -> str:
 _env = SandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
 # Jinja types this dict as holding only its built-in filters.
 cast(dict[str, Any], _env.filters).update(
-    duration=duration, tiles=tiles, md=md, spoiler=spoiler
+    duration=duration,
+    tiles=tiles,
+    md=md,
+    spoiler=spoiler,
+    plural=plural,
 )
 
 

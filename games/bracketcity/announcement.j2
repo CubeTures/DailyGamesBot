@@ -1,17 +1,21 @@
 {% set emoji = {"Tourist": ":camera_with_flash:", "Commuter": ":steam_locomotive:", "Resident": ":house:", "Council Member": ":classical_building:", "Chief of Police": ":police_officer:", "Mayor": ":medal:", "Power Broker": ":briefcase:", "Kingmaker": ":crown:", "Puppet Master": ":crystal_ball:"} %}
 {% set filled = (score / 10) | round | int %}
 {% set square = ":purple_square:" if rank == "Puppet Master" else ":red_square:" if score < 25 else ":yellow_square:" if score < 75 else ":green_square:" %}
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " (hard mode)" if hard_mode }}
-{{ emoji[rank] }} {{ rank }} with {{ "%.1f" % score }} points{{ " in %s" % (time_secs | duration) if time_secs }}
+:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+{{ score }} points{{ " in %s" % (time_secs | duration) if time_secs }}
+{{ emoji[rank] }} {{ rank }}
+{% if hard_mode %}
+:fire: Hard mode
+{% endif %}
 {% if hard_mode or rank == "Puppet Master" %}
 :dart: {{ keystrokes }} keystrokes ({{ min_keystrokes }} minimum)
-{% else %}
-:x: Wrong guesses: {{ wrong_guesses }}
+{% elif wrong_guesses %}
+:x: {{ wrong_guesses | plural("wrong guess", "wrong guesses") }}
 {% endif %}
 {% if peeks %}
-:eyes: Peeks: {{ peeks }}
+:eyes: {{ peeks | plural("peek") }}
 {% endif %}
 {% if reveals %}
-:ring_buoy: Answers revealed: {{ reveals }}
+:ring_buoy: {{ reveals | plural("reveal") }}
 {% endif %}
 {{ square * filled }}{{ ":white_large_square:" * (10 - filled) }}

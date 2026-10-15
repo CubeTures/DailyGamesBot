@@ -10,7 +10,7 @@ Goal: a `games/<name>/` directory whose `config.toml` `[[triggers]]` fire
 exactly once the player has **finished** today's puzzle (won *or* lost), with
 every reported field already final, and that extracts a stable `puzzle_id`
 plus the result fields (`fields.js`) and turns them into an announcement
-(`announcement.j2`) in the house style.
+(`announcement.j2`) in the house style (header, score line, qualifiers, emoji).
 
 Read `games/README.md` first. It is the format reference: the files in a
 game's directory, trigger types, the expression helpers, the standard field
@@ -185,14 +185,34 @@ Rules:
 Write the game's announcement following the house style in "Announcement" in
 `games/README.md`:
 
-- First line `:bee: {{ player }} played **<title>** <puzzle>`: the game's puzzle number (`#{{ puzzle_number }}`), or `{{ puzzle_id }}` if it has none.
-- Then the result in the game's own terms (score vs. par, time, guesses), and an emoji grid or bar if the game's share screen has one. Mirror that share screen.
+- Every game uses the same layout, so the channel reads as one system:
+
+  ```
+  :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+  <score> in <time>
+  :emoji: <qualifier>
+  :emoji: <qualifier>
+  <emoji grid or bar>
+  ||<spoilers>||
+  ```
+
+- **Header.** Exactly as above. `{{ puzzle_id }}` replaces `#{{ puzzle_number }}` only if the game has no number. Nothing else goes on it: modes like hard mode are qualifiers.
+- **Score line.** Only the primary score, the one the scoreboard ranks by, then the time that breaks ties: `{{ " in %s" % (time_secs | duration) if time_secs }}`, or `after` for a loss or give-up. No qualifiers, no emoji.
+  - A numeric score starts with the number, in the game's terms: `3 guesses`, `4 groups`, `77 points`, `2 under par`, `160 uniqueness` (not `Uniqueness 160`). Count nouns go through `| plural` so 1 reads `1 guess`.
+  - Leave off the maximum or target; players know it: `3 guesses`, not `3/6 guesses`; `245 points`, not `245/700`.
+  - Special outcomes are words in place of the number: a loss (`Out of guesses after 5:00`, `Out of hearts after 0:40`), a give-up (`Gave up after 1:10`), a zero-mistake solve (`Perfect in 0:40`) and par (`At par in 1:05`). A loss in a game that ranks partial scores shows the partial score instead (`2 groups after 1:01`, `3 orbs after 2:00`).
+  - When the time is the score (Gauntle), the line is just the time: `9:10.11 total time`.
+- **Qualifiers.** Everything else worth knowing about the run, each on its own line: an emoji, then the qualifier in sentence case (`:x: 3 mistakes`, `:bulb: 2 hints`, `:fire: Hard mode`, `:trophy: Top 29%`). Ranks and bands the score earns go here too (`:medal: Mayor`, `:shrimp: Schooler`). Only show counts that aren't zero. A fraction is fine on a qualifier line when its total isn't otherwise known (`:white_check_mark: 9/9 correct`, `:sparkles: 3/11 flawless`). Reuse the emoji other games use for the same thing: `:x:` mistakes, wrong guesses and misses, `:bulb:` hints, `:eyes:` peeks and reveals, `:ring_buoy:` answers revealed, `:fire:` hard mode, `:trophy:` percentiles, `:sparkles:` flawless.
+- **Emoji.** Then the share screen's emoji grid or bar, if it has one. Per-item breakdowns (Gauntle's games, Fermi's factors) go here, a line each.
+- **Spoilers** last (see below).
+- Plain text: no bold besides the game in the header, no exclamations.
+- Compare with existing templates before writing a new one so it reads like them: `wordle` (loss on the score line, a mode qualifier), `bracketcity` (every part), `chess` (`Perfect`), `minutecryptic` (`At par`, give-up), `gauntle` (time as the score).
 - Every outcome reads correctly: win, loss or give-up, and missing optional fields (`{% if x is not none %}`).
 - Never spell out the answer. The player's own answers (see above) go in one `||spoiler||` block at the end, a line each, escaped with `| md` (see `games/krillion/announcement.j2`).
 - Emoji as Discord shortcodes (`:green_square:`), only ones in the `SHORTCODES` map in `src/launcher/templates/discord-markdown.js`. If you need another, add it to that map (the shortcode and its emoji) so the launcher renders it too.
 - Only the markdown the launcher renders: `**bold**`, `*italic*`, `__underline__`, `~~strike~~`, `` `code` ``, `||spoiler||`.
 
-Preview it for every outcome with the field values from the runs:
+Preview it for every outcome with the field values from the runs. `data/real.db` holds real results from real players (`sqlite3 data/real.db "select data from results where game='<name>'"`), useful for checking the template reads well on real data:
 
 ```sh
 uv run python3 -m src.announce <name> '<fields JSON from a run>'

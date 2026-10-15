@@ -1,3 +1,6 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
-{{ score }} orb{{ "s" if score != 1 }}, {{ hearts_lost }} mistake{{ "s" if hearts_lost != 1 }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{{ score | plural("orb") }}{{ " %s %s" % ("in" if won else "after", time_secs | duration) if time_secs }}
+{% if hearts_lost %}
+:broken_heart: {{ hearts_lost | plural("mistake") }}
+{% endif %}
 {{ row }}

@@ -25,6 +25,12 @@ def test_md_and_spoiler_escape_markdown() -> None:
     assert announce.spoiler("x|y") == r"||x\|y||"
 
 
+def test_plural() -> None:
+    assert announce.plural(1, "hint") == "1 hint"
+    assert announce.plural(0, "hint") == "0 hints"
+    assert announce.plural(3, "guess", "guesses") == "3 guesses"
+
+
 def test_render_default_template() -> None:
     game = WORDLE.model_copy(update={"announcement_template": None})
     text = announce.render(
