@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daily Games</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+<link rel="icon" type="image/png" href="{{ favicon }}">
 <style>
 {% include "style.css" %}
 .warning { display: flex; }
@@ -13,7 +13,7 @@
 <body>
   <div class="warning">
     <div class="warning-card">
-      <div class="emoji" aria-hidden="true">🎲</div>
+      <img class="emoji" src="{{ favicon }}" alt="">
       {%- if expired %}
       <h2>Your link has expired</h2>
       <p>Run <code>/play</code> in Discord for a new one.</p>

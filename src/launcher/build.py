@@ -16,6 +16,7 @@ from src.settings import LAUNCHER_DIR, results_channel_id
 
 TEMPLATES_DIR = Path(__file__).with_name("templates")
 GAME_DAY_JS = Path(__file__).parents[1] / "games" / "game_day.js"
+FAVICON_PATH = TEMPLATES_DIR / "favicon.png"
 OUTPUT_PATH = LAUNCHER_DIR / "index.html"
 # Where the launcher's server puts the viewer's token as it sends the page.
 TOKEN_PLACEHOLDER = "__DGB_TOKEN__"
@@ -50,13 +51,18 @@ def render_launcher() -> str:
             # Game roles live in the results channel's server.
             roles_enabled=results_channel_id() is not None,
             game_day_js=GAME_DAY_JS.read_text(),
+            favicon=_favicon_data_uri(),
         )
     )
 
 
 def render_locked(expired: bool) -> str:
     """The page for visitors without a token, or with one that's been reset."""
-    return _environment().get_template("locked.html.j2").render(expired=expired)
+    return (
+        _environment()
+        .get_template("locked.html.j2")
+        .render(expired=expired, favicon=_favicon_data_uri())
+    )
 
 
 def _environment() -> jinja2.Environment:
@@ -83,8 +89,15 @@ def _icon_data_uri(game: Game) -> str | None:
     """The icon inlined, so the launcher stays one self-contained file."""
     if game.icon_path is None:
         return None
-    mime_type = ICON_MIME_TYPES[game.icon_path.suffix]
-    data = base64.b64encode(game.icon_path.read_bytes()).decode()
+    return _data_uri(game.icon_path, ICON_MIME_TYPES[game.icon_path.suffix])
+
+
+def _favicon_data_uri() -> str:
+    return _data_uri(FAVICON_PATH, "image/png")
+
+
+def _data_uri(path: Path, mime_type: str) -> str:
+    data = base64.b64encode(path.read_bytes()).decode()
     return f"data:{mime_type};base64,{data}"
 
 

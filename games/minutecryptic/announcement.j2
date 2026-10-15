@@ -1,4 +1,4 @@
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% if won %}
 {{ (hints + letters_revealed) | plural("hint") if score is none else "%d under par" % -score if score < 0 else "At par" if score == 0 else "%d over par" % score }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}

@@ -1,4 +1,4 @@
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% if won %}
 {{ "Perfect" if score == 0 else score | plural("mistake") }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}

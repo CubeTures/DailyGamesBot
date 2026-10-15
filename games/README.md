@@ -218,7 +218,7 @@ shown on the launcher when you click a result on today's scoreboard.
 Wordle's:
 
 ```jinja
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {% if won %}
 {{ score | plural("guess", "guesses") }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}
@@ -235,7 +235,7 @@ Out of guesses{{ " after %s" % (time_secs | duration) if time_secs }}
 which renders as:
 
 ```
-:bee: @player played **@Wordle** #1571
+:sun_with_face: @player played **@Wordle** #1571
 2 guesses in 1:35
 :fire: Hard mode
 :white_large_square::yellow_square::white_large_square::white_large_square::white_large_square:
@@ -248,7 +248,7 @@ Every game's announcement has the same parts, in this order, so the
 channel reads as one system:
 
 ```
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 <score> in <time>
 :emoji: <qualifier>
 :emoji: <qualifier>
@@ -256,7 +256,7 @@ channel reads as one system:
 ||<spoilers>||
 ```
 
-- **Header.** Exactly `:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}`
+- **Header.** Exactly `:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}`
   (`{{ puzzle_id }}` in place of `#{{ puzzle_number }}` only if the game has
   no number). Modes like hard mode are qualifiers, not part of it.
 - **Score line.** Only the game's primary metric, the thing the player

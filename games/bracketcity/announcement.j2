@@ -1,7 +1,7 @@
 {% set emoji = {"Tourist": ":camera_with_flash:", "Commuter": ":steam_locomotive:", "Resident": ":house:", "Council Member": ":classical_building:", "Chief of Police": ":police_officer:", "Mayor": ":medal:", "Power Broker": ":briefcase:", "Kingmaker": ":crown:", "Puppet Master": ":crystal_ball:"} %}
 {% set filled = (score / 10) | round | int %}
 {% set square = ":purple_square:" if rank == "Puppet Master" else ":red_square:" if score < 25 else ":yellow_square:" if score < 75 else ":green_square:" %}
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {{ score }} points{{ " in %s" % (time_secs | duration) if time_secs }}
 {{ emoji[rank] }} {{ rank }}
 {% if hard_mode %}

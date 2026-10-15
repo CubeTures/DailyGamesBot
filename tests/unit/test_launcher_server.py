@@ -60,7 +60,7 @@ def test_results_api(launcher: str) -> None:
     [row] = body
     assert row["game"] == "wordle"
     assert row["discord_id"] == "7"
-    assert row["announcement"].startswith(":bee:")
+    assert row["announcement"].startswith(":sun_with_face:")
     assert _get(f"{launcher}/api/results?day=2026-10-09&token={token}") == (200, [])
     assert _get(f"{launcher}/api/results?day=2026-10-08")[0] == 401
     assert _get(f"{launcher}/api/results?day=2026-10-08&token=x")[0] == 401

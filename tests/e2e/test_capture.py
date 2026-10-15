@@ -75,7 +75,7 @@ def _check_row(player: Player, row: Row, expected: dict[str, Any]) -> None:
         problems.append(f"  {len(player.rows())} rows saved, expected 1")
 
     # The launcher serves the same announcement the bot posts. Every game's
-    # template opens with :bee:; the generic fallback (used when the template
+    # template opens with :sun_with_face:; the generic fallback (used when the template
     # throws) doesn't.
     shown = [
         r
@@ -85,7 +85,7 @@ def _check_row(player: Player, row: Row, expected: dict[str, Any]) -> None:
     announcement = shown[0]["announcement"] if shown else None
     if not shown:
         problems.append("  not in the launcher's /api/results for its game day")
-    elif not announcement or not announcement.startswith(":bee:"):
+    elif not announcement or not announcement.startswith(":sun_with_face:"):
         problems.append(
             f"  announcement fell back to the generic one (template error?):\n"
             f"    {announcement!r}"

@@ -207,7 +207,7 @@ Write the game's announcement following the house style in "Announcement" in
 - Every game uses the same layout, so the channel reads as one system:
 
   ```
-  :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+  :sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
   <score> in <time>
   :emoji: <qualifier>
   :emoji: <qualifier>

@@ -3,7 +3,7 @@ var discordMarkdown = (function () {
   // Discord shortcodes the announcement templates use; any others show as
   // typed.
   var SHORTCODES = {
-    bee: "🐝", green_square: "🟩", yellow_square: "🟨", white_large_square: "⬜",
+    sun_with_face: "🌞", green_square: "🟩", yellow_square: "🟨", white_large_square: "⬜",
     black_large_square: "⬛", purple_square: "🟪", blue_square: "🟦",
     orange_square: "🟧", red_square: "🟥", brown_square: "🟫",
     green_circle: "🟢", yellow_circle: "🟡", red_circle: "🔴", white_circle: "⚪",

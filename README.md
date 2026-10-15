@@ -4,6 +4,8 @@ Play daily web games (Wordle, Fermi, Minute Cryptic, Krillion...) through a
 local proxy that captures your result, and have a Discord bot post everyone's
 scores.
 
+![Logo](src/launcher/templates/favicon.png)
+
 ## Setup
 
 ```sh

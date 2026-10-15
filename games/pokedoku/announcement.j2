@@ -1,4 +1,4 @@
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {{ score }} uniqueness{{ " in %s" % (time_secs | duration) if time_secs }}
 {% if uniqueness_percentile is not none %}
 :trophy: Top {{ "%d" % (100 - uniqueness_percentile) | round(0, "ceil") }}%

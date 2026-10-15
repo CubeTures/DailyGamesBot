@@ -1,4 +1,4 @@
-:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
 {{ score | plural("point") }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% if pangrams %}
 :cherry_blossom: {{ pangrams | plural("pangram") }}
