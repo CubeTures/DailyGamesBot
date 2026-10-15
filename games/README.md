@@ -171,6 +171,42 @@ never clicked or typed since that load, i.e. the puzzle was finished outside
 the proxy and its result fired on load. The scoreboard breaks score ties by
 it and shows it beside each score.
 
+## Scoring
+
+The launcher's scoreboard ranks each day's results by `score` alone (lowest
+first, or highest with `higher_score_wins = true`), puts losses
+(`won: false`) below every result that isn't one, and breaks ties by
+`time_secs`. So `score` decides the ranking, and has to rank runs the way
+the players would:
+
+1. **Use the game's own headline score when it has one**, as the game
+   computes it (Bracket City's and Circuits' points, PokeDoku's uniqueness,
+   Fermi's factor, Gauntle's total time). Don't re-weight it or add
+   penalties the game doesn't count; if the game's scoring is odd, that's
+   the game.
+2. **Otherwise, build one that every way of doing worse moves.** Each
+   mistake, hint, reveal or lost life the game tracks must cost, so two
+   runs the game would call different never tie on score. A count that
+   every win shares (6 orbs, 4 groups) is not a score by itself: Orbs is
+   orbs minus hearts lost, Connections groups minus mistakes, Chess and
+   Clues by Sam count their mistakes (and hints), lowest first.
+3. **One scale, one direction.** Set `higher_score_wins` to match, and
+   comment the formula in `fields.js` with what a perfect run, a typical
+   one and a loss come to (see `connections/fields.js`).
+4. **Losses are `won: false`, not just a low score.** They always rank
+   below wins, and among themselves by `score`, so where a loss can still
+   be partly good (groups found, orbs collected) keep its score on the
+   same scale. A game that can't be lost reports no `won`. Where a loss
+   has no meaningful score, as in Wordle, report `score: null`.
+5. **Time only breaks ties.** Leave it out of `score` unless the game
+   folds it in itself (Circuits) or the time is the score (Gauntle).
+6. **Keep the raw counts as their own fields.** The announcement shows the
+   primary metric (`orbs`, `groups_found`, `attempts`), not `score`, so a
+   derived `score` needs the count it's built from beside it.
+7. **Check the order.** Before settling, line up a perfect win, a sloppy
+   win, a close loss and a bad loss, and make sure `score`, `won` and the
+   tie-break sort them in that order.
+
 ## Announcement
 
 When a result is saved, the bot posts it to the channel in
@@ -223,10 +259,15 @@ channel reads as one system:
 - **Header.** Exactly `:bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}`
   (`{{ puzzle_id }}` in place of `#{{ puzzle_number }}` only if the game has
   no number). Modes like hard mode are qualifiers, not part of it.
-- **Score line.** Only the primary score, the one the scoreboard ranks
-  by, then the time that breaks ties,
+- **Score line.** Only the game's primary metric, the thing the player
+  is going for (orbs, groups, guesses, points), then the time that breaks
+  ties,
   `{{ " in %s" % (time_secs | duration) if time_secs }}`, or `after` for a
   loss or give-up. Nothing else goes on it.
+  - This is often not the scoreboard's `score`: Orbs ranks by orbs minus
+    mistakes but says `6 orbs`, with the mistakes as a qualifier. Never
+    put the scoreboard's number or "points" made up for it here; only
+    say points when the game itself scores in points.
   - A numeric score starts with the number, in the game's own terms
     (`3 guesses`, `4 groups`, `77 points`, `2 under par`,
     `160 uniqueness`), and leaves off the maximum, which players know

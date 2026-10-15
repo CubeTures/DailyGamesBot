@@ -180,6 +180,25 @@ Rules:
 - Write `vars.js` and `fields.js` defensively with `?.`. A throw anywhere skips the whole check (no result is sent), and a field that silently comes back null is a bug.
 - Don't capture secrets or tokens. Keep `share_text`-like data small. Fields may hold the answer (Wordle's `guesses` end with it), but the announcement must not show it. When the player's answers are their own and can't be looked up later (Krillion's free-text answers), capture them as a field so the announcement can show them behind a spoiler.
 
+### Scoring
+
+Decide `score` (and `higher_score_wins` in `config.toml`) by "Scoring" in
+`games/README.md`. In short:
+
+- The game's own headline score if it has one, exactly as the game computes it.
+- Otherwise a score that every mistake, hint, reveal or lost life moves, so no
+  two runs the game would call different tie. A count every win shares (all 6
+  orbs, all 4 groups) isn't enough on its own; subtract or count the mistakes.
+- One scale, one direction, with its formula and its range (perfect, typical,
+  loss) commented in `fields.js`.
+- Losses are `won: false` (ranked below every win); their `score` ranks them
+  among themselves, so keep it on the same scale where a loss can be partly good.
+- Time only breaks ties, unless the game itself counts it.
+- Report the raw counts (`orbs`, `groups_found`, `attempts`) as fields of their
+  own: the announcement's score line shows the primary metric, not `score`.
+- Check the ranking with a perfect win, a sloppy win, a close loss and a bad
+  loss from the runs (or `data/real.db`): they must sort in that order.
+
 ### announcement.j2
 
 Write the game's announcement following the house style in "Announcement" in
@@ -197,7 +216,7 @@ Write the game's announcement following the house style in "Announcement" in
   ```
 
 - **Header.** Exactly as above. `{{ puzzle_id }}` replaces `#{{ puzzle_number }}` only if the game has no number. Nothing else goes on it: modes like hard mode are qualifiers.
-- **Score line.** Only the primary score, the one the scoreboard ranks by, then the time that breaks ties: `{{ " in %s" % (time_secs | duration) if time_secs }}`, or `after` for a loss or give-up. No qualifiers, no emoji.
+- **Score line.** Only the game's primary metric, the thing the player is going for, then the time that breaks ties. It's often not the scoreboard's `score`: Orbs ranks by orbs minus mistakes but says `6 orbs`, with the mistakes as a qualifier. Never put the scoreboard's number, or "points" invented for it, on this line; say points only when the game scores in points. Then the time: `{{ " in %s" % (time_secs | duration) if time_secs }}`, or `after` for a loss or give-up. No qualifiers, no emoji.
   - A numeric score starts with the number, in the game's terms: `3 guesses`, `4 groups`, `77 points`, `2 under par`, `160 uniqueness` (not `Uniqueness 160`). Count nouns go through `| plural` so 1 reads `1 guess`.
   - Leave off the maximum or target; players know it: `3 guesses`, not `3/6 guesses`; `245 points`, not `245/700`.
   - Special outcomes are words in place of the number: a loss (`Out of guesses after 5:00`, `Out of hearts after 0:40`), a give-up (`Gave up after 1:10`), a zero-mistake solve (`Perfect in 0:40`) and par (`At par in 1:05`). A loss in a game that ranks partial scores shows the partial score instead (`2 groups after 1:01`, `3 orbs after 2:00`).

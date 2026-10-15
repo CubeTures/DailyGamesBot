@@ -1,5 +1,5 @@
 :bee: {{ player }} played **{{ game }}** #{{ puzzle_number }}
-{{ score | plural("orb") }}{{ " %s %s" % ("in" if won else "after", time_secs | duration) if time_secs }}
+{{ orbs | plural("orb") }}{{ " %s %s" % ("in" if won else "after", time_secs | duration) if time_secs }}
 {% if hearts_lost %}
 :broken_heart: {{ hearts_lost | plural("mistake") }}
 {% endif %}
