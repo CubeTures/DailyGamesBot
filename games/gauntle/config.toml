@@ -1,0 +1,28 @@
+#:schema ../schema.json
+
+name = "gauntle"
+title = "Gauntle"
+description = "A daily gauntlet of eleven quick puzzles against one timer."
+icon = "icon.png"
+origin = "https://gauntle.com"
+landing_path = "/"
+
+# Puzzles are dated in UTC+3 (Etc/GMT-3; POSIX signs are inverted), so the
+# day rolls over at 21:00 UTC.
+[reset]
+time = "00:00"
+timezone = "Etc/GMT-3"
+
+# Anonymous runs: the result the game keeps in localStorage.
+[[triggers]]
+name = "anon-result"
+type = "page"
+when = "!!run"
+
+# Any run, logged in or not: the last game's completion response.
+[[triggers]]
+name = "run-complete"
+type = "network"
+url = "/api/run/complete-game$"
+method = "POST"
+when = "!!run"

@@ -10,7 +10,7 @@ var discordMarkdown = (function () {
     black_circle: "⚫", blue_circle: "🔵", purple_circle: "🟣", orange_circle: "🟠",
     white_check_mark: "✅", x: "❌", trophy: "🏆", first_place: "🥇",
     second_place: "🥈", third_place: "🥉", fire: "🔥", star: "⭐", tada: "🎉",
-    stopwatch: "⏱️", clock: "🕐", brain: "🧠", bulb: "💡", skull: "💀",
+    stopwatch: "⏱️", clock: "🕐", brain: "🧠", bulb: "💡", skull: "💀", sparkles: "✨",
     game_die: "🎲", puzzle_piece: "🧩", thinking: "🤔", heart: "❤️",
     green_heart: "💚", blue_heart: "💙", purple_heart: "💜", orange_heart: "🧡",
     broken_heart: "💔",

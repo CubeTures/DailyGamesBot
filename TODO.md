@@ -1,6 +1,38 @@
+# TODO
+
+## P0
+
+- Fix the scoring of the orbs to be (orbs got - mistakes made)
+- Say time of reset instead of timezone, easier to understand and less ugly
+- Help button in top right to explain features
+- Overflow right issue on mobile views (only happens sometimes?)
+
+- https://www.merriam-webster.com/games/blossom-word-game
+- https://www.britannica.com/quiz/tightrope
+- https://timeguessr.com/
+
+## P1
+
+- Cross with friends
+	- Automatically send link to join when they start typing
+	- Log completion at time of game as the time of the user that started the activity
+	- Have a "co-op" tag
+	- Whenever completing multiple in a day, just increment their score
+- Admin channel env variable
+	- Triggers the running of all unit tests every day
+	- Sends a warning in the channel on degraded performance
+
+## P2
+
 - Let players download their own results
 - Statistics board: per game and per person
+- Send notifications when running out on time as a reminder to play
 - See if we can allow logins to accounts for saved progress
+	- Try an un-man-in-the-middle strategy
+		- Redirect them to the actual site so they can login
+		- When they get back attempt to fetch their token for them?
+			- Probably not possible
+
 
 ## Games
 
@@ -11,13 +43,4 @@
 - https://www.thewikipediagame.com/
 - https://www.vulture.com/article/daily-movie-grid-trivia-game-cinematrix.html
 - https://originle.io/mattias/?day=3
-
-- https://www.merriam-webster.com/games/blossom-word-game
-- https://www.britannica.com/quiz/tightrope
-- https://gauntle.com/
-- https://timeguessr.com/
-
 - https://listdle.com/
-
-- Send notifications when running out on time as a reminder to play
-- Cross with friends to automatically send link when someone starts typing
