@@ -8,11 +8,19 @@ Britannica sits behind Cloudflare, which starts challenging the browser (a
 a short time; failures then are that, not the capture. Wait and rerun.
 """
 
+import re
 from typing import Any
 
 from tests.e2e.expect import between, where
 from tests.e2e.harness import Driver, Expected, Player, Solution
 from tests.e2e.solutions import game_day
+
+# Everything but the game (through the proxy) and Britannica's own CDN. The
+# page's ad stack otherwise fires thousands of cookie-sync requests a minute,
+# which slows every action enough that the 15-second answer timer runs out.
+_THIRD_PARTY = re.compile(
+    r"^https?://(?!(tightrope\.localhost|cdn(-dev)?\.britannica\.com)[:/])"
+)
 
 # The game's difficulty bonus for crossing, by weekday (Monday first).
 BONUS = [200, 220, 240, 260, 280, 300, 320]
@@ -43,6 +51,7 @@ def learn(player: Player) -> Solution:
 
 def _start(player: Player) -> None:
     page = player.page
+    page.route(_THIRD_PARTY, lambda route: route.abort())
     # The How to Play dialog opens on a browser's first visit and covers the
     # Play button; the game skips it once its settings say it's been seen.
     page.evaluate(
