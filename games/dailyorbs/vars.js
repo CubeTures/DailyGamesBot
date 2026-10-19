@@ -1,5 +1,7 @@
-// localStorage "daily-orbs-<dateKey>" holds a day's progress, rewritten after
-// every answer (trimmed, from a won run):
+// localStorage "daily-orbs-profile:<browserId>:daily-orbs-<dateKey>" holds a
+// day's progress, rewritten after every answer. <browserId> is the active
+// profile's, from "daily-orbs-profile-registry-v1"; before profiles the key
+// was plain "daily-orbs-<dateKey>". Trimmed, from a won run:
 //   {dateKey: "2026-10-08",
 //    puzzles: [{puzzleId: "just-dance-ii", color: "green", orbs: 3,
 //               livesLeft: 1, completed: true, gameOver: false, gaveUp: false}, ...],
@@ -20,7 +22,11 @@
 // The game day changes at midnight Hawaii-Aleutian time, the same as [reset]
 // (en-CA formats a date as YYYY-MM-DD).
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Adak" }).format(new Date());
-const st = (() => { const s = ls(`daily-orbs-${day}`); return s?.dateKey === day ? s : null; })();
+const profile = ls("daily-orbs-profile-registry-v1")?.activeBrowserId;
+const st = (() => {
+  const s = (profile && ls(`daily-orbs-profile:${profile}:daily-orbs-${day}`)) ?? ls(`daily-orbs-${day}`);
+  return s?.dateKey === day ? s : null;
+})();
 
 const outcome = (() => {
   const events = st?.eventHistory ?? [];

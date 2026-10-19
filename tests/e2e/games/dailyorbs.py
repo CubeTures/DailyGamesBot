@@ -76,9 +76,17 @@ def learn(player: Player) -> Solution:
     }
 
 
+# The day state's localStorage key, under the active profile (as vars.js).
+DAY_STATE_KEY = """(date) => {
+  const registry = JSON.parse(localStorage.getItem("daily-orbs-profile-registry-v1") || "null");
+  return `daily-orbs-profile:${registry?.activeBrowserId}:daily-orbs-${date}`;
+}"""
+
+
 def _day_state(player: Player, date: str) -> dict[str, Any]:
     return player.page.evaluate(
-        "(key) => JSON.parse(localStorage.getItem(key) || 'null')", f"daily-orbs-{date}"
+        f"(date) => JSON.parse(localStorage.getItem(({DAY_STATE_KEY})(date)) || 'null')",
+        date,
     )
 
 
@@ -112,9 +120,9 @@ def _bijection(player: Player, date: str, puzzle: Puzzle, wrong: int) -> None:
     _open(player, puzzle)
     pid = puzzle["id"]
     page.wait_for_function(
-        "([key, id]) => JSON.parse(localStorage.getItem(key) || 'null')"
-        "?.snapshots?.[id]?.bijectionShuffledB?.length > 0",
-        arg=[f"daily-orbs-{date}", pid],
+        f"([date, id]) => JSON.parse(localStorage.getItem(({DAY_STATE_KEY})(date))"
+        " || 'null')?.snapshots?.[id]?.bijectionShuffledB?.length > 0",
+        arg=[date, pid],
     )
     # The cards' on-screen order; matched ones are removed from both columns.
     snapshot = _day_state(player, date)["snapshots"][pid]
@@ -183,10 +191,17 @@ def _categorization(player: Player, date: str, puzzle: Puzzle, wrong: int) -> No
 
     def pick(item: str, category: str) -> None:
         row = page.locator(f'[data-cat-item="{item}"]').filter(visible=True)
-        # The category buttons are in a popover the row opens.
-        if not row.locator(".cat-popover-visible").count():
+        # The category buttons are in a popover the row opens. An answered
+        # row grows its explanation, shifting the rows below, so a click
+        # can land on the wrong row; try again until this one's opens.
+        popover = row.locator(".cat-popover-visible")
+        for _ in range(5):
+            if popover.count():
+                break
             row.locator(".cat-name").click()
-        row.locator("button.cat-btn").filter(
+            page.wait_for_timeout(400)
+        popover.wait_for()
+        popover.locator("button.cat-btn").filter(
             has=page.get_by_text(category, exact=True)
         ).click()
         page.wait_for_timeout(600)
