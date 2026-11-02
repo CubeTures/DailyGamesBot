@@ -42,3 +42,21 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - id: meta-with-tests
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-with-tests
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.with-tests
+          push: true
+          tags: ${{ steps.meta-with-tests.outputs.tags }}
+          labels: ${{ steps.meta-with-tests.outputs.labels }}
+          cache-from: type=gha,scope=with-tests
+          cache-to: type=gha,scope=with-tests,mode=max

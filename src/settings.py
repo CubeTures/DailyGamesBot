@@ -27,7 +27,7 @@ PUBLIC_SCHEME = _PUBLIC.scheme
 # (a reverse proxy, Docker) serves the public URL on a different port.
 PROXY_PORT = int(os.environ.get("DGB_PROXY_PORT") or _PUBLIC.port or 8080)
 # The launcher's own server, which only the proxy talks to.
-LAUNCHER_PORT = 8090
+LAUNCHER_PORT = int(os.environ.get("DGB_LAUNCHER_PORT") or 8090)
 LAUNCHER_URL = PUBLIC_URL
 # Each game's host (and port, if any), with {game} for its name. Default: a
 # subdomain of the public URL. Set it when those can't get a certificate, e.g.
@@ -72,6 +72,20 @@ def results_channel_ids() -> list[int]:
         if channel_id not in ids:
             ids.append(channel_id)
     return ids
+
+
+def admin_channel_id() -> int | None:
+    """The channel the daily test run reports degraded tests in. None to not
+    run the tests."""
+    raw = os.environ.get("DISCORD_ADMIN_CHANNEL_ID", "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        raise SystemExit(
+            f"DISCORD_ADMIN_CHANNEL_ID must be a channel ID, got {raw!r}"
+        ) from None
 
 
 def configure_logging() -> None:

@@ -88,8 +88,12 @@ def browser(pytestconfig: pytest.Config) -> Generator[Browser]:
         browser = p.chromium.launch(
             channel="chrome",
             headless=not pytestconfig.getoption("headed"),
-            # Some sites refuse automated browsers outright.
-            args=["--disable-blink-features=AutomationControlled"],
+            args=[
+                # Some sites refuse automated browsers outright.
+                "--disable-blink-features=AutomationControlled",
+                # Docker's /dev/shm is too small for Chrome.
+                "--disable-dev-shm-usage",
+            ],
         )
         try:
             yield browser

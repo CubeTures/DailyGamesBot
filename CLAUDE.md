@@ -23,7 +23,7 @@ uv run pytest -m live -k wordle --headed   # one game, watching the browser
 `.env` (from `.env.example`) holds `DISCORD_BOT_TOKEN` and, optionally,
 `DISCORD_RESULTS_CHANNEL_IDS` (comma-separated channels results are announced
 in, at most one per server; the old `DISCORD_RESULTS_CHANNEL_ID` is its
-fallback) and
+fallback), `DISCORD_ADMIN_CHANNEL_ID` (daily test reports; see below) and
 `DGB_PUBLIC_URL` / `DGB_PROXY_PORT` / `DGB_GAME_HOST` (where it's served; see
 below).
 
@@ -74,7 +74,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
   server with the JSON API (`server.py`, one function per route)
 - `src/discord_bot/`: client, polling loops, `/play` and `/primary` (`bot.py`), result
   posts (`announcer.py`), username lookups (`player_names.py`), game roles
-  (`roles.py`), results channel lookups (`channels.py`)
+  (`roles.py`), results channel lookups (`channels.py`), the daily test run
+  (`daily_tests.py`)
 - `src/announce.py`: renders a result's `announcement.j2`
 - `tests/unit/`: offline tests of the store, rewrites, capture endpoints,
   announcements and launcher API, each on a scratch database
@@ -171,6 +172,19 @@ needs full type annotations. Its config is `[tool.pyright]` in
   polls every 15s to give or take the role in each of those servers the
   player is registered with. The table is the source of
   truth: roles changed by hand in Discord aren't reflected on the launcher.
+- **Daily tests.** With `DISCORD_ADMIN_CHANNEL_ID` set, the bot runs
+  `pytest -m 'not live'` and then `pytest -m live` in subprocesses every day
+  at `daily_tests.RUN_AT` (12:00 UTC). Only if a test failed or errored, or a
+  run broke (timeout, other exit code), it posts them in that channel with
+  each run's output and a zip of `tests/e2e/.artifacts/` (minus traces)
+  attached. The live run gets its own ports (18080/18090, via
+  `DGB_PUBLIC_URL` and `DGB_LAUNCHER_PORT`) so it doesn't collide with the
+  running proxy; both runs blank the other `DGB_*` URL settings so `.env`
+  doesn't leak into them, and use a scratch `DGB_DB_PATH`. Needs the dev
+  dependencies and Chrome: in Docker, the image from `Dockerfile.with-tests`
+  (published as `ghcr.io/<repo>-with-tests` by `.github/workflows/build.yml`
+  beside the plain one), which also installs `libnss-myhostname` so
+  `*.localhost` resolves outside Chrome.
 - **Hiding games.** Each player chooses which games they see. The pencil
   beside "Games" puts the launcher in edit mode, where every card shows
   with an eye; each click cycles the game through shown, card hidden

@@ -2,7 +2,9 @@
 with the server it's run in, /primary picks the server their scoreboard opens
 on, and finished games are announced in the results channel (from
 DISCORD_RESULTS_CHANNEL_IDS) of each server the player is registered with,
-pinging the game's role there (see roles.py).
+pinging the game's role there (see roles.py). With DISCORD_ADMIN_CHANNEL_ID
+set, the tests run daily and degraded ones are reported there (see
+daily_tests.py).
 
 A link carries a token standing in for the player's Discord ID (see
 store/players.py). It stays the same until an admin resets it.
@@ -19,11 +21,12 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
+from src.discord_bot import daily_tests
 from src.discord_bot.announcer import announce_pending_results
-from src.discord_bot.channels import ResultsChannels, results_channels
+from src.discord_bot.channels import ResultsChannels, fetch_channel, results_channels
 from src.discord_bot.player_names import refresh_player_name, refresh_stale_names
 from src.discord_bot.roles import create_game_roles, sync_subscriptions
-from src.settings import LAUNCHER_URL, results_channel_ids
+from src.settings import LAUNCHER_URL, admin_channel_id, results_channel_ids
 from src.store import guilds, players
 
 POLL_SECONDS = 15
@@ -32,12 +35,14 @@ log = logging.getLogger(__name__)
 
 
 async def run_bot(token: str) -> None:
-    client = create_client(results_channel_ids())
+    client = create_client(results_channel_ids(), admin_channel_id())
     async with client:
         await client.start(token)
 
 
-def create_client(results_channel_ids: list[int]) -> discord.Client:
+def create_client(
+    results_channel_ids: list[int], admin_channel_id: int | None = None
+) -> discord.Client:
     client = discord.Client(intents=discord.Intents.default())
     tree = app_commands.CommandTree(client)
     # The working results channels by server ID, found in on_ready.
@@ -55,6 +60,16 @@ def create_client(results_channel_ids: list[int]) -> discord.Client:
     async def poll_subscriptions() -> None:
         await sync_subscriptions([channel.guild for channel in channels.values()])
 
+    @tasks.loop(time=daily_tests.RUN_AT)
+    async def run_daily_tests() -> None:
+        if admin_channel_id is None:
+            return
+        channel = await fetch_channel(client, admin_channel_id)
+        if not isinstance(channel, discord.abc.Messageable):
+            log.error("Admin channel %s doesn't take messages", admin_channel_id)
+            return
+        await daily_tests.run_and_report(channel)
+
     @client.event
     async def on_ready() -> None:
         await tree.sync()
@@ -68,6 +83,8 @@ def create_client(results_channel_ids: list[int]) -> discord.Client:
         if channels:
             _ensure_running(poll_unannounced_results)
             _ensure_running(poll_subscriptions)
+        if admin_channel_id is not None:
+            _ensure_running(run_daily_tests)
         log.info("Logged in as %s", client.user)
 
     @client.event

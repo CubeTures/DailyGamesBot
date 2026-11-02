@@ -24,3 +24,13 @@ def test_results_channel_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DISCORD_RESULTS_CHANNEL_IDS", "1,general")
     with pytest.raises(SystemExit):
         settings.results_channel_ids()
+
+
+def test_admin_channel_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DISCORD_ADMIN_CHANNEL_ID", " ")
+    assert settings.admin_channel_id() is None
+    monkeypatch.setenv("DISCORD_ADMIN_CHANNEL_ID", " 42 ")
+    assert settings.admin_channel_id() == 42
+    monkeypatch.setenv("DISCORD_ADMIN_CHANNEL_ID", "admin")
+    with pytest.raises(SystemExit):
+        settings.admin_channel_id()

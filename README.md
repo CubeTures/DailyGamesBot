@@ -42,4 +42,5 @@ Cloudflare Tunnel, see [SETUP.md](SETUP.md).
 
 ## Admins
 
-Run `uv run python3 -m src.store reset-token <discord id>` to reset someone's token.
+- Run `uv run python3 -m src.store reset-token <discord id>` to reset someone's token
+- Use `DISCORD_ADMIN_CHANNEL_ID` and the `ghcr.io/<repo>-with-tests` image to test and get a report for degradation of any games
