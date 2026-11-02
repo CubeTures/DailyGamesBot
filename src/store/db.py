@@ -27,7 +27,23 @@ CREATE TABLE IF NOT EXISTS players (
     discord_id  TEXT PRIMARY KEY,
     name        TEXT,
     name_stale  INTEGER NOT NULL DEFAULT 0,
-    token       TEXT  -- in their /play link; see players.token_for
+    token       TEXT,  -- in their /play link; see players.token_for
+    primary_guild TEXT  -- the server their scoreboard opens on
+);
+CREATE TABLE IF NOT EXISTS guilds (
+    guild_id    TEXT PRIMARY KEY,
+    name        TEXT  -- for the launcher's server picker; kept by the bot
+);
+CREATE TABLE IF NOT EXISTS player_guilds (
+    discord_id    TEXT NOT NULL,
+    guild_id      TEXT NOT NULL,
+    registered_at TEXT NOT NULL,
+    PRIMARY KEY (discord_id, guild_id)
+);
+CREATE TABLE IF NOT EXISTS announcements (
+    result_id   INTEGER NOT NULL,  -- results.id
+    guild_id    TEXT NOT NULL,     -- the server it was posted in
+    PRIMARY KEY (result_id, guild_id)
 );
 CREATE TABLE IF NOT EXISTS subscriptions (
     discord_id  TEXT NOT NULL,
@@ -83,6 +99,7 @@ def _prepare(conn: sqlite3.Connection) -> None:
         backfill=lambda: _backfill_game_days(conn),
     )
     _add_column(conn, "players", "token TEXT")
+    _add_column(conn, "players", "primary_guild TEXT")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS players_token ON players (token)")
 
 

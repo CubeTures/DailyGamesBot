@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from src.launcher import build, server
-from src.store import hidden_games, players, results
+from src.store import guilds, hidden_games, players, results
 
 
 @pytest.fixture
@@ -55,13 +55,24 @@ def test_results_api(launcher: str) -> None:
         )
     )
     token = players.token_for("8")
-    status, body = _get(f"{launcher}/api/results?day=2026-10-08&token={token}")
+    guilds.register("7", "g")
+    guilds.register("8", "g")
+    guilds.register("9", "h")
+    assert _get(f"{launcher}/api/results?day=2026-10-08&token={token}") == (200, [])
+    assert _get(f"{launcher}/api/results?day=2026-10-08&token={token}&guild=h") == (
+        200,
+        [],
+    )
+    status, body = _get(f"{launcher}/api/results?day=2026-10-08&token={token}&guild=g")
     assert status == 200
     [row] = body
     assert row["game"] == "wordle"
     assert row["discord_id"] == "7"
     assert row["announcement"].startswith(":sun_with_face:")
-    assert _get(f"{launcher}/api/results?day=2026-10-09&token={token}") == (200, [])
+    assert _get(f"{launcher}/api/results?day=2026-10-09&token={token}&guild=g") == (
+        200,
+        [],
+    )
     assert _get(f"{launcher}/api/results?day=2026-10-08")[0] == 401
     assert _get(f"{launcher}/api/results?day=2026-10-08&token=x")[0] == 401
 
@@ -70,7 +81,21 @@ def test_me_api(launcher: str) -> None:
     old = players.token_for("7")
     players.reset_token("7")
     token = players.token_for("7")
-    assert _get(f"{launcher}/api/me?token={token}") == (200, {"discord_id": "7"})
+    assert _get(f"{launcher}/api/me?token={token}") == (
+        200,
+        {"discord_id": "7", "guilds": [], "primary_guild": None},
+    )
+    guilds.register("7", "g1")
+    guilds.register("7", "g2")
+    guilds.save_name("g2", "Two")
+    assert _get(f"{launcher}/api/me?token={token}") == (
+        200,
+        {
+            "discord_id": "7",
+            "guilds": [{"id": "g1", "name": None}, {"id": "g2", "name": "Two"}],
+            "primary_guild": "g1",
+        },
+    )
     assert _get(f"{launcher}/api/me?token={old}")[0] == 401
     assert _get(f"{launcher}/api/me")[0] == 401
 

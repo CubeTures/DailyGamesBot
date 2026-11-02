@@ -12,7 +12,7 @@ import jinja2
 from src.games.models import ICON_MIME_TYPES, Game
 from src.games.registry import GAMES_BY_NAME
 from src.proxy.capture import ENTER_PATH
-from src.settings import LAUNCHER_DIR, results_channel_id
+from src.settings import LAUNCHER_DIR, results_channel_ids
 
 TEMPLATES_DIR = Path(__file__).with_name("templates")
 GAME_DAY_JS = Path(__file__).parents[1] / "games" / "game_day.js"
@@ -49,7 +49,7 @@ def render_launcher() -> str:
             resets={game.name: game.reset.js_config() for game in games},
             higher_score_wins=[game.name for game in games if game.higher_score_wins],
             # Game roles live in the results channel's server.
-            roles_enabled=results_channel_id() is not None,
+            roles_enabled=bool(results_channel_ids()),
             game_day_js=GAME_DAY_JS.read_text(),
             favicon=_favicon_data_uri(),
         )

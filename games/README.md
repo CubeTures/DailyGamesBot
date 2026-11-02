@@ -209,8 +209,8 @@ the players would:
 
 ## Announcement
 
-When a result is saved, the bot posts it to the channel in
-`DISCORD_RESULTS_CHANNEL_ID`. `announcement.j2` is a
+When a result is saved, the bot posts it to the results channel (from
+`DISCORD_RESULTS_CHANNEL_IDS`) of each server its player has registered with. `announcement.j2` is a
 [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) template for
 that message, so each game can show its result its own way. The same text is
 shown on the launcher when you click a result on today's scoreboard.

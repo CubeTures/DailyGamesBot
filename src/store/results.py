@@ -66,9 +66,17 @@ def save(result: NewResult) -> bool:
         return True
 
 
-def on_day(day: date) -> list[StoredResult]:
-    """Results for the puzzles of game day `day`."""
-    return _select("r.game_day = ?", (day.isoformat(),))
+def on_day(day: date, viewer_id: str, guild_id: str | None) -> list[StoredResult]:
+    """Results for the puzzles of game day `day` that the viewer may see:
+    their own, plus, if they're registered with server `guild_id`, those of
+    everyone registered with it."""
+    return _select(
+        "r.game_day = ? AND (r.discord_id = ? OR (EXISTS ("
+        " SELECT 1 FROM player_guilds WHERE discord_id = ? AND guild_id = ?)"
+        " AND r.discord_id IN ("
+        " SELECT discord_id FROM player_guilds WHERE guild_id = ?)))",
+        (day.isoformat(), viewer_id, viewer_id, guild_id, guild_id),
+    )
 
 
 def unannounced() -> list[StoredResult]:
@@ -77,8 +85,27 @@ def unannounced() -> list[StoredResult]:
 
 
 def mark_announced(result_id: int) -> None:
+    """Mark the result done with: posted in all its player's servers, or
+    skipped."""
     with connect() as conn:
         conn.execute("UPDATE results SET announced = 1 WHERE id = ?", (result_id,))
+
+
+def announced_in(result_id: int) -> set[str]:
+    """The servers the result has been posted in so far."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT guild_id FROM announcements WHERE result_id = ?", (result_id,)
+        ).fetchall()
+    return {guild_id for (guild_id,) in rows}
+
+
+def mark_announced_in(result_id: int, guild_id: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO announcements (result_id, guild_id) VALUES (?, ?)",
+            (result_id, guild_id),
+        )
 
 
 def _select(where: str, params: Sequence[Any] = ()) -> list[StoredResult]:

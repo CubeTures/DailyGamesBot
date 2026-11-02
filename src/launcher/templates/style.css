@@ -75,7 +75,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .section-head .note { flex: 1; }
 
 .day-nav { display: flex; align-items: center; gap: 6px; }
-.day-nav button, .day-nav input {
+.day-nav button, .day-nav input, .day-nav select {
   height: 32px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -93,15 +93,16 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .day-nav button:active:not(:disabled) { transform: scale(0.92); }
 #day-today { animation: fade-in 0.2s ease both; }
 .day-nav input { padding: 0 8px; }
+.day-nav select { max-width: 14em; padding: 0 8px; cursor: pointer; text-overflow: ellipsis; }
 .day-nav button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
 .day-nav button:disabled { opacity: 0.4; cursor: default; }
-.day-nav button:focus-visible, .day-nav input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.day-nav button:focus-visible, .day-nav input:focus-visible, .day-nav select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .day-nav [hidden] { display: none; }
 #scores-title.swap { animation: fade-in 0.25s ease both; }
 @media (max-width: 600px) {
   .section-head.scores-head { flex-wrap: wrap; }
   .scores-head .day-nav { width: 100%; }
-  .scores-head .day-nav input { flex: 1; min-width: 0; }
+  .scores-head .day-nav input, .scores-head .day-nav select { flex: 1; min-width: 0; }
 }
 
 .games {

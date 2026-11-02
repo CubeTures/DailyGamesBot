@@ -4,5 +4,7 @@ They run in different processes (the proxy inside mitmdump), so they
 coordinate through these tables rather than by calling each other: the proxy
 saves results unannounced and marks the player's name stale, the launcher
 saves role subscriptions unsynced, and the bot polls for both, acts on them
-in Discord and marks them done.
+in Discord and marks them done. The bot also records which servers each
+player has registered with (guilds.py) and their names, which the launcher
+reads for its server picker.
 """

@@ -21,7 +21,9 @@ uv run pytest -m live -k wordle --headed   # one game, watching the browser
 ```
 
 `.env` (from `.env.example`) holds `DISCORD_BOT_TOKEN` and, optionally,
-`DISCORD_RESULTS_CHANNEL_ID` (the channel results are announced in) and
+`DISCORD_RESULTS_CHANNEL_IDS` (comma-separated channels results are announced
+in, at most one per server; the old `DISCORD_RESULTS_CHANNEL_ID` is its
+fallback) and
 `DGB_PUBLIC_URL` / `DGB_PROXY_PORT` / `DGB_GAME_HOST` (where it's served; see
 below).
 
@@ -56,7 +58,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
   capture script and the launcher (its Python twin is `Reset.day_at`)
 - `src/store/`: the SQLite store (`data/results.db`, override with
   `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
-  `subscriptions.py`, `hidden_games.py`; `db.py` connects, creates the
+  `subscriptions.py`, `hidden_games.py`, `guilds.py` (servers players
+  registered with, their primary one, server names); `db.py` connects, creates the
   tables and migrates old databases; `__main__.py` is the admin CLI
 - `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads and
   that routes each subdomain to its game (`addon.py`), localhost rewrites
@@ -69,9 +72,9 @@ needs full type annotations. Its config is `[tool.pyright]` in
   builds them for games that fetch from other hosts
 - `src/launcher/`: page generation (`build.py`, `templates/`) and its HTTP
   server with the JSON API (`server.py`, one function per route)
-- `src/discord_bot/`: client, polling loops and `/play` (`bot.py`), result
+- `src/discord_bot/`: client, polling loops, `/play` and `/primary` (`bot.py`), result
   posts (`announcer.py`), username lookups (`player_names.py`), game roles
-  (`roles.py`), channel lookups (`channels.py`)
+  (`roles.py`), results channel lookups (`channels.py`)
 - `src/announce.py`: renders a result's `announcement.j2`
 - `tests/unit/`: offline tests of the store, rewrites, capture endpoints,
   announcements and launcher API, each on a scratch database
@@ -105,8 +108,11 @@ needs full type annotations. Its config is `[tool.pyright]` in
   `src/games/game_day.js`), kept in the game's localStorage under `__dgb_timer`.
 - **Launcher.** `launcher/index.html` is rendered from
   `src/launcher/templates/` and the game configs on every proxy start. It shows a card per game and a
-  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD&token=...` on the
-  launcher's server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
+  scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD&token=...&guild=ID` on the
+  launcher's server. It shows the viewer's own results plus those of the
+  players registered with the server picked in its dropdown (from
+  `/api/me`, shown with two or more servers; it opens on the primary one),
+  if the viewer is registered with it too. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
   The board can go forward to tomorrow while some game is already on it.
   It opens on the home day: tomorrow once the viewer has a result on it,
   otherwise today. The button back to it is labelled with that day. A view following the home day
@@ -121,7 +127,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   the same wall-clock time as the reset itself. Each card is tinted with
   its icon's dominant color (`icon-color.js`). Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
-  `DISCORD_RESULTS_CHANNEL_ID` set, a bell on each card toggles the
+  `DISCORD_RESULTS_CHANNEL_IDS` set, a bell on each card toggles the
   player's game role via `GET`/`POST /api/subscriptions`. Cards are divs
   whose title link stretches over the whole card, so the bell can be a
   button inside it.
@@ -144,15 +150,26 @@ needs full type annotations. Its config is `[tool.pyright]` in
   cookie gets a 404 (`has_working_token()` in `capture/endpoints.py`, which
   caches a working token for 60s, so a reset takes up to a minute to lock
   games). The bot records usernames for the
-  scoreboard on first `/play` and after each result. With
-  `DISCORD_RESULTS_CHANNEL_ID` set, it polls every 15s for unannounced
-  results and posts them using the game's `announcement.j2`; player mentions
-  don't ping, and results over 6 hours old when first seen are skipped.
+  scoreboard on first `/play` and after each result.
+- **Servers.** `/play` run in a server registers the player with it
+  (`player_guilds`); the first becomes their primary server (the one the
+  scoreboard opens on) until `/primary`, run in another, changes it. Players
+  are never unregistered. The bot keeps server names in `guilds` for the
+  launcher. On startup it registers players from before servers were tracked
+  with each results channel's server they're a member of. With
+  `DISCORD_RESULTS_CHANNEL_IDS` set, it polls every 15s for unannounced
+  results and posts each in the results channel of every server its player
+  is registered with, using the game's `announcement.j2` (`announcements`
+  records where it went, so a failed post is retried without repeating the
+  rest); player mentions don't ping, and results over 6 hours old when first
+  seen are skipped. A channel ID names its server; if two are in the same
+  server, the bot logs an error and uses the first.
 - **Game roles.** On startup the bot creates a mentionable role named after
-  each game's `title` in the results channel's server (reusing one that
+  each game's `title` in each results channel's server (reusing one that
   already has that name; needs Manage Roles). Announcements ping it. Role
   picks from the launcher are saved in the `subscriptions` table and the bot
-  polls every 15s to give or take the role. The table is the source of
+  polls every 15s to give or take the role in each of those servers the
+  player is registered with. The table is the source of
   truth: roles changed by hand in Discord aren't reflected on the launcher.
 - **Hiding games.** Each player chooses which games they see. The pencil
   beside "Games" puts the launcher in edit mode, where every card shows

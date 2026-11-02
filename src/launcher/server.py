@@ -1,5 +1,5 @@
-"""Serves the launcher page and its JSON API: the results its scoreboard
-reads, the role subscriptions its bells toggle, and the games each player has
+"""Serves the launcher page and its JSON API: the player's servers and the
+results its scoreboard reads, the role subscriptions its bells toggle, and the games each player has
 hidden.
 
 Players are identified by the token from their /play link, which the store
@@ -29,22 +29,32 @@ from src.launcher.build import (
 )
 from src.proxy.capture import TOKEN_COOKIE, token_cookie
 from src.settings import LAUNCHER_PORT
-from src.store import hidden_games, players, results, subscriptions
+from src.store import guilds, hidden_games, players, results, subscriptions
 
 Reply = tuple[int, Any]
 
 
 def _get_results(params: dict[str, str]) -> Reply:
-    """GET /api/results?day=YYYY-MM-DD&token=TOKEN: that game day's results."""
-    _player(params.get("token"))
+    """GET /api/results?day=YYYY-MM-DD&token=TOKEN&guild=ID: that game day's
+    results of the players registered with server ID, if the viewer is too,
+    and the viewer's own."""
+    discord_id = _player(params.get("token"))
     # The page sends the viewer's local date; fall back to the server's.
     day = _parse_day(params.get("day")) or date.today()
-    return 200, [_result_json(r) for r in results.on_day(day)]
+    shown = results.on_day(day, discord_id, params.get("guild") or None)
+    return 200, [_result_json(r) for r in shown]
 
 
 def _get_me(params: dict[str, str]) -> Reply:
-    """GET /api/me?token=TOKEN: {"discord_id"} of the token's player."""
-    return 200, {"discord_id": _player(params.get("token"))}
+    """GET /api/me?token=TOKEN: {"discord_id", "guilds": [{"id", "name"}],
+    "primary_guild"} of the token's player, with the servers they're
+    registered with."""
+    discord_id = _player(params.get("token"))
+    return 200, {
+        "discord_id": discord_id,
+        "guilds": [{"id": g.id, "name": g.name} for g in guilds.of_player(discord_id)],
+        "primary_guild": guilds.primary(discord_id),
+    }
 
 
 def _get_subscriptions(params: dict[str, str]) -> Reply:

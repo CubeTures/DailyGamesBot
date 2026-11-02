@@ -6,27 +6,13 @@ scores.
 
 ![Logo](src/launcher/templates/favicon.png)
 
-## Setup
+## Commands
 
-```sh
-uv sync
-cp .env.example .env   # and fill it in
-uv run python3 -m src
-```
-
-Or with Docker: `docker compose up --build`. To deploy it behind a
-Cloudflare Tunnel, see [SETUP.md](SETUP.md).
-
-Open http://localhost:8080 for the launcher (games open on its subdomains,
-e.g. http://wordle.localhost:8080; use Chrome or Firefox, which resolve them
-without any setup), or run `/play` in Discord to get
-your personal link so your scores count. Keep it to yourself: it's how the
-games know it's you. If it leaks, an admin can reset it with
-`uv run python3 -m src.store reset-token <discord id>`, and your next `/play`
-gets a new one. On the launcher you can also pick
-which games' Discord roles you want, to get pinged when someone finishes them.
-The pencil beside "Games" lets you hide games you don't play: click a game
-once to hide its card, twice to hide its scoreboard too.
+- `/play`
+    - Get a personal link to register with a server
+- `/primary`
+    - Set the current server as your primary
+- `
 
 ## Adding games
 
@@ -42,3 +28,18 @@ asks you to play a round or two. From what the page does, it works out how to
 detect a finished game, which result fields to capture, and what the Discord
 announcement should say, then checks it all end to end. Once it works, open a
 pull request.
+
+## Setup
+
+```sh
+uv sync
+cp .env.example .env   # and fill it in
+uv run python3 -m src
+```
+
+Or with Docker: `docker compose up --build`. To deploy it behind a
+Cloudflare Tunnel, see [SETUP.md](SETUP.md).
+
+## Admins
+
+Run `uv run python3 -m src.store reset-token <discord id>` to reset someone's token.

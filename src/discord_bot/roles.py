@@ -1,5 +1,6 @@
-"""Game roles: one per game, named after it, in the results channel's server.
-Players pick theirs on the launcher, and results for a game ping its role.
+"""Game roles: one per game, named after it, in each server with a results
+channel. Players pick theirs on the launcher, and results for a game ping its
+role. A pick applies in every such server the player is registered with.
 
 The launcher saves picks in the store (it can't reach the bot), so the bot
 polls for unsynced ones and gives or takes the role. The bot needs the
@@ -13,7 +14,7 @@ import discord
 
 from src.games.models import Game
 from src.games.registry import GAMES_BY_NAME
-from src.store import subscriptions
+from src.store import guilds, subscriptions
 
 log = logging.getLogger(__name__)
 
@@ -39,9 +40,13 @@ async def create_game_roles(guild: discord.Guild) -> None:
         await game_role(guild, game)
 
 
-async def sync_subscriptions(guild: discord.Guild) -> None:
+async def sync_subscriptions(servers: list[discord.Guild]) -> None:
+    """Apply each unsynced pick in the player's servers among `servers`."""
     for sub in await asyncio.to_thread(subscriptions.unsynced):
-        if not await _apply(guild, sub):
+        registered = await asyncio.to_thread(guilds.of_player, sub.discord_id)
+        ids = {guild.id for guild in registered}
+        applied = [await _apply(g, sub) for g in servers if str(g.id) in ids]
+        if not all(applied):
             return  # Try again next loop.
         await asyncio.to_thread(subscriptions.mark_synced, sub)
 

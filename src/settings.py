@@ -53,17 +53,25 @@ def bot_token() -> str:
     return token
 
 
-def results_channel_id() -> int | None:
-    """The channel results are announced in, or None to not announce them."""
-    raw = os.environ.get("DISCORD_RESULTS_CHANNEL_ID", "").strip()
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except ValueError:
-        raise SystemExit(
-            f"DISCORD_RESULTS_CHANNEL_ID must be a channel ID, got {raw!r}"
-        ) from None
+def results_channel_ids() -> list[int]:
+    """The channels results are announced in, one per server (a channel ID
+    also names its server). Empty to not announce them."""
+    raw = (
+        os.environ.get("DISCORD_RESULTS_CHANNEL_IDS", "").strip()
+        # Its name from when the bot served one server.
+        or os.environ.get("DISCORD_RESULTS_CHANNEL_ID", "").strip()
+    )
+    ids: list[int] = []
+    for part in raw.replace(",", " ").split():
+        try:
+            channel_id = int(part)
+        except ValueError:
+            raise SystemExit(
+                f"DISCORD_RESULTS_CHANNEL_IDS must be channel IDs, got {part!r}"
+            ) from None
+        if channel_id not in ids:
+            ids.append(channel_id)
+    return ids
 
 
 def configure_logging() -> None:

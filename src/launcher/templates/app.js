@@ -12,6 +12,11 @@
   var token = rememberToken();
   // The viewer's Discord ID, once identify() has asked the server.
   var discordId = null;
+  // The servers the viewer has registered with by running /play in them,
+  // as [{id, name}], and the one the scoreboard shows (null with none). It
+  // shows that server's players' results, plus the viewer's own.
+  var guilds = [];
+  var guildId = null;
   // Each game's icon color, by game name, once tintCards() has found it.
   var TINTS = {};
   // Games the viewer has hidden, by name: "card" hides just its card, "all"
@@ -36,7 +41,8 @@
     return value;
   }
 
-  // Resolves to the viewer's Discord ID, or null if the server can't say.
+  // Resolves to {discord_id, guilds, primary_guild} for the viewer, or null
+  // if the server can't say.
   function identify() {
     return fetch("/api/me?token=" + encodeURIComponent(token)).then(function (res) {
       if (res.status === 401) {
@@ -45,7 +51,7 @@
         location.reload();
         return null;
       }
-      return res.json().then(function (body) { return body.discord_id; });
+      return res.json();
     }).catch(function () { return null; });
   }
 
@@ -166,7 +172,8 @@
   // game that resets in another timezone shows on the board of its puzzle's
   // date, which may be the viewer's tomorrow or yesterday.
   function fetchResults(day) {
-    return getJson("/api/results?day=" + isoDate(day) + "&token=" + encodeURIComponent(token));
+    return getJson("/api/results?day=" + isoDate(day) + "&token=" + encodeURIComponent(token) +
+      (guildId ? "&guild=" + encodeURIComponent(guildId) : ""));
   }
 
   var dialog = document.getElementById("dialog");
@@ -485,6 +492,8 @@
   }
 
   function emptyText(day) {
+    // Without a server, the board only has the viewer's own results.
+    if (!guildId) return "Run /play in a Discord server to see its players' scores here.";
     if (sameDay(day, today())) return "Nobody has finished a game yet today. Be the first!";
     if (day > today()) return "Nobody has finished one of tomorrow's games yet. Be the first!";
     return "Nobody finished a game that day.";
@@ -509,6 +518,7 @@
       days[isoDate(day)] = day;
     });
     var keys = Object.keys(days);
+    var forGuild = guildId;
     Promise.all(keys.map(function (key) { return fetchResults(days[key]); })).then(function (lists) {
       var byDay = {};
       var newHome = today();
@@ -535,6 +545,8 @@
         updateNavButtons();
       }
       var shown = shownDay();
+      // The viewer has switched servers since: its own refresh draws the board.
+      if (forGuild !== guildId) return;
       if (byDay[isoDate(shown)]) renderBoards(byDay[isoDate(shown)], emptyText(shown));
     }).catch(function () {});
   }
@@ -760,10 +772,39 @@
   });
   window.addEventListener("hashchange", function () { setViewDay(dayFromHash(), true); });
 
+  // Fills the server picker, which opens on the viewer's primary server and
+  // is only shown when they have more than one.
+  function setUpGuilds(me) {
+    guilds = (me && me.guilds) || [];
+    var ids = guilds.map(function (g) { return g.id; });
+    guildId = me && ids.indexOf(me.primary_guild) >= 0 ? me.primary_guild : ids[0] || null;
+    var picker = document.getElementById("guild-pick");
+    picker.textContent = "";
+    guilds.forEach(function (g) {
+      var option = el("option", "", g.name || "Server " + g.id);
+      option.value = g.id;
+      picker.appendChild(option);
+    });
+    picker.value = guildId || "";
+    picker.hidden = guilds.length < 2;
+    picker.addEventListener("change", function () {
+      guildId = picker.value;
+      shownOnBoard = null;
+      lastBoards = null;
+      if (viewDay) {
+        showDay(viewDay);
+      } else {
+        showMessage(document.getElementById("boards"), "Loading…", true);
+        refreshToday();
+      }
+    });
+  }
+
   // The scoreboard waits for the viewer's ID: it marks their rows, and
   // whether they've played tomorrow's games decides the day it opens on.
-  identify().then(function (id) {
-    discordId = id;
+  identify().then(function (me) {
+    discordId = me && me.discord_id;
+    setUpGuilds(me);
     setUpPings();
     setUpHiding();
     setViewDay(dayFromHash(), true);
