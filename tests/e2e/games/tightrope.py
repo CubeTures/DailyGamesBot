@@ -8,6 +8,7 @@ Britannica sits behind Cloudflare, which starts challenging the browser (a
 a short time; failures then are that, not the capture. Wait and rerun.
 """
 
+import html
 import re
 from typing import Any
 
@@ -63,12 +64,20 @@ def _start(player: Player) -> None:
     page.get_by_test_id("AnswerButton").first.wait_for()
 
 
+def _text(answer: str) -> str:
+    """An answer as its button reads: the API's answers can hold HTML
+    (`<i>assuage</i>`)."""
+    return " ".join(html.unescape(re.sub(r"<[^>]*>", "", answer)).split())
+
+
 def _answer(player: Player, n: int, text: str) -> None:
     """Answer question n (from 0) with the option reading `text`."""
     page = player.page
     card = page.get_by_test_id("QuestionCard")
     card.filter(has_text=f"{n + 1}/9").wait_for(timeout=30_000)
-    button = page.get_by_test_id("AnswerButton").filter(has_text=text).first
+    # Exactly, so an answer inside another ("Sun" in "Sunday") isn't mistaken.
+    exact = re.compile(rf"^\s*{re.escape(text)}\s*$")
+    button = page.get_by_test_id("AnswerButton").filter(has_text=exact).first
     # Answers unlock once the question has shown for a moment.
     page.wait_for_function(
         "t => [...document.querySelectorAll('[data-testid=AnswerButton]')]"
@@ -85,7 +94,7 @@ def _play(player: Player, solution: Solution, right: list[bool]) -> None:
     for n, ok in enumerate(right):
         q = solution["questions"][n]
         pick = q["correct"] if ok else (q["correct"] + 1) % len(q["answers"])
-        _answer(player, n, q["answers"][pick])
+        _answer(player, n, _text(q["answers"][pick]))
 
 
 def _expected(solution: Solution, right: list[bool]) -> Expected:

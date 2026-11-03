@@ -27,6 +27,9 @@ def _play(player: Player, solution: Solution, factors: list[float]) -> list[str]
     page = player.page
     page.wait_for_function("typeof productPrice === 'number'")
     guesses = [f"{solution['price'] * f:.2f}" for f in factors]
+    # A one-guess win otherwise lands within half a second of the page load,
+    # and the capture's timer rightly reports time_secs 0.
+    page.wait_for_timeout(1500)
     for guess in guesses:
         page.locator("#guess-input").fill(guess)
         page.locator("#guess-button").click()

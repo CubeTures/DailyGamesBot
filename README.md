@@ -12,7 +12,6 @@ scores.
     - Get a personal link to register with a server
 - `/primary`
     - Set the current server as your primary
-- `
 
 ## Adding games
 

@@ -11,3 +11,4 @@ launcher/
 tests/e2e/.solutions/
 tests/e2e/.artifacts/
 deploy.sh
+artifacts
