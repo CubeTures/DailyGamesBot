@@ -14,6 +14,7 @@
   --primary-soft: rgba(192, 57, 43, 0.1);
   --done: #1f8a4c;
   --done-soft: rgba(31, 138, 76, 0.12);
+  --fire: #e8590c;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
   --shadow-hover: 0 4px 8px rgba(16, 24, 40, 0.06), 0 12px 24px rgba(16, 24, 40, 0.08);
   --tint-amount: 5%;
@@ -39,6 +40,7 @@
     --primary-soft: rgba(255, 138, 128, 0.12);
     --done: #4cc47f;
     --done-soft: rgba(76, 196, 127, 0.14);
+    --fire: #ff8a3d;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
     --tint-amount: 5%;
@@ -138,7 +140,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   border-color: color-mix(in oklab, var(--tint, var(--border-strong)) 18%, var(--border-strong));
 }
 .card .card-foot { border-top-color: color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border)); }
-.card[style*="--tint"] .reset {
+.card[style*="--tint"] :is(.reset, .streak) {
   background: color-mix(in oklab, var(--tint) var(--tint-pill-amount), var(--tint-pill-base));
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
@@ -231,8 +233,11 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 }
 .tags { display: flex; align-items: center; gap: 6px; }
 /* .reset shows when a game that resets in a fixed timezone, not the
-   player's own, gets its next puzzle, on the player's clock. */
-.reset {
+   player's own, gets its next puzzle, on the player's clock. .streak shows
+   the viewer's streak in the game (app.js sets data-streak on the card):
+   fire-colored once today's is played ("live"), like .reset while it ended
+   yesterday and can still be kept going ("pending"). */
+.reset, .streak {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -245,8 +250,13 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   font-variant-numeric: tabular-nums;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
-.reset[hidden] { display: none; }
-.reset svg {
+.reset[hidden], .card:not([data-streak]) .streak { display: none; }
+.card[data-streak="live"] .streak {
+  background: color-mix(in oklab, var(--fire) var(--tint-pill-amount), var(--tint-pill-base));
+  color: var(--fire);
+}
+.card.streak-up .streak { animation: streak-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+:is(.reset, .streak) svg {
   width: 12px;
   height: 12px;
   fill: none;
@@ -604,6 +614,7 @@ code {
   from { box-shadow: var(--shadow), 0 0 0 0 var(--done-soft); border-color: var(--done); }
   50% { box-shadow: var(--shadow), 0 0 0 8px var(--done-soft); border-color: var(--done); }
 }
+@keyframes streak-up { from { scale: 0.4; } 60% { scale: 1.2; } }
 @keyframes roll { from { transform: rotate(-200deg) scale(0.4); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,7 +9,7 @@ their timezone and whenever they played.
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from src.store.db import connect
@@ -35,6 +35,16 @@ class StoredResult:
     puzzle_id: str
     data: dict[str, Any]
     captured_at: datetime
+    game_day: date
+    # Game days in a row the player had a result for this game, ending on
+    # this one's.
+    streak: int
+
+
+@dataclass(frozen=True)
+class Streak:
+    days: int  # game days in a row with a result
+    last_day: date  # the latest of them
 
 
 def save(result: NewResult) -> bool:
@@ -121,23 +131,66 @@ def mark_announced_in(result_id: int, guild_id: str) -> None:
         )
 
 
+def streaks(discord_id: str) -> dict[str, Streak]:
+    """Each game's latest streak of the player's: the game days in a row
+    ending on the last one they have a result for. Whether it's still going
+    depends on the game's current game day, which the caller knows."""
+    days = _days_played([discord_id])
+    return {
+        game: Streak(_streak(played, max(played)), max(played))
+        for (game, _), played in days.items()
+    }
+
+
+def _days_played(discord_ids: Sequence[str]) -> dict[tuple[str, str], set[date]]:
+    """The game days each of the players has a result on, by (game, player)."""
+    if not discord_ids:
+        return {}
+    marks = ", ".join("?" * len(discord_ids))
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT game, discord_id, game_day FROM results"
+            f" WHERE discord_id IN ({marks})",
+            list(discord_ids),
+        ).fetchall()
+    days: dict[tuple[str, str], set[date]] = {}
+    for game, discord_id, game_day in rows:
+        days.setdefault((game, discord_id), set()).add(date.fromisoformat(game_day))
+    return days
+
+
+def _streak(played: set[date], through: date) -> int:
+    """How many game days in a row up to `through` are in `played`."""
+    days = 0
+    while through - timedelta(days=days) in played:
+        days += 1
+    return days
+
+
 def _select(where: str, params: Sequence[Any] = ()) -> list[StoredResult]:
     with connect() as conn:
         rows = conn.execute(
             "SELECT r.id, r.game, r.discord_id, p.name, r.puzzle_id, r.data,"
-            " r.captured_at FROM results r LEFT JOIN players p USING (discord_id)"
+            " r.captured_at, r.game_day"
+            " FROM results r LEFT JOIN players p USING (discord_id)"
             f" WHERE {where} ORDER BY r.captured_at",
             params,
         ).fetchall()
-    return [
-        StoredResult(
-            id=id_,
-            game=game,
-            discord_id=discord_id,
-            player_name=name,
-            puzzle_id=puzzle_id,
-            data=json.loads(data),
-            captured_at=datetime.fromisoformat(captured_at),
+    played = _days_played(sorted({row[2] for row in rows}))
+    stored: list[StoredResult] = []
+    for id_, game, discord_id, name, puzzle_id, data, captured_at, game_day in rows:
+        day = date.fromisoformat(game_day)
+        stored.append(
+            StoredResult(
+                id=id_,
+                game=game,
+                discord_id=discord_id,
+                player_name=name,
+                puzzle_id=puzzle_id,
+                data=json.loads(data),
+                captured_at=datetime.fromisoformat(captured_at),
+                game_day=day,
+                streak=_streak(played[game, discord_id], day),
+            )
         )
-        for id_, game, discord_id, name, puzzle_id, data, captured_at in rows
-    ]
+    return stored

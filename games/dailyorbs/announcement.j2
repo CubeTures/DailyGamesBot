@@ -1,4 +1,4 @@
-:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}
 {{ orbs | plural("orb") }}{{ " %s %s" % ("in" if won else "after", time_secs | duration) if time_secs }}
 {% if hearts_lost %}
 :broken_heart: {{ hearts_lost | plural("mistake") }}

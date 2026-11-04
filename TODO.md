@@ -7,6 +7,7 @@
     - Log completion at time of game as the time of the user that started the activity
     - Have a "co-op" tag
     - Whenever completing multiple in a day, just increment their score
+- Remove auto-refreshing to just refresh on demand
 
 ## P2
 
@@ -21,6 +22,10 @@
             - Probably not possible
 
 ## Games
+
+- https://farflung.game/
+- https://squaredle.app/
+- https://playplain.app/play
 
 - https://googlefeud.com/feudle/
 - https://framed.wtf/

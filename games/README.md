@@ -218,7 +218,7 @@ shown on the launcher when you click a result on today's scoreboard.
 Wordle's:
 
 ```jinja
-:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}
 {% if won %}
 {{ score | plural("guess", "guesses") }}{{ " in %s" % (time_secs | duration) if time_secs }}
 {% else %}
@@ -235,7 +235,7 @@ Out of guesses{{ " after %s" % (time_secs | duration) if time_secs }}
 which renders as:
 
 ```
-:sun_with_face: @player played **@Wordle** #1571
+:sun_with_face: @player played **@Wordle** #1571 :fire: 12
 2 guesses in 1:35
 :fire: Hard mode
 :white_large_square::yellow_square::white_large_square::white_large_square::white_large_square:
@@ -248,7 +248,7 @@ Every game's announcement has the same parts, in this order, so the
 channel reads as one system:
 
 ```
-:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}
 <score> in <time>
 :emoji: <qualifier>
 :emoji: <qualifier>
@@ -256,9 +256,10 @@ channel reads as one system:
 ||<spoilers>||
 ```
 
-- **Header.** Exactly `:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}`
+- **Header.** Exactly `:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}`
   (`{{ puzzle_id }}` in place of `#{{ puzzle_number }}` only if the game has
-  no number). Modes like hard mode are qualifiers, not part of it.
+  no number). It ends in the player's streak, shown from its second day.
+  Modes like hard mode are qualifiers, not part of it.
 - **Score line.** Only the game's primary metric, the thing the player
   is going for (orbs, groups, guesses, points), then the time that breaks
   ties,
@@ -322,6 +323,9 @@ In scope:
 - `player`: a mention of the player (rendered as their name, no ping)
 - `game`: a mention of the game's role in Discord (so it pings
   subscribers), its `title` on the launcher; `puzzle_id`; `fields`: all fields as a dict
+- `streak`: how many game days in a row the player has a result for this
+  game, ending on this one's (1 for a first or lone day, which isn't shown
+  as a streak)
 - filters: `duration` (seconds as `1:05` / `1:02:03`) and
   `tiles(answer)` (a guess scored against the answer as a 🟩🟨⬛ row; this
   uses the answer, so only reach for it when the game reports one), `md`

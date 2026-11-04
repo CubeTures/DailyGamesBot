@@ -28,6 +28,7 @@ STANDARD_FIELDS = ("won", "score", "max_score", "attempts", "time_secs", "share_
 
 DEFAULT_TEMPLATE = """\
 {{ player }} {{ "didn't solve" if won is false else "finished" }} **{{ game }}**
+{{- " :fire: %d" % streak if streak > 1 }}
 {%- if score is not none %} with {{ score }}
 {%- if max_score is not none %}/{{ max_score }}{% endif %}{% endif %}
 {%- if time_secs %} in {{ time_secs | duration }}{% endif %}
@@ -125,11 +126,13 @@ def render(
     player: str,
     puzzle_id: str,
     fields: dict[str, Any],
+    streak: int,
     game_mention: str | None = None,
 ) -> str:
     """The announcement text, falling back to DEFAULT_TEMPLATE if the game's
     template fails. `game_mention` (the game's role mention) stands in for
-    the title as `game` when given."""
+    the title as `game` when given. `streak` is the game days in a row the
+    player has played it, this one included; templates show it from 2."""
     game_name = game_mention or game.title
     context = {
         **dict.fromkeys(STANDARD_FIELDS),
@@ -138,6 +141,7 @@ def render(
         "game": game_name,
         "player": player,
         "puzzle_id": puzzle_id,
+        "streak": streak,
         "fields": fields,
     }
     templates = (
@@ -156,6 +160,7 @@ def render_result(
         puzzle_id=result.puzzle_id,
         fields=result.data,
         game_mention=game_mention,
+        streak=result.streak,
     )
 
 
@@ -172,6 +177,7 @@ def main() -> None:
             player="@player",
             puzzle_id=str(fields.get("puzzle_id", "")),
             fields=fields,
+            streak=fields.get("streak", 1),
         )
     )
 

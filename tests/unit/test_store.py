@@ -27,6 +27,38 @@ def test_save_keeps_first_capture_and_marks_name_stale() -> None:
     assert results.on_day(date(2026, 10, 9), "1", None) == []
 
 
+def _played(game: str, day: int, discord_id: str = "1") -> None:
+    results.save(
+        results.NewResult(
+            game=game,
+            discord_id=discord_id,
+            puzzle_id=f"{game}-{day}",
+            game_day=date(2026, 10, day),
+            data={},
+            trigger="t",
+        )
+    )
+
+
+def test_streaks_count_game_days_in_a_row() -> None:
+    for day in (1, 3, 4, 5):
+        _played("wordle", day)
+    _played("wordle", 4, discord_id="2")
+    _played("chess", 2)
+    by_day = {
+        r.game_day.day: r.streak
+        for r in results.unannounced()
+        if r.game == "wordle" and r.discord_id == "1"
+    }
+    assert by_day == {1: 1, 3: 1, 4: 2, 5: 3}
+    assert results.streaks("1") == {
+        "wordle": results.Streak(3, date(2026, 10, 5)),
+        "chess": results.Streak(1, date(2026, 10, 2)),
+    }
+    assert results.streaks("2") == {"wordle": results.Streak(1, date(2026, 10, 4))}
+    assert results.streaks("3") == {}
+
+
 def test_announcing() -> None:
     results.save(_result("a"))
     results.save(_result("b"))

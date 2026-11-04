@@ -288,6 +288,39 @@
     cardsRendered = true;
   }
 
+  // Each card's streak of two or more game days: "live" when the viewer has
+  // played its current game day and the days before it in a row, "pending"
+  // when the run ended on the day before (playing today keeps it going),
+  // otherwise none. A single day isn't a streak yet.
+  var streaksRendered = false;
+  function renderStreaks(streaks) {
+    document.querySelectorAll(".card").forEach(function (card) {
+      var game = card.dataset.game;
+      var streak = streaks[game];
+      var current = currentGameDay(game);
+      var last = streak && parseDayKey(streak.last_day);
+      var state = !last || streak.days < 2 ? ""
+        : sameDay(last, current) ? "live"
+        : sameDay(last, addDays(current, -1)) ? "pending" : "";
+      var was = card.dataset.streak || "";
+      if (!state) {
+        delete card.dataset.streak;
+        return;
+      }
+      card.dataset.streak = state;
+      card.querySelector(".streak .days").textContent = streak.days;
+      // Celebrate the streak growing while the page is open.
+      if (streaksRendered && state === "live" && was !== "live") replay(card, "streak-up");
+    });
+    streaksRendered = true;
+  }
+
+  function refreshStreaks() {
+    return getJson("/api/streaks?token=" + encodeURIComponent(token)).then(function (body) {
+      renderStreaks(body.streaks || {});
+    }).catch(function () {});
+  }
+
   // Keys ("game" and "game:discord_id") of what the scoreboard showed last,
   // or null after a day change so the next render animates in whole.
   var shownOnBoard = null;
@@ -543,6 +576,7 @@
         current[game] = byDay[cardDays[game]][game];
       });
       renderCards(current);
+      refreshStreaks();
 
       var oldHome = homeDay && home();
       homeDay = newHome;

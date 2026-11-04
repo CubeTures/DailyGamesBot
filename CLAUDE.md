@@ -131,7 +131,13 @@ needs full type annotations. Its config is `[tool.pyright]` in
   games whose reset isn't `local` show, in a pill in their footer, when
   it next comes round on the viewer's clock (e.g. "5 PM"), unless that's
   the same wall-clock time as the reset itself. Each card is tinted with
-  its icon's dominant color (`icon-color.js`). Clicking a result shows the
+  its icon's dominant color (`icon-color.js`). A flame pill in each card's
+  footer shows the viewer's streak in that game (two or more game days in a
+  row with a result, from `GET /api/streaks`; `results.streaks()`): fire-colored once
+  today's is played, styled like the reset pill while it ended yesterday and
+  can still be kept going, gone after that. From the second day, every
+  announcement's header ends in `:fire: N`, the streak as of that result's
+  game day (`StoredResult.streak`). Clicking a result shows the
   game's `announcement.j2` rendered as HTML. With
   `DISCORD_RESULTS_CHANNEL_IDS` set, a bell on each card toggles the
   player's game role via `GET`/`POST /api/subscriptions`. Cards are divs

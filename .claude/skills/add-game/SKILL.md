@@ -207,7 +207,7 @@ Write the game's announcement following the house style in "Announcement" in
 - Every game uses the same layout, so the channel reads as one system:
 
   ```
-  :sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}
+  :sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}
   <score> in <time>
   :emoji: <qualifier>
   :emoji: <qualifier>
@@ -215,7 +215,7 @@ Write the game's announcement following the house style in "Announcement" in
   ||<spoilers>||
   ```
 
-- **Header.** Exactly as above. `{{ puzzle_id }}` replaces `#{{ puzzle_number }}` only if the game has no number. Nothing else goes on it: modes like hard mode are qualifiers.
+- **Header.** Exactly as above, ending in the player's streak (`streak`, shown from its second day). `{{ puzzle_id }}` replaces `#{{ puzzle_number }}` only if the game has no number. Nothing else goes on it: modes like hard mode are qualifiers.
 - **Score line.** Only the game's primary metric, the thing the player is going for, then the time that breaks ties. It's often not the scoreboard's `score`: Orbs ranks by orbs minus mistakes but says `6 orbs`, with the mistakes as a qualifier. Never put the scoreboard's number, or "points" invented for it, on this line; say points only when the game scores in points. Then the time: `{{ " in %s" % (time_secs | duration) if time_secs }}`, or `after` for a loss or give-up. No qualifiers, no emoji.
   - A numeric score starts with the number, in the game's terms: `3 guesses`, `4 groups`, `77 points`, `2 under par`, `160 uniqueness` (not `Uniqueness 160`). Count nouns go through `| plural` so 1 reads `1 guess`.
   - Leave off the maximum or target; players know it: `3 guesses`, not `3/6 guesses`; `245 points`, not `245/700`.

@@ -1,5 +1,5 @@
-"""Serves the launcher page and its JSON API: the player's servers and the
-results its scoreboard reads, the role subscriptions its bells toggle, and the games each player has
+"""Serves the launcher page and its JSON API: the player's servers, the
+results its scoreboard reads, their streaks, the role subscriptions its bells toggle, and the games each player has
 hidden.
 
 Players are identified by the token from their /play link, which the store
@@ -65,6 +65,19 @@ def _get_me(params: dict[str, str]) -> Reply:
     }
 
 
+def _get_streaks(params: dict[str, str]) -> Reply:
+    """GET /api/streaks?token=TOKEN: {"streaks": {game: {"days", "last_day"}}},
+    each game's latest run of game days in a row the player has a result for.
+    The page decides whether it's still going from the game's current day."""
+    discord_id = _player(params.get("token"))
+    return 200, {
+        "streaks": {
+            game: {"days": s.days, "last_day": s.last_day.isoformat()}
+            for game, s in results.streaks(discord_id).items()
+        }
+    }
+
+
 def _get_subscriptions(params: dict[str, str]) -> Reply:
     """GET /api/subscriptions?token=TOKEN: the games whose role they want."""
     discord_id = _player(params.get("token"))
@@ -100,6 +113,7 @@ def _post_hidden(body: bytes) -> Reply:
 _GET_ROUTES: dict[str, Callable[[dict[str, str]], Reply]] = {
     "/api/me": _get_me,
     "/api/results": _get_results,
+    "/api/streaks": _get_streaks,
     "/api/subscriptions": _get_subscriptions,
     "/api/hidden": _get_hidden,
 }
@@ -202,6 +216,7 @@ def _result_json(result: results.StoredResult) -> dict[str, Any]:
         "puzzle_id": result.puzzle_id,
         "data": result.data,
         "captured_at": result.captured_at.isoformat(),
+        "streak": result.streak,
         # What the bot posts, or None if the game's config is gone. The page
         # has no role IDs, so the role mention carries the game's name instead.
         "announcement": (

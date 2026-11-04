@@ -83,6 +83,30 @@ def test_results_api(launcher: str) -> None:
     assert _get(f"{launcher}/api/results?day=2026-10-08&token=x")[0] == 401
 
 
+def test_streaks_api(launcher: str) -> None:
+    token = players.token_for("7")
+    assert _get(f"{launcher}/api/streaks?token={token}") == (200, {"streaks": {}})
+    for day in (8, 9):
+        results.save(
+            results.NewResult(
+                game="wordle",
+                discord_id="7",
+                puzzle_id=str(day),
+                game_day=date(2026, 10, day),
+                data={},
+                trigger="t",
+            )
+        )
+    assert _get(f"{launcher}/api/streaks?token={token}") == (
+        200,
+        {"streaks": {"wordle": {"days": 2, "last_day": "2026-10-09"}}},
+    )
+    [row] = _get(f"{launcher}/api/results?day=2026-10-09&token={token}")[1]
+    assert row["streak"] == 2
+    assert ":fire: 2" in row["announcement"].splitlines()[0]
+    assert _get(f"{launcher}/api/streaks?token=x")[0] == 401
+
+
 def test_me_api(launcher: str) -> None:
     old = players.token_for("7")
     players.reset_token("7")

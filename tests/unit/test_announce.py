@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from src import announce
 from src.games.registry import GAMES_BY_NAME
@@ -38,19 +38,22 @@ def test_render_default_template() -> None:
         player="@p",
         puzzle_id="1",
         fields={"won": True, "score": 3, "max_score": 6, "time_secs": 65},
+        streak=4,
     )
-    assert text == "@p finished **Wordle** with 3/6 in 1:05"
+    assert text == "@p finished **Wordle** :fire: 4 with 3/6 in 1:05"
 
 
 def test_render_falls_back_when_template_fails() -> None:
     game = WORDLE.model_copy(update={"announcement_template": "{{ 1 / 0 }}"})
-    text = announce.render(game, player="@p", puzzle_id="1", fields={"won": False})
+    text = announce.render(
+        game, player="@p", puzzle_id="1", fields={"won": False}, streak=1
+    )
     assert text == "@p didn't solve **Wordle**"
 
 
 def test_render_truncates_to_discord_limit() -> None:
     game = WORDLE.model_copy(update={"announcement_template": "{{ 'x' * 3000 }}"})
-    text = announce.render(game, player="@p", puzzle_id="1", fields={})
+    text = announce.render(game, player="@p", puzzle_id="1", fields={}, streak=1)
     assert len(text) == announce.DISCORD_MAX_LENGTH
     assert text.endswith("…")
 
@@ -65,6 +68,20 @@ def test_render_result_uses_game_mention() -> None:
         puzzle_id="1",
         data={},
         captured_at=datetime.now(UTC),
+        game_day=date(2026, 10, 8),
+        streak=12,
     )
     text = announce.render_result(game, result, game_mention="<@&9>")
-    assert text == "<@42> finished **<@&9>**"
+    assert text == "<@42> finished **<@&9>** :fire: 12"
+
+
+def test_game_templates_show_streak_after_puzzle_number_from_day_two() -> None:
+    def header(streak: int) -> str:
+        fields = {"puzzle_number": 7}
+        text = announce.render(
+            WORDLE, player="@p", puzzle_id="1", fields=fields, streak=streak
+        )
+        return text.splitlines()[0]
+
+    assert header(1).endswith("#7")
+    assert header(2).endswith("#7 :fire: 2")
