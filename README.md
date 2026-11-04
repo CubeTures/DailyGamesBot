@@ -13,6 +13,16 @@ scores.
 - `/primary`
     - Set the current server as your primary
 
+## Features
+
+- A simple portal to see what games you've played today
+- Automatic posting of your scores in discord
+- Opt-in to getting notified when others complete a game
+- See everyone's scores ranked
+- History of scores for immortal bragging rights
+- Join on multiple servers
+- Free and Open Source so anyone can add new games
+
 ## Adding games
 
 Games live in `games/<name>/`, one directory each. The easiest way to add one

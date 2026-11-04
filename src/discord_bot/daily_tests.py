@@ -3,6 +3,11 @@ unit tests and the live tests once a day and, only if any are degraded
 (failed, errored, or the run itself broke), posts them in that channel with
 the pytest output and the live tests' artifacts attached.
 
+The report opens with a level: red if capturing is degraded (a live test's
+capture went wrong, raising the harness's CaptureFailed, or a unit test
+failed), yellow if only drivers are (a live test couldn't play its game, or a
+run broke).
+
 The live tests start their own proxy, so they run on ports of their own
 (LIVE_PROXY_PORT, LIVE_LAUNCHER_PORT) beside the bot's. They need the dev
 dependencies (`uv sync`) and the system Chrome, as when run by hand.
@@ -36,6 +41,11 @@ ARTIFACTS_DIR = REPO_ROOT / "tests" / "e2e" / ".artifacts"
 # Discord's attachment limit is 10 MiB per message; keep under it.
 MAX_ATTACHMENTS_BYTES = 9 * 1024 * 1024
 MAX_MESSAGE_CHARS = 2000
+# Report levels.
+DRIVERS_DEGRADED = "\N{LARGE YELLOW CIRCLE}"
+CAPTURE_DEGRADED = "\N{LARGE RED CIRCLE}"
+# The start of a failure message raised by tests.e2e.harness.CaptureFailed.
+CAPTURE_FAILED = "tests.e2e.harness.CaptureFailed"
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +55,8 @@ class Degraded:
     test: str  # e.g. test_capture.py::test_capture[wordle-win]
     outcome: str  # "failed" or "error"
     message: str
+    # Capturing is broken, not just a driver: see the module docstring.
+    capture: bool = False
 
 
 @dataclass
@@ -126,13 +138,20 @@ def parse_junit(xml: str) -> tuple[int, list[Degraded]]:
             problem = case.find(outcome)
             if problem is None:
                 continue
-            module = (case.get("classname") or "").rsplit(".", 1)[-1]
+            classname = case.get("classname") or ""
+            module = classname.rsplit(".", 1)[-1]
             message = (problem.get("message") or "").strip().splitlines()
+            first = message[0] if message else ""
+            capture = not classname.startswith("tests.e2e.")
+            if first.startswith(CAPTURE_FAILED):
+                capture = True
+                first = first.removeprefix(CAPTURE_FAILED + ": ")
             degraded.append(
                 Degraded(
                     test=f"{module}.py::{case.get('name')}",
                     outcome="failed" if outcome == "failure" else "error",
-                    message=message[0] if message else "",
+                    message=first,
+                    capture=capture,
                 )
             )
             break
@@ -147,12 +166,15 @@ def report(runs: list[SuiteRun]) -> str | None:
             lines.append(f"- {run.name} tests: {run.broken}")
         for d in run.degraded:
             detail = f": {d.message[:150]}" if d.message else ""
-            lines.append(f"- `{d.test}` {d.outcome}{detail}")
+            capture = " (capture)" if d.capture else ""
+            lines.append(f"- `{d.test}` {d.outcome}{capture}{detail}")
     if not lines:
         return None
     count = sum(len(run.degraded) for run in runs)
     total = sum(run.total for run in runs)
-    text = f"**Daily tests: {count} of {total} degraded**"
+    capture = any(d.capture for run in runs for d in run.degraded)
+    level = CAPTURE_DEGRADED if capture else DRIVERS_DEGRADED
+    text = f"{level} **Daily tests: {count} of {total} degraded**"
     for i, line in enumerate(lines):
         if len(text) + len(line) + 40 > MAX_MESSAGE_CHARS:
             text += f"\n…and {len(lines) - i} more; see the logs."

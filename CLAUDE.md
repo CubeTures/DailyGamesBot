@@ -177,7 +177,9 @@ needs full type annotations. Its config is `[tool.pyright]` in
   at `daily_tests.RUN_AT` (12:00 UTC). Only if a test failed or errored, or a
   run broke (timeout, other exit code), it posts them in that channel with
   each run's output and a zip of `tests/e2e/.artifacts/` (minus traces)
-  attached. The live run gets its own ports (18080/18090, via
+  attached. The post opens with 🔴 if capturing is degraded (a live test
+  raised the harness's `CaptureFailed`, or a unit test failed), otherwise
+  🟡 (drivers only: a game couldn't be played through, or a run broke). The live run gets its own ports (18080/18090, via
   `DGB_PUBLIC_URL` and `DGB_LAUNCHER_PORT`) so it doesn't collide with the
   running proxy; both runs blank the other `DGB_*` URL settings so `.env`
   doesn't leak into them, and use a scratch `DGB_DB_PATH`. Needs the dev

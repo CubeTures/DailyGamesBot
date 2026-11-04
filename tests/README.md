@@ -40,6 +40,11 @@ so the real `data/results.db` is never touched.
 
 ## When one fails
 
+A capture problem raises `CaptureFailed` (wrong fields, a result from an
+unfinished game, or nothing saved though a trigger fires); anything else,
+including `NoResult` (nothing saved and no trigger fires), is most likely the
+driver's. The daily report marks the first 🔴 and the rest 🟡.
+
 The assertion lists each field that didn't match (`won: expected true, got
 false`), then all saved fields and the announcement. If nothing was saved,
 it shows `__dgb.status()` and `__dgb.dryRun()` from every frame instead.

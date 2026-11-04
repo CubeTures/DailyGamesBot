@@ -31,7 +31,14 @@ class Row:
 
 
 class NoResult(AssertionError):
-    pass
+    """Nothing was saved and no trigger says the game is finished: most
+    likely the driver didn't get it there."""
+
+
+class CaptureFailed(AssertionError):
+    """The capture went wrong, not the driver: a finished game saved nothing,
+    an unfinished one saved a result, or the saved fields are wrong. The
+    daily test report flags these red, the rest yellow."""
 
 
 @dataclass
@@ -124,16 +131,21 @@ class Player:
             if found:
                 return found[0]
             self.page.wait_for_timeout(500)
-        raise NoResult(
+        status = self.status()
+        fired = any(t.get("fired") for f in status for t in f.get("dryRun", []))
+        raise (CaptureFailed if fired else NoResult)(
             f"no {self.game.name} result saved for {self.discord_id} within"
-            f" {timeout:.0f}s.\n__dgb state per frame:\n"
-            + json.dumps(self.status(), indent=2, ensure_ascii=False)[:6000]
+            f" {timeout:.0f}s"
+            + (" though a trigger fires" if fired else "")
+            + ".\n__dgb state per frame:\n"
+            + json.dumps(status, indent=2, ensure_ascii=False)[:6000]
         )
 
     def assert_no_result(self, wait: float = 4) -> None:
         """Nothing was saved (for a game left unfinished)."""
         self.page.wait_for_timeout(wait * 1000)
-        assert not self.rows(), f"unexpected result: {self.rows()}"
+        if self.rows():
+            raise CaptureFailed(f"unexpected result: {self.rows()}")
 
 
 def _click_away(locator: Locator) -> None:

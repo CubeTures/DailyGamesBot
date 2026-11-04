@@ -59,12 +59,16 @@ def _click(player: Player, square: str) -> None:
     player.page.wait_for_timeout(250)
 
 
-def _move(player: Player, move: chess.Move) -> None:
+def _move(player: Player, move: chess.Move, color: chess.Color) -> None:
     _click(player, chess.square_name(move.from_square))
     _click(player, chess.square_name(move.to_square))
     if move.promotion:
-        symbol = chess.piece_symbol(move.promotion)
-        player.page.locator(f".promotion-piece[class*='{symbol}']").first.click()
+        # Each choice is classed by color and piece, e.g. `promotion-piece wn`.
+        # Match that class exactly: "promotion-piece" itself contains n and r.
+        piece = ("w" if color == chess.WHITE else "b") + chess.piece_symbol(
+            move.promotion
+        )
+        player.page.locator(f".promotion-piece.{piece}").click()
     # The site's reply (or the "Incorrect" state) animates in.
     player.page.wait_for_timeout(1500)
 
@@ -106,7 +110,7 @@ def _play(player: Player, solution: Solution, *, mistakes: int, finish: bool) ->
     page.wait_for_timeout(1000)
     moves = [chess.Move.from_uci(m) for m in solution["moves"]]
     for _ in range(mistakes):
-        _move(player, _wrong(board, moves[0]))
+        _move(player, _wrong(board, moves[0]), board.turn)
         retry = page.get_by_role("button", name="Retry")
         if retry.is_visible():
             retry.click()
@@ -115,7 +119,7 @@ def _play(player: Player, solution: Solution, *, mistakes: int, finish: bool) ->
         return
     for n, move in enumerate(moves):
         if n % 2 == 0:  # the player's; the site plays the rest
-            _move(player, move)
+            _move(player, move, board.turn)
         board.push(move)
 
 

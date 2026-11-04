@@ -23,7 +23,7 @@ from src.settings import LAUNCHER_URL
 from tests.e2e import expect, solutions
 from tests.e2e.conftest import PlayerFactory
 from tests.e2e.games import DRIVERS
-from tests.e2e.harness import Driver, Player, Row
+from tests.e2e.harness import CaptureFailed, Driver, Player, Row
 
 CASES = [
     pytest.param(name, scenario, id=f"{name}-{scenario}")
@@ -93,13 +93,14 @@ def _check_row(player: Player, row: Row, expected: dict[str, Any]) -> None:
     elif "None" in announcement or "{{" in announcement:
         problems.append(f"  announcement has None or raw Jinja:\n{announcement}")
 
-    assert not problems, (
-        f"{game.name} result for {player.discord_id} doesn't match:\n"
-        + "\n".join(problems)
-        + "\nsaved fields:\n"
-        + json.dumps(row.data, indent=2, ensure_ascii=False)
-        + (f"\nannouncement:\n{announcement}" if announcement else "")
-    )
+    if problems:
+        raise CaptureFailed(
+            f"{game.name} result for {player.discord_id} doesn't match:\n"
+            + "\n".join(problems)
+            + "\nsaved fields:\n"
+            + json.dumps(row.data, indent=2, ensure_ascii=False)
+            + (f"\nannouncement:\n{announcement}" if announcement else "")
+        )
 
 
 @pytest.mark.live

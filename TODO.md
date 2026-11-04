@@ -7,9 +7,6 @@
     - Log completion at time of game as the time of the user that started the activity
     - Have a "co-op" tag
     - Whenever completing multiple in a day, just increment their score
-- Admin channel env variable
-    - Triggers the running of all unit tests every day
-    - Sends a warning in the channel on degraded performance
 
 ## P2
 
