@@ -13,8 +13,10 @@
   // The viewer's Discord ID, once identify() has asked the server.
   var discordId = null;
   // The servers the viewer has registered with by running /play in them,
-  // as [{id, name}], and the one the scoreboard shows (null with none). It
-  // shows that server's players' results, plus the viewer's own.
+  // as [{id, name}], and the one the scoreboard shows (null with none, or
+  // ALL_GUILDS for all of them). It shows that server's players' results,
+  // plus the viewer's own.
+  var ALL_GUILDS = "all";
   var guilds = [];
   var guildId = null;
   // Each game's icon color, by game name, once tintCards() has found it.
@@ -772,14 +774,23 @@
   });
   window.addEventListener("hashchange", function () { setViewDay(dayFromHash(), true); });
 
-  // Fills the server picker, which opens on the viewer's primary server and
-  // is only shown when they have more than one.
+  // Fills the server picker, which opens on the server the viewer last
+  // picked here (else their primary one) and is only shown when they have
+  // more than one, with an "All servers" option first.
   function setUpGuilds(me) {
     guilds = (me && me.guilds) || [];
     var ids = guilds.map(function (g) { return g.id; });
-    guildId = me && ids.indexOf(me.primary_guild) >= 0 ? me.primary_guild : ids[0] || null;
+    if (guilds.length > 1) ids.push(ALL_GUILDS);
+    var last = loadLastGuild();
+    guildId = ids.indexOf(last) >= 0 ? last
+      : me && ids.indexOf(me.primary_guild) >= 0 ? me.primary_guild : ids[0] || null;
     var picker = document.getElementById("guild-pick");
     picker.textContent = "";
+    if (guilds.length > 1) {
+      var all = el("option", "", "All Servers");
+      all.value = ALL_GUILDS;
+      picker.appendChild(all);
+    }
     guilds.forEach(function (g) {
       var option = el("option", "", g.name || "Server " + g.id);
       option.value = g.id;
@@ -789,6 +800,7 @@
     picker.hidden = guilds.length < 2;
     picker.addEventListener("change", function () {
       guildId = picker.value;
+      saveLastGuild(guildId);
       shownOnBoard = null;
       lastBoards = null;
       if (viewDay) {
@@ -798,6 +810,21 @@
         refreshToday();
       }
     });
+  }
+
+  // The server picked last, kept per browser.
+  function loadLastGuild() {
+    try {
+      return localStorage.getItem("guild");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveLastGuild(id) {
+    try {
+      localStorage.setItem("guild", id);
+    } catch (e) { /* it just opens on the primary server next time */ }
   }
 
   // The scoreboard waits for the viewer's ID: it marks their rows, and

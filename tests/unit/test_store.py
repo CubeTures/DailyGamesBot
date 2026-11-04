@@ -80,6 +80,15 @@ def test_scoreboard_shows_only_a_shared_servers_players() -> None:
     # Not registered there, so only their own results.
     assert players_shown("me", "g2") == {"me"}
     assert players_shown("stranger", "g2") == {"stranger", "outsider"}
+    assert players_shown("me", results.ALL_GUILDS) == {"me", "friend"}
+    guilds.register("me", "g2")
+    assert players_shown("me", results.ALL_GUILDS) == {
+        "me",
+        "friend",
+        "stranger",
+        "outsider",
+    }
+    assert players_shown("friend", results.ALL_GUILDS) == {"me", "friend"}
 
 
 def test_players() -> None:

@@ -66,10 +66,23 @@ def save(result: NewResult) -> bool:
         return True
 
 
+# The `guild_id` of on_day() for every server the viewer is registered with.
+# Discord IDs are numeric, so it can't name a real server.
+ALL_GUILDS = "all"
+
+
 def on_day(day: date, viewer_id: str, guild_id: str | None) -> list[StoredResult]:
     """Results for the puzzles of game day `day` that the viewer may see:
     their own, plus, if they're registered with server `guild_id`, those of
-    everyone registered with it."""
+    everyone registered with it. `ALL_GUILDS` gives those of everyone who
+    shares any server with them."""
+    if guild_id == ALL_GUILDS:
+        return _select(
+            "r.game_day = ? AND (r.discord_id = ? OR r.discord_id IN ("
+            " SELECT them.discord_id FROM player_guilds them"
+            " JOIN player_guilds me USING (guild_id) WHERE me.discord_id = ?))",
+            (day.isoformat(), viewer_id, viewer_id),
+        )
     return _select(
         "r.game_day = ? AND (r.discord_id = ? OR (EXISTS ("
         " SELECT 1 FROM player_guilds WHERE discord_id = ? AND guild_id = ?)"

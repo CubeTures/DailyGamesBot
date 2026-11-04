@@ -112,8 +112,11 @@ needs full type annotations. Its config is `[tool.pyright]` in
   scoreboard (score, ties broken by `time_secs`) read from `GET /api/results?day=YYYY-MM-DD&token=...&guild=ID` on the
   launcher's server. It shows the viewer's own results plus those of the
   players registered with the server picked in its dropdown (from
-  `/api/me`, shown with two or more servers; it opens on the primary one),
-  if the viewer is registered with it too. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
+  `/api/me`, shown with two or more servers), if the viewer is registered
+  with it too. With two or more there's also "All servers" first
+  (`guild=all`), for everyone sharing any server with the viewer. It opens
+  on the pick last made in that browser (`localStorage` `guild`), else the
+  primary server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
   The board can go forward to tomorrow while some game is already on it.
   It opens on the home day: tomorrow once the viewer has a result on it,
   otherwise today. The button back to it is labelled with that day. A view following the home day
@@ -154,7 +157,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
   scoreboard on first `/play` and after each result.
 - **Servers.** `/play` run in a server registers the player with it
   (`player_guilds`); the first becomes their primary server (the one the
-  scoreboard opens on) until `/primary`, run in another, changes it. Players
+  scoreboard opens on in a browser that hasn't picked one yet) until `/primary`, run in another, changes it. Players
   are never unregistered. The bot keeps server names in `guilds` for the
   launcher. On startup it registers players from before servers were tracked
   with each results channel's server they're a member of. With

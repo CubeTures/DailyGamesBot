@@ -37,7 +37,8 @@ Reply = tuple[int, Any]
 def _get_results(params: dict[str, str]) -> Reply:
     """GET /api/results?day=YYYY-MM-DD&token=TOKEN&guild=ID: that game day's
     results of the players registered with server ID, if the viewer is too,
-    and the viewer's own."""
+    and the viewer's own. `guild=all` takes every server the viewer is
+    registered with."""
     discord_id = _player(params.get("token"))
     # The page sends the viewer's local date; fall back to the server's.
     day = _parse_day(params.get("day")) or date.today()

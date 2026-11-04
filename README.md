@@ -28,7 +28,7 @@ scores.
 Games live in `games/<name>/`, one directory each. The easiest way to add one
 is the [Claude Code](https://claude.com/claude-code) `/add-game` skill:
 
-```
+```bash
 /add-game https://example.com/daily-puzzle
 ```
 
