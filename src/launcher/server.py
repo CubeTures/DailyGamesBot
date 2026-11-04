@@ -38,12 +38,19 @@ def _get_results(params: dict[str, str]) -> Reply:
     """GET /api/results?day=YYYY-MM-DD&token=TOKEN&guild=ID: that game day's
     results of the players registered with server ID, if the viewer is too,
     and the viewer's own. `guild=all` takes every server the viewer is
-    registered with."""
+    registered with, and marks the results of their primary server's players
+    with "in_primary": true."""
     discord_id = _player(params.get("token"))
     # The page sends the viewer's local date; fall back to the server's.
     day = _parse_day(params.get("day")) or date.today()
-    shown = results.on_day(day, discord_id, params.get("guild") or None)
-    return 200, [_result_json(r) for r in shown]
+    guild_id = params.get("guild") or None
+    shown = [_result_json(r) for r in results.on_day(day, discord_id, guild_id)]
+    if guild_id == results.ALL_GUILDS:
+        primary = guilds.primary(discord_id)
+        in_primary: set[str] = guilds.members(primary) if primary else set()
+        for row in shown:
+            row["in_primary"] = row["discord_id"] in in_primary
+    return 200, shown
 
 
 def _get_me(params: dict[str, str]) -> Reply:

@@ -77,6 +77,15 @@ def of_player(discord_id: str) -> list[PlayerGuild]:
     return [PlayerGuild(guild_id, name) for guild_id, name in rows]
 
 
+def members(guild_id: str) -> set[str]:
+    """The players registered with a server."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT discord_id FROM player_guilds WHERE guild_id = ?", (guild_id,)
+        ).fetchall()
+    return {discord_id for (discord_id,) in rows}
+
+
 def is_registered(discord_id: str, guild_id: str) -> bool:
     with connect() as conn:
         row = conn.execute(

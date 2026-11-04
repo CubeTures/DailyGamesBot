@@ -114,7 +114,9 @@ needs full type annotations. Its config is `[tool.pyright]` in
   players registered with the server picked in its dropdown (from
   `/api/me`, shown with two or more servers), if the viewer is registered
   with it too. With two or more there's also "All servers" first
-  (`guild=all`), for everyone sharing any server with the viewer. It opens
+  (`guild=all`), for everyone sharing any server with the viewer; its rows
+  carry `in_primary`, and the page highlights the primary server's players
+  (`--primary`, red) and tints "See all" when some are below the cut. It opens
   on the pick last made in that browser (`localStorage` `guild`), else the
   primary server. The chosen day is kept in the URL as `#day=YYYY-MM-DD`.
   The board can go forward to tomorrow while some game is already on it.

@@ -73,6 +73,12 @@ def test_results_api(launcher: str) -> None:
         200,
         [],
     )
+    [row] = _get(f"{launcher}/api/results?day=2026-10-08&token={token}&guild=all")[1]
+    assert row["in_primary"] is True
+    assert "in_primary" not in body[0]
+    guilds.set_primary("8", "h")
+    [row] = _get(f"{launcher}/api/results?day=2026-10-08&token={token}&guild=all")[1]
+    assert row["in_primary"] is False
     assert _get(f"{launcher}/api/results?day=2026-10-08")[0] == 401
     assert _get(f"{launcher}/api/results?day=2026-10-08&token=x")[0] == 401
 

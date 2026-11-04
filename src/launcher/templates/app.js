@@ -19,6 +19,9 @@
   var ALL_GUILDS = "all";
   var guilds = [];
   var guildId = null;
+  // The viewer's primary server's name. With ALL_GUILDS its players' rows
+  // are highlighted (the server marks them "in_primary").
+  var primaryName = null;
   // Each game's icon color, by game name, once tintCards() has found it.
   var TINTS = {};
   // Games the viewer has hidden, by name: "card" hides just its card, "all"
@@ -307,7 +310,7 @@
 
   // `back` is passed on to the announcement, for rows in the full list.
   function boardRow(result, rank, namesById, isNew, back) {
-    var item = el("li", result.discord_id === discordId ? "me" : "");
+    var item = el("li", result.discord_id === discordId ? "me" : result.in_primary ? "primary" : "");
     item.style.setProperty("--r", String(Math.min(rank, 10)));
     if (isNew) item.classList.add("fresh");
     var row = el(result.announcement ? "button" : "div", "row");
@@ -355,12 +358,14 @@
     container.appendChild(head);
     var list = el("ol", "ranks");
     var hiddenNew = false;
+    var hiddenPrimary = 0;
     ranked.forEach(function (result, rank) {
       var key = game + ":" + result.discord_id;
       var isNew = !entering && !shownOnBoard[key];
       shown[key] = true;
       if (visible.indexOf(rank) < 0) {
         hiddenNew = hiddenNew || isNew;
+        if (result.in_primary && result.discord_id !== discordId) hiddenPrimary++;
         return;
       }
       list.appendChild(boardRow(result, rank, namesById, isNew));
@@ -372,6 +377,11 @@
     if (truncated) {
       var more = el("button", "see-all", "See all " + ranked.length);
       more.type = "button";
+      // Players from the primary server below the cut tint the button.
+      if (hiddenPrimary) {
+        more.classList.add("has-primary");
+        more.title = hiddenPrimary + " more from " + (primaryName || "your primary server");
+      }
       more.addEventListener("click", openFull);
       container.appendChild(more);
     }
@@ -784,6 +794,8 @@
     var last = loadLastGuild();
     guildId = ids.indexOf(last) >= 0 ? last
       : me && ids.indexOf(me.primary_guild) >= 0 ? me.primary_guild : ids[0] || null;
+    var primary = guilds.filter(function (g) { return me && g.id === me.primary_guild; })[0];
+    primaryName = primary ? primary.name : null;
     var picker = document.getElementById("guild-pick");
     picker.textContent = "";
     if (guilds.length > 1) {
