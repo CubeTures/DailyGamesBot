@@ -416,7 +416,9 @@
         more.title = hiddenPrimary + " more from " + (primaryName || "your primary server");
       }
       more.addEventListener("click", openFull);
-      container.appendChild(more);
+      var bar = el("div", "see-all-bar");
+      bar.appendChild(more);
+      container.appendChild(bar);
     }
     return container;
   }

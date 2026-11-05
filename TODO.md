@@ -13,6 +13,7 @@
 
 - Let players download their own results
 - Statistics board: per game and per person
+	- Elo / rating system
 - Send notifications when running out on time as a reminder to play
 - Help button in top right to explain features
 - See if we can allow logins to accounts for saved progress

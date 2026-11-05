@@ -377,12 +377,17 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .board-head button.count:focus-visible { outline: 2px solid var(--accent); }
 .board-head .count.fresh { animation: count-fresh 1.6s ease both; }
 .ranks { list-style: none; margin: 0; padding: 6px; }
+/* The divider spans the board; the button inside is shaped like a row. */
+.see-all-bar {
+  padding: 6px;
+  border-top: 1px solid color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border));
+}
 .see-all {
   display: block;
   width: 100%;
-  padding: 10px 16px;
+  padding: 7px 10px;
   border: 0;
-  border-top: 1px solid color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border));
+  border-radius: 9px;
   background: none;
   color: var(--accent);
   font: inherit;
@@ -391,19 +396,11 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
-.see-all:hover { background: var(--surface-2); }
+/* A faint wash of its own text color, quieter than the rows' hover. */
+.see-all:hover { background-color: color-mix(in oklab, currentColor 7%, transparent); }
+.see-all:active { background-color: color-mix(in oklab, currentColor 12%, transparent); }
 /* Players from the viewer's primary server are below the cut. */
 .see-all.has-primary { color: var(--primary); }
-.see-all.has-primary::after {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  vertical-align: middle;
-}
 .see-all:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .board.entering { animation: board-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i) * 60ms); }
 .board.entering li {
