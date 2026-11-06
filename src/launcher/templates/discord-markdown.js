@@ -23,7 +23,8 @@ var discordMarkdown = (function () {
     crystal_ball: "🔮", zap: "⚡",
     tulip: "🌷", cherry_blossom: "🌸", rose: "🌹", hibiscus: "🌺", sunflower: "🌻",
     blossom: "🌼", rosette: "🏵️", white_flower: "💮", bouquet: "💐",
-    straight_ruler: "📏"
+    straight_ruler: "📏",
+    evergreen_tree: "🌲", ear_of_rice: "🌾", mountain_snow: "🏔️", ice_cube: "🧊"
   };
 
   var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };

@@ -1,0 +1,30 @@
+#:schema ../schema.json
+
+name = "farflung"
+title = "Farflung"
+description = "Pin a country for each of five prompts; rarer answers take you further."
+icon = "icon.png"
+origin = "https://farflung.game"
+landing_path = "/"
+higher_score_wins = true
+
+# Each expedition is the device's own date (the game's `localDay`).
+[reset]
+time = "00:00"
+timezone = "local"
+
+# Saving the finished expedition answers with how far it went against
+# everyone else's; only this response has it.
+[[triggers]]
+name = "finish"
+type = "network"
+method = "POST"
+url = "/api/v1/expeditions/\\d{4}-\\d{2}-\\d{2}/finish$"
+when = "finished && !!saved"
+
+# Fallback for when that save fails (offline, server down) and for a revisit:
+# the stored run, once the save has had time to answer.
+[[triggers]]
+name = "day-run"
+type = "page"
+when = "finished && Date.now() - run.completedAt > 20000"

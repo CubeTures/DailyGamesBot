@@ -1,0 +1,15 @@
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}
+{{ km }} km{{ " in %s" % (time_secs | duration) if time_secs }}
+{% if land %}
+{{ {"The woods": ":evergreen_tree:", "The plains": ":ear_of_rice:", "The mountains": ":mountain_snow:", "The ice": ":ice_cube:", "The edge": ":earth_americas:"}[land] }} {{ land }}
+{% endif %}
+{% if further_than %}
+:trophy: Top {{ [1, ((1 - further_than) * 100) | round(6) | round(0, "ceil") | int] | max }}%
+{% endif %}
+{% if timed %}
+:stopwatch: Timed
+{% endif %}
+{{ row }}
+{% for p in pins or [] %}
+{{ "||" if loop.first }}{{ loop.index }}. {{ p.country | md if p.country else "*no pin*" }} · {{ p.tier }}{{ "||" if loop.last }}
+{% endfor %}

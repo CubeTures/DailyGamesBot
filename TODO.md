@@ -24,7 +24,6 @@
 
 ## Games
 
-- https://farflung.game/
 - https://squaredle.app/
 - https://playplain.app/play
 
