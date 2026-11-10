@@ -1,61 +1,72 @@
-"""Fermi: each question's answer is shown once it's guessed, so learn()
-guesses 1 three times and reads them off. There's no losing: scenarios run
-from spot on to far off."""
+"""Fermi: learn() guesses 1 three times and works each answer out from how
+far off the results screen says that was (the answer shown on the reveal is
+rounded: 1.2 shows as "1"). Guesses are whole numbers, so even the closest
+scenario can be off by a bit. There's no losing: scenarios run from spot on
+to far off."""
 
 import math
 import re
 
+from playwright.sync_api import Locator
+
 from tests.e2e.expect import approx, length, where
 from tests.e2e.harness import Driver, Expected, Player, Solution
-
-# Answers can be shown with a scale word ("1.2 billion").
-SCALES = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12}
-
-
-def _number(text: str) -> float:
-    match = re.match(r"\s*([\d.,]+)\s*([a-z]*)", text.lower())
-    assert match, f"not a number: {text!r}"
-    value = float(match[1].replace(",", ""))
-    return value * SCALES.get(match[2], 1)
 
 
 def _start(player: Player) -> None:
     player.page.get_by_role("button", name="Play Today's →").click()
 
 
-def _guess(player: Player, n: int, guess: float) -> float:
-    """Answer question n (0-2) with `guess`; returns the answer it reveals."""
+def _guess(player: Player, n: int, guess: int) -> None:
+    """Answer question n (0-2) with `guess`."""
     page = player.page
     if n:
         page.get_by_role("button", name=f"Question {n + 1} →").click()
-    # Typed out in full: the box won't take exponents ("1.64e+08").
-    page.get_by_role("textbox", name="your guess").fill(f"{guess:.15g}")
+    page.get_by_role("textbox", name="your guess").fill(str(guess))
     page.get_by_role("button", name=re.compile("Lock it in")).click()
-    answer = page.locator(".score-card.target .score-num")
-    answer.wait_for()
-    return _number(answer.inner_text())
+    page.locator(".score-card.target .score-num").wait_for()
 
 
-def _play(player: Player, guesses: list[float]) -> list[float]:
+def _play(player: Player, guesses: list[int]) -> None:
     _start(player)
-    answers = [_guess(player, n, g) for n, g in enumerate(guesses)]
+    for n, g in enumerate(guesses):
+        _guess(player, n, g)
     player.page.get_by_role("button", name="See results →").click()
-    return answers
+
+
+def _answer_from(factor: Locator) -> float:
+    """The answer to a guess of 1, from its row on the results screen:
+    "< 1.20×" (too low) means it's 1.2, "> 4.00×" (too high) 0.25."""
+    value = float(re.sub(r"[^\d.]", "", factor.inner_text()))
+    side = factor.locator("[aria-label]").first
+    label = side.get_attribute("aria-label") if side.count() else ""
+    return 1 / value if "too high" in (label or "") else value
 
 
 def learn(player: Player) -> Solution:
     player.open()
-    number = int(
-        player.page.get_by_text(re.compile(r"^No\. \d+$")).first.inner_text()[4:]
-    )
-    return {"number": number, "answers": _play(player, [1, 1, 1])}
+    page = player.page
+    _play(player, [1, 1, 1])
+    factors = page.locator(".q-row .q-factor")
+    factors.nth(2).wait_for()
+    # Read here, not on the start screen: that can show yesterday's number
+    # for a moment.
+    number = int(page.get_by_text(re.compile(r"^No\. \d+$")).first.inner_text()[4:])
+    return {
+        "number": number,
+        "answers": [_answer_from(factors.nth(n)) for n in range(3)],
+    }
 
 
 def _factor(guess: float, answer: float) -> float:
     return max(guess / answer, answer / guess)
 
 
-def _expected(solution: Solution, guesses: list[float]) -> Expected:
+def _whole(x: float) -> int:
+    return max(1, round(x))
+
+
+def _expected(solution: Solution, guesses: list[int]) -> Expected:
     answers = solution["answers"]
     factors = [_factor(g, a) for g, a in zip(guesses, answers, strict=True)]
     # The day's score: the geometric mean of the factors, each capped at 1,000×.
@@ -91,22 +102,22 @@ def _expected(solution: Solution, guesses: list[float]) -> Expected:
 
 
 def win(player: Player, solution: Solution) -> Expected:
-    guesses = solution["answers"]
+    """Each answer, to the nearest whole number."""
+    guesses = [_whole(a) for a in solution["answers"]]
     _play(player, guesses)
     return _expected(solution, guesses)
 
 
 def far_off(player: Player, solution: Solution) -> Expected:
     """Guess 1 every time (the learn run's guesses)."""
-    guesses = [1.0, 1.0, 1.0]
+    guesses = [1, 1, 1]
     _play(player, guesses)
     return _expected(solution, guesses)
 
 
 def mixed(player: Player, solution: Solution) -> Expected:
     a = solution["answers"]
-    # Guesses are whole numbers.
-    guesses: list[float] = [a[0], a[1] * 10, max(1, round(a[2] / 10))]
+    guesses = [_whole(a[0]), _whole(a[1] * 10), _whole(a[2] / 10)]
     _play(player, guesses)
     return _expected(solution, guesses)
 

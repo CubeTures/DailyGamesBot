@@ -1,7 +1,7 @@
 """Farflung: five prompts, a country pinned for each. The day's deck is served
 encrypted, so there's no solution to learn: the driver pins the same five big
 countries every day and reads how each did from the game's own status line
-("Brazil: Miss, 0 km") as it goes. Every expedition ends in a distance, so
+("Brazil: Miss, +0 km") as it goes. Every expedition ends in a distance, so
 there's one outcome; most days that's five misses, sometimes a find or two.
 """
 
@@ -35,8 +35,11 @@ LANDS = [
     (100, "The plains"),
 ]
 
-# The map's status after a drop: "<country>: <tier>, <km> km".
-DROPPED = re.compile(r"^(?P<country>.+): (?P<tier>[A-Za-z ]+), (?P<km>\d+) km$")
+# The map's status after a drop: "<country>: <tier>, +<km> km", sometimes
+# followed by ". New Location".
+DROPPED = re.compile(
+    r"^(?P<country>.+): (?P<tier>[A-Za-z ]+), \+?(?P<km>\d+) km(\. .*)?$"
+)
 
 
 def _drop(player: Player, x: int, y: int) -> dict[str, str | int]:
@@ -45,7 +48,9 @@ def _drop(player: Player, x: int, y: int) -> dict[str, str | int]:
     page.wait_for_timeout(1200)
     page.mouse.click(x, y)
     page.get_by_role("button", name="Drop pin").click()
-    status = page.get_by_role("status").filter(has_text=re.compile(r", \d+ km$")).first
+    status = (
+        page.get_by_role("status").filter(has_text=re.compile(r", \+?\d+ km")).first
+    )
     status.wait_for(timeout=15_000)
     match = DROPPED.match((status.text_content() or "").strip())
     assert match, f"driver problem: no pin result in {status.text_content()!r}"
