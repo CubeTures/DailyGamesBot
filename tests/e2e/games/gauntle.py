@@ -1,8 +1,9 @@
 """Gauntle: a run of eleven mini-games against one clock. Every run ends in a
 total time (failing or skipping a game only adds a penalty), so the one
 scenario plays the cheapest full run: skip every game that has a Skip button
-(it unlocks after 45s, so a run takes about eight minutes) and make one
-throwaway move in the two that don't (Ratiole's cut, Angle's three dials)."""
+(it unlocks after 45s and then asks for a confirming click, so a run takes
+about eight minutes) and make one throwaway move in the two that don't
+(Ratiole's cut, Angle's three dials)."""
 
 import re
 from datetime import date
@@ -80,6 +81,8 @@ def skip_all(player: Player, _solution: Solution) -> Expected:
             # It counts down "Skip (45s)", disabled, until it unlocks.
             page.locator("button:enabled", has_text="Skip").wait_for(timeout=90000)
             skip.click()
+            # The first click only arms it: it turns into "Confirm skip".
+            page.get_by_role("button", name="Confirm skip").click(timeout=10000)
             skipped.add(n)
         elif dial.count():
             _turn_dials(page)

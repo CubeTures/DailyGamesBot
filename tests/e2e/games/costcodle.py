@@ -1,5 +1,6 @@
 """Costcodle: the price comes from the site's own games.json, read off the
-page once it has loaded today's product."""
+page once it has loaded today's product. Only the Classic mode is captured
+and played, not the five-product Checkout mode the page opens on."""
 
 from tests.e2e.expect import where
 from tests.e2e.harness import Driver, Expected, Player, Solution
@@ -25,6 +26,10 @@ def _row(guess: float, price: float) -> str:
 def _play(player: Player, solution: Solution, factors: list[float]) -> list[str]:
     """Guess price × each factor; returns the guesses as the game stores them."""
     page = player.page
+    # The page opens on its Checkout mode, under a notice announcing it; the
+    # Classic game (the one captured) is the other tab.
+    player.dismiss(page.locator("[data-close-announce]"))
+    page.locator("[data-mode-btn='classic']").click()
     page.wait_for_function("typeof productPrice === 'number'")
     guesses = [f"{solution['price'] * f:.2f}" for f in factors]
     # A one-guess win otherwise lands within half a second of the page load,

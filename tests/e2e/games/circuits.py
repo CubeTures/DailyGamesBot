@@ -76,9 +76,13 @@ def _start(player: Player) -> FrameLocator:
 
 def _select(player: Player, board: FrameLocator, tile: str) -> Locator:
     """Select a box. Clicking the selected box deselects it, so click only
-    if it isn't already (the selected box has a 3px outline)."""
+    if it isn't already (the selected box has an outline: a box-shadow with a
+    nonzero spread, "rgb(0, 0, 0) 0px 0px 0px 4px", where the rest have 0px)."""
     box = board.locator(f'[data-drop-tile-id="{tile}"]')
-    selected = "e => getComputedStyle(e.firstElementChild).boxShadow.endsWith(' 3px')"
+    selected = (
+        "e => parseFloat(getComputedStyle(e.firstElementChild)"
+        ".boxShadow.split(' ').at(-1)) > 0"
+    )
     if not box.evaluate(selected):
         box.click()
     _wait(player, lambda: box.evaluate(selected), f"box {tile} to be selected")
