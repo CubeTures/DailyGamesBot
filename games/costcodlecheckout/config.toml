@@ -1,0 +1,10 @@
+#:schema ../schema.json
+
+name = "costcodlecheckout"
+title = "Costcodle Checkout"
+description = "Price five Costco products. Your score is how many dollars you were off in total."
+icon = "icon.png"
+origin = "https://costcodle.com"
+landing_path = "/"
+mode_of = "costcodle"
+mode = "Checkout"

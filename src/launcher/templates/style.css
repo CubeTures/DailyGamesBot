@@ -14,6 +14,8 @@
   --primary-soft: rgba(192, 57, 43, 0.1);
   --done: #1f8a4c;
   --done-soft: rgba(31, 138, 76, 0.12);
+  --on-done: #ffffff;
+  --mode-ring: #ffffff;
   --fire: #e8590c;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
   --shadow-hover: 0 4px 8px rgba(16, 24, 40, 0.06), 0 12px 24px rgba(16, 24, 40, 0.08);
@@ -40,6 +42,8 @@
     --primary-soft: rgba(255, 138, 128, 0.12);
     --done: #4cc47f;
     --done-soft: rgba(76, 196, 127, 0.14);
+    --on-done: #0e1014;
+    --mode-ring: #b4bac6;
     --fire: #ff8a3d;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -155,7 +159,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .card-link { color: inherit; text-decoration: none; outline: none; }
 .card-link::after { content: ""; position: absolute; inset: 0; border-radius: 16px; }
 .card-top { display: flex; align-items: center; gap: 14px; }
-.card h3 { flex: 1; margin: 0; font-size: 1.1rem; }
+.title-block { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.card h3 { margin: 0; font-size: 1.1rem; }
 
 .ping, .icon-btn {
   position: relative;
@@ -274,7 +279,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   position: absolute;
   top: 50%;
   left: 50%;
-  z-index: 1;
+  /* Over the card's buttons and mode pill, which still take clicks through it. */
+  z-index: 2;
   transform: translate(-50%, -50%) rotate(-8deg);
   pointer-events: none;
 }
@@ -316,6 +322,112 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 .stamp span { font-size: 1.3rem; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
 .stamp span:empty { display: none; }
 .play { color: var(--accent); font-size: 0.9rem; font-weight: 600; }
+
+/* A game's modes (mode-stack.js): a stack of cards, and of scoreboards,
+   with the mode on top in front and the next one peeking out behind. */
+.stack {
+  position: relative;
+  display: grid;
+  isolation: isolate;
+  margin: 0 14px 12px 0;
+}
+.stack[hidden] { display: none; }
+.stack > * { grid-area: 1 / 1; transform-origin: 40% 70%; }
+.stack > [data-depth="none"] { display: none !important; }
+.stack.stacked > * {
+  touch-action: pan-y;
+  transition: transform 0.45s cubic-bezier(0.2, 0.85, 0.25, 1.05), box-shadow 0.15s ease,
+    border-color 0.15s ease, background-color 0.3s ease;
+}
+.stack.stacked > [data-depth="0"] { z-index: 2; }
+.stack.stacked > [data-depth="1"] {
+  z-index: 1;
+  transform: translate(9px, 8px) rotate(2deg);
+  cursor: pointer;
+  background-color: color-mix(in oklab, var(--tint, var(--surface)) calc(var(--tint-amount) * 2.4), var(--surface));
+  box-shadow: var(--shadow);
+}
+.stack.stacked > [data-depth="1"] * { pointer-events: none; }
+/* The card behind slides out a little further when you point at it. */
+.stack.stacked > [data-depth="1"]:hover { transform: translate(15px, 12px) rotate(3deg); }
+.stack.stacked > [data-depth="1"] .icon { transform: none; }
+.stack > .dragging { transition: none !important; cursor: grabbing; box-shadow: var(--shadow-hover); }
+.stack > .flying { box-shadow: var(--shadow-hover); }
+.stack.stacked .board-head .count { display: none; }
+
+/* The pill switching modes, which is also the stack's indicator: the mode
+   showing is named; the others are a badge each,
+   a green check once played. Under the stamp, which is later in the card. */
+.modes {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tint, var(--surface-2)) var(--tint-pill-amount), var(--tint-pill-base));
+}
+.modes[hidden] { display: none; }
+.board-head .modes { flex: none; }
+.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2px 9px 2px 3px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.1s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.mode:not(.is-current) { padding-right: 3px; }
+.mode:not(.is-current) .label { display: none; }
+.mode:hover { background: color-mix(in oklab, var(--text) 7%, transparent); color: var(--text); }
+.mode:active { transform: scale(0.92); }
+.mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mode .badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+}
+.mode .badge svg {
+  display: none;
+  width: 9px;
+  height: 9px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mode .label { overflow: hidden; text-overflow: ellipsis; }
+.mode.is-done { color: var(--done); }
+.mode.is-done .badge { border-color: var(--done); background: var(--done); color: var(--on-done); }
+.mode.is-done .badge svg { display: block; }
+.mode.is-current {
+  background: color-mix(in oklab, var(--text) 7%, transparent);
+  color: var(--text);
+}
+/* A light ring, so an unplayed mode's badge shows on the chip. */
+.mode.is-current:not(.is-done) .badge { border-color: var(--mode-ring); }
+.mode.is-current:hover { background: color-mix(in oklab, var(--text) 12%, transparent); }
+/* With one mode showing, the pill just names it. */
+.stack:not(.stacked) .mode { cursor: default; }
+.stack:not(.stacked) .mode:active { transform: none; }
+.stack:not(.stacked) .mode.is-current:hover { background: color-mix(in oklab, var(--text) 7%, transparent); }
 .play::after { content: " \2192"; display: inline-block; transition: transform 0.15s ease; }
 .card:hover .play::after { transform: translateX(3px); }
 
@@ -402,6 +514,8 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
 /* Players from the viewer's primary server are below the cut. */
 .see-all.has-primary { color: var(--primary); }
 .see-all:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* A new result below the cut of a board whose count the mode pill replaces. */
+.see-all.fresh { animation: count-fresh 1.6s ease both; }
 .board.entering { animation: board-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i) * 60ms); }
 .board.entering li {
   animation: row-in 0.3s ease both;

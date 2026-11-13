@@ -216,6 +216,34 @@
       "$ref": "#/$defs/Reset",
       "description": "When the daily puzzle changes. Default: the player's midnight."
     },
+    "mode": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "This game's name as one of a game's modes, e.g. \"Classic\". The launcher shows a game's modes as one stack of cards, and one of scoreboards, each mode still its own game with its own results. Needed by the game `mode_of` names and by every game naming it.",
+      "title": "Mode"
+    },
+    "mode_of": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The game (its `name`) this is another mode of, with its own scoring. Shown in that game's stack, which takes its title.",
+      "title": "Mode Of"
+    },
     "triggers": {
       "description": "Each says when the player has finished and what to report. They share the game's vars.js and fields.js. A game with no triggers is still proxied, just not captured.",
       "items": {

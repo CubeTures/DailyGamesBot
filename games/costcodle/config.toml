@@ -6,6 +6,7 @@ description = "Guess the price of a Costco product in six tries."
 icon = "icon.png"
 origin = "https://costcodle.com"
 landing_path = "/"
+mode = "Classic"
 
 [[triggers]]
 name = "local-state"

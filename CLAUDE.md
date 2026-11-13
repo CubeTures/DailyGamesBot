@@ -198,6 +198,21 @@ needs full type annotations. Its config is `[tool.pyright]` in
   (published as `ghcr.io/<repo>-with-tests` by `.github/workflows/build.yml`
   beside the plain one), which also installs `libnss-myhostname` so
   `*.localhost` resolves outside Chrome.
+- **Modes.** A game with several modes scored differently has one game
+  per mode (see `games/README.md`): the extra ones name the main one with
+  `mode_of`, and each has a `mode` name (`check_modes()` in `loader.py`).
+  The launcher stacks a game's modes into one card (`.stack` in the
+  template, `mode-stack.js`), the mode on top in front and the next one
+  peeking out behind; only two ever show, and switching makes the card
+  behind the mode picked before shuffling the front one behind it. The
+  pill under the title names the mode showing (even when it's the only
+  one, so a lone mode isn't mistaken for the game) and shows each other
+  as a badge, green once played; a click on it, on the card behind, a
+  drag of the front card or the arrow keys switch. The scoreboard stacks the
+  modes played that day the same way, its pill replacing the player count,
+  and both stacks of a game switch together; the mode on top is kept per
+  browser (`localStorage` `stack_tops`). Hiding works per mode; edit mode
+  puts every mode back in its stack.
 - **Hiding games.** Each player chooses which games they see. The pencil
   beside "Games" puts the launcher in edit mode, where every card shows
   with an eye; each click cycles the game through shown, card hidden

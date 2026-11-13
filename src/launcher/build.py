@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 import jinja2
 
+from src.games.loader import modes_of
 from src.games.models import ICON_MIME_TYPES, Game
 from src.games.registry import GAMES_BY_NAME
 from src.proxy.capture import ENTER_PATH
@@ -39,13 +40,23 @@ def write_launcher() -> str:
 
 def render_launcher() -> str:
     games = sorted(GAMES_BY_NAME.values(), key=lambda game: game.title.casefold())
+    # A game's modes share one stack of cards, in their order.
+    stacks = [modes_of(GAMES_BY_NAME, game) for game in games if game.mode_of is None]
     return (
         _environment()
         .get_template("index.html.j2")
         .render(
             token_placeholder=TOKEN_PLACEHOLDER,
-            games=[_card(game) for game in games],
+            stacks=[[_card(mode) for mode in stack] for stack in stacks],
             game_titles={game.name: game.title for game in games},
+            full_titles={game.name: full_title(game) for game in games},
+            modes={
+                stack[0].name: [
+                    {"game": mode.name, "mode": mode.mode} for mode in stack
+                ]
+                for stack in stacks
+                if len(stack) > 1
+            },
             resets={game.name: game.reset.js_config() for game in games},
             higher_score_wins=[game.name for game in games if game.higher_score_wins],
             # Game roles live in the results channel's server.
@@ -73,10 +84,21 @@ def _environment() -> jinja2.Environment:
     )
 
 
+def full_title(game: Game) -> str:
+    """A mode's title is the title of the game it's a mode of, then its
+    mode ("Costcodle Checkout"); any other game's is just its title."""
+    if game.mode is None:
+        return game.title
+    return f"{GAMES_BY_NAME[game.group].title} {game.mode}"
+
+
 def _card(game: Game) -> dict[str, Any]:
     return {
         "name": game.name,
-        "title": game.title,
+        # Every mode's card carries the title of the game they're modes of.
+        "title": GAMES_BY_NAME[game.group].title,
+        "full_title": full_title(game),
+        "mode": game.mode,
         "description": game.description,
         "icon": _icon_data_uri(game),
         # Through /__dgb/enter, which app.js tags with the player's ID.

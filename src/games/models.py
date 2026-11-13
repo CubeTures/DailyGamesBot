@@ -30,6 +30,9 @@ LOCAL_TIMEZONE = "local"
 
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1)]
 
+# It's also the game's subdomain and its hooks module's name.
+GameName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9]*$")]
+
 JsExpr = Annotated[
     str,
     StringConstraints(pattern=r"\S"),
@@ -160,11 +163,7 @@ def _unique_trigger_names(triggers: list[Trigger]) -> list[Trigger]:
 class GameConfig(_StrictModel):
     model_config = ConfigDict(title="Game config")
 
-    name: str = Field(
-        # It's also the game's subdomain and its hooks module's name.
-        pattern=r"^[a-z][a-z0-9]*$",
-        description="Must match the game's directory name.",
-    )
+    name: GameName = Field(description="Must match the game's directory name.")
     title: NonEmptyStr = Field(
         default_factory=lambda data: str(data["name"]).title(),
         description="Shown on the launcher. Defaults to the name.",
@@ -198,6 +197,22 @@ class GameConfig(_StrictModel):
         default_factory=Reset,
         description="When the daily puzzle changes. Default: the player's midnight.",
     )
+    mode: NonEmptyStr | None = Field(
+        default=None,
+        description=(
+            "This game's name as one of a game's modes, e.g. \"Classic\". The"
+            " launcher shows a game's modes as one stack of cards, and one of"
+            " scoreboards, each mode still its own game with its own results."
+            " Needed by the game `mode_of` names and by every game naming it."
+        ),
+    )
+    mode_of: GameName | None = Field(
+        default=None,
+        description=(
+            "The game (its `name`) this is another mode of, with its own"
+            " scoring. Shown in that game's stack, which takes its title."
+        ),
+    )
     triggers: Annotated[list[Trigger], AfterValidator(_unique_trigger_names)] = Field(
         default_factory=list[Trigger],
         description=(
@@ -219,3 +234,8 @@ class Game(GameConfig):
     @property
     def local_origin(self) -> str:
         return game_origin(self.name)
+
+    @property
+    def group(self) -> str:
+        """The game whose stack of modes this is in; its own name if none."""
+        return self.mode_of or self.name

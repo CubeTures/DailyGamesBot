@@ -27,7 +27,11 @@
         </button>
       </div>
       <div class="games" id="games">
-{%- for game in games %}
+{%- for stack in stacks %}
+{%- if stack | length > 1 %}
+        <div class="stack" data-group="{{ stack[0].name }}">
+{%- endif %}
+{%- for game in stack %}
         <div class="card" data-game="{{ game.name }}" data-hide="shown">
           <div class="card-top">
             {%- if game.icon %}
@@ -35,7 +39,13 @@
             {%- else %}
             <div class="icon mono" aria-hidden="true">{{ game.title[0] }}</div>
             {%- endif %}
-            <h3><a class="card-link" href="{{ game.url }}" target="_blank" rel="noopener">{{ game.title }}</a></h3>
+            <div class="title-block">
+              <h3><a class="card-link" href="{{ game.url }}" target="_blank" rel="noopener"
+                     {%- if game.mode %} aria-label="{{ game.full_title }}"{% endif %}>{{ game.title }}</a></h3>
+              {%- if game.mode %}
+              <div class="modes" role="tablist" aria-label="{{ game.title }} modes" hidden></div>
+              {%- endif %}
+            </div>
             <button type="button" class="icon-btn visibility">
               <svg class="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c4.97 0 8.3 3.6 9.94 6.65a1 1 0 0 1 0 .7 13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2.06 11.65a1 1 0 0 0 0 .7C3.7 15.4 7.03 19 12 19a9.74 9.74 0 0 0 5.39-1.61"/><path d="M14.08 14.16a3 3 0 0 1-4.24-4.24"/><path d="m2 2 20 20"/></svg>
@@ -43,7 +53,7 @@
             </button>
             {%- if roles_enabled %}
             <button type="button" class="ping" aria-pressed="false" hidden
-                    aria-label="Get pinged in Discord when someone finishes {{ game.title }}">
+                    aria-label="Get pinged in Discord when someone finishes {{ game.full_title }}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
             </button>
             {%- endif %}
@@ -69,6 +79,10 @@
           </div>
           <div class="stamp-body"><div class="stamp"><b class="stamp-word"></b><span class="stamp-score"></span></div></div>
         </div>
+{%- endfor %}
+{%- if stack | length > 1 %}
+        </div>
+{%- endif %}
 {%- endfor %}
       </div>
     </section>
@@ -105,12 +119,15 @@
     </div>
   </dialog>
 <script id="game-titles" type="application/json">{{ game_titles | tojson }}</script>
+<script id="full-titles" type="application/json">{{ full_titles | tojson }}</script>
 <script id="resets" type="application/json">{{ resets | tojson }}</script>
 <script id="higher-score-wins" type="application/json">{{ higher_score_wins | tojson }}</script>
+<script id="modes" type="application/json">{{ modes | tojson }}</script>
 <script>
 {{ game_day_js | safe }}
 {% include "discord-markdown.js" %}
 {% include "icon-color.js" %}
+{% include "mode-stack.js" %}
 {% include "app.js" %}
 </script>
 </body>

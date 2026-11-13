@@ -6,6 +6,8 @@
 // closeness is guess-far (over 25% off), guess-near (within 25%) or guess-win
 // (within 5%); direction is &uarr; (go higher), &darr; (go lower) or &check;.
 // A loss is six guesses without hasWon. There's no archive or practice mode.
+// Checkout, the site's other mode, is games/costcodlecheckout: a subdomain
+// of its own, so its storage never mixes with this "state".
 const st = ls("state");
 
 // The game number, worked out as the game does (main.js getGameNumber()):

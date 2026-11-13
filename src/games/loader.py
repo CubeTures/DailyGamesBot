@@ -113,7 +113,48 @@ def load_game(game_dir: Path) -> Game:
     )
 
 
+def check_modes(games: dict[str, Game]) -> None:
+    """A game's modes (see `mode` and `mode_of` in models.py) name a game
+    that isn't itself a mode of another, and every one of them, that game
+    included, has a distinct `mode`."""
+    for game in games.values():
+        if game.mode_of is None:
+            continue
+        where = f"{game.name}/{CONFIG_FILE}"
+        main = games.get(game.mode_of)
+        if main is None or main is game:
+            raise ConfigError(f"{where}: mode_of names no other game")
+        if main.mode_of is not None:
+            raise ConfigError(
+                f"{where}: {main.name} is itself a mode of {main.mode_of};"
+                f" use mode_of = {main.mode_of!r}"
+            )
+        if game.mode is None or main.mode is None:
+            missing = game.name if game.mode is None else main.name
+            raise ConfigError(f"{missing}/{CONFIG_FILE}: needs a mode")
+    groups: dict[str, list[Game]] = {}
+    for game in games.values():
+        groups.setdefault(game.group, []).append(game)
+    for name, group in groups.items():
+        if len(group) == 1 and group[0].mode is not None:
+            raise ConfigError(
+                f"{name}/{CONFIG_FILE}: has a mode but no other game is a mode of it"
+            )
+        modes = [game.mode for game in group]
+        if len(set(modes)) != len(modes):
+            raise ConfigError(f"{name}/{CONFIG_FILE}: its modes' names repeat")
+
+
 def load_games(games_dir: Path = GAMES_DIR) -> dict[str, Game]:
     """Every game in `games_dir`, keyed by name."""
     games = (load_game(p) for p in sorted(games_dir.iterdir()) if p.is_dir())
-    return {game.name: game for game in games}
+    by_name = {game.name: game for game in games}
+    check_modes(by_name)
+    return by_name
+
+
+def modes_of(games: dict[str, Game], game: Game) -> list[Game]:
+    """The modes in `game`'s stack, the game they're modes of first, then
+    the rest by name. Just `game` if it has no modes."""
+    group = [g for g in games.values() if g.group == game.group]
+    return sorted(group, key=lambda g: (g.mode_of is not None, g.name))

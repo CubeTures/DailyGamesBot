@@ -1,7 +1,21 @@
 (function () {
   var GAME_TITLES = JSON.parse(document.getElementById("game-titles").textContent);
+  // "Costcodle Checkout" for a mode, otherwise the same as GAME_TITLES.
+  var FULL_TITLES = JSON.parse(document.getElementById("full-titles").textContent);
   var RESETS = JSON.parse(document.getElementById("resets").textContent);
   var HIGHER_SCORE_WINS = JSON.parse(document.getElementById("higher-score-wins").textContent);
+  // Games with modes, by the name of the game they're modes of: its modes
+  // in order, as [{game, mode}]. Each mode is its own game with its own
+  // results; the launcher shows them as one stack (mode-stack.js).
+  var MODES = JSON.parse(document.getElementById("modes").textContent);
+  // Every game in a stack of modes, the one they're modes of included: its
+  // group, mode name and place in the stack.
+  var STACK_OF = {};
+  Object.keys(MODES).forEach(function (group) {
+    MODES[group].forEach(function (m, index) {
+      STACK_OF[m.game] = { group: group, mode: m.mode, index: index };
+    });
+  });
   var MEDALS = ["🥇", "🥈", "🥉"];
   var REFRESH_MS = 30000;
   // Rows a scoreboard card shows before the rest move to the full list.
@@ -27,6 +41,8 @@
   // Games the viewer has hidden, by name: "card" hides just its card, "all"
   // its scoreboard too. See setUpHiding().
   var hiddenGames = loadHiddenGames();
+  // The mode each stack shows on top, by group, as last picked here.
+  var stackTops = loadStackTops();
 
   function rememberToken() {
     // The server only sends this page for a working token, from the /play
@@ -73,6 +89,19 @@
 
   function gameTitle(game) {
     return GAME_TITLES[game] || game;
+  }
+
+  // The game whose stack of modes `game` is in, or `game` itself.
+  function groupOf(game) {
+    return STACK_OF[game] ? STACK_OF[game].group : game;
+  }
+
+  function modeName(game) {
+    return STACK_OF[game] ? STACK_OF[game].mode : "";
+  }
+
+  function fullTitle(game) {
+    return FULL_TITLES[game] || game;
   }
 
   function playerName(id, name) {
@@ -245,7 +274,7 @@
     message.innerHTML = discordMarkdown.toHtml(
       result.announcement, function (id) { return playerName(id, namesById[id]); }, gameTitle);
     showDialog(result.game,
-      gameTitle(result.game) + " · " + playerName(result.discord_id, result.name), false, back);
+      fullTitle(result.game) + " · " + playerName(result.discord_id, result.name), false, back);
   }
 
   // Scrolls to `focusId`'s row and focuses it (coming back from their
@@ -260,7 +289,7 @@
       if (result.discord_id === (focusId || discordId)) target = item;
       fullBoard.appendChild(item);
     });
-    showDialog(game, gameTitle(game) + " · " + playerCount(ranked.length), true);
+    showDialog(game, fullTitle(game) + " · " + playerCount(ranked.length), true);
     if (target) {
       target.scrollIntoView({ block: "center" });
       var row = target.querySelector(".row");
@@ -286,7 +315,136 @@
       card.querySelector(".play").textContent = mine ? "Open" : "Play";
     });
     cardsRendered = true;
+    // The mode pills turn green as modes are played.
+    layoutCardStacks();
   }
+
+  // ---- Stacks of a game's modes (mode-stack.js) ----
+
+  function loadStackTops() {
+    try {
+      return JSON.parse(localStorage.getItem("stack_tops")) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function gameCard(game) {
+    return document.querySelector('.card[data-game="' + game + '"]');
+  }
+
+  // A card stack shows the modes the viewer hasn't hidden, or all of them
+  // while they're choosing which to hide.
+  function layoutCardStacks() {
+    var editing = document.getElementById("games").classList.contains("editing");
+    document.querySelectorAll("#games .stack").forEach(function (stack) {
+      var group = stack.dataset.group;
+      var modes = MODES[group].map(function (m) { return m.game; }).filter(function (game) {
+        return editing || !hiddenGames[game];
+      });
+      modeStack.layout(stack, modes, stackTops[group], {
+        isDone: function (game) { return gameCard(game).classList.contains("done"); },
+        modeName: modeName,
+      });
+    });
+  }
+
+  // Brings `game` to the top of its card stack and its scoreboard stack,
+  // the front ones flying off towards `dir` (1 for left, -1 for right).
+  function pickMode(group, game, dir) {
+    stackTops[group] = game;
+    try {
+      localStorage.setItem("stack_tops", JSON.stringify(stackTops));
+    } catch (e) { /* it just opens on the first mode next time */ }
+    document.querySelectorAll('.stack[data-group="' + group + '"]').forEach(function (stack) {
+      modeStack.shuffle(stack, game, dir);
+    });
+  }
+
+  // The mode `step` places on from the one on top (-1 for the one before):
+  // one on is what the card behind brings up.
+  function nextMode(stack, step) {
+    var modes = modeStack.modes(stack);
+    var at = modes.indexOf(modeStack.front(stack).dataset.game);
+    return modes[(at + (step || 1) + modes.length) % modes.length];
+  }
+
+  // Ways to switch: the pill (the mode showing goes on to the next), a
+  // click on the card peeking out behind, the arrow keys on the pill, and
+  // dragging the front card away.
+  function setUpStacks() {
+    document.addEventListener("click", function (e) {
+      var stack = e.target.closest(".stack.stacked");
+      if (!stack) return;
+      var group = stack.dataset.group;
+      var stop = function () { e.preventDefault(); e.stopPropagation(); };
+      if (stack.dataset.dragged) return stop();
+      var node = e.target.closest("[data-depth]");
+      if (node && node.parentNode === stack && node.dataset.depth !== "0") {
+        stop();
+        pickMode(group, nextMode(stack), 1);
+        return;
+      }
+      var button = e.target.closest(".modes .mode");
+      if (!button) return;
+      stop();
+      var top = modeStack.front(stack).dataset.game;
+      pickMode(group, button.dataset.game === top ? nextMode(stack) : button.dataset.game, 1);
+    }, true);
+
+    document.addEventListener("keydown", function (e) {
+      var stack = e.target.closest && e.target.closest(".stack.stacked");
+      if (!stack || !e.target.closest(".modes")) return;
+      var step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      pickMode(stack.dataset.group, nextMode(stack, step), step);
+    });
+
+    var drag = null;
+    document.addEventListener("pointerdown", function (e) {
+      var node = e.target.closest(".stack.stacked > [data-depth='0']");
+      if (!node || e.button !== 0 || e.target.closest(".modes, .ping, .icon-btn")) return;
+      if (document.getElementById("games").classList.contains("editing")) return;
+      drag = { node: node, stack: node.parentNode, x: e.clientX, dx: 0, moved: false, id: e.pointerId };
+    });
+    window.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.dx = e.clientX - drag.x;
+      if (!drag.moved && Math.abs(drag.dx) > 6) {
+        drag.moved = true;
+        drag.node.classList.add("dragging");
+        try { drag.node.setPointerCapture(e.pointerId); } catch (err) { /* drags without it */ }
+      }
+      if (drag.moved) {
+        drag.node.style.transform = "translate(" + drag.dx + "px, " + (-Math.abs(drag.dx) * 0.06) +
+          "px) rotate(" + (drag.dx / 28) + "deg)";
+      }
+    });
+    function endDrag(e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var d = drag;
+      drag = null;
+      if (!d.moved) return;
+      // Swallow the click that ends the drag.
+      d.stack.dataset.dragged = "1";
+      setTimeout(function () { delete d.stack.dataset.dragged; }, 0);
+      if (Math.abs(d.dx) > Math.min(90, d.node.offsetWidth * 0.25)) {
+        // Like the arrow keys: thrown left brings up the next mode, right the one before.
+        var step = d.dx < 0 ? 1 : -1;
+        pickMode(d.stack.dataset.group, nextMode(d.stack, step), step);
+      } else {
+        d.node.classList.remove("dragging");
+        d.node.style.transform = "";
+      }
+    }
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    document.addEventListener("dragstart", function (e) {
+      if (e.target.closest && e.target.closest(".stack.stacked")) e.preventDefault();
+    });
+  }
+  setUpStacks();
 
   // Each card's streak of two or more game days: "live" when the viewer has
   // played its current game day and the days before it in a row, "pending"
@@ -377,7 +535,15 @@
     }
     var head = el("div", "board-head");
     head.appendChild(smallIcon(game));
-    head.appendChild(el("h3", "", gameTitle(game)));
+    head.appendChild(el("h3", "", gameTitle(groupOf(game))));
+    // In a stack of modes, the pill stands in for the count.
+    if (STACK_OF[game]) {
+      var pill = el("div", "modes");
+      pill.setAttribute("role", "tablist");
+      pill.setAttribute("aria-label", gameTitle(groupOf(game)) + " modes");
+      pill.hidden = true;
+      head.appendChild(pill);
+    }
     var visible = visibleRanks(ranked);
     var truncated = visible.length < ranked.length;
     var openFull = function () { showFullBoard(game, ranked, namesById); };
@@ -415,6 +581,7 @@
         more.classList.add("has-primary");
         more.title = hiddenPrimary + " more from " + (primaryName || "your primary server");
       }
+      if (hiddenNew) more.classList.add("fresh");
       more.addEventListener("click", openFull);
       var bar = el("div", "see-all-bar");
       bar.appendChild(more);
@@ -430,10 +597,14 @@
     lastBoards = { byGame: byGame, emptyText: emptyText };
     var boards = document.getElementById("boards");
     var played = Object.keys(byGame);
+    // A game's modes sort together, in their order.
+    var modeIndex = function (game) {
+      return STACK_OF[game] ? STACK_OF[game].index : 0;
+    };
     var games = played.filter(function (game) {
       return hiddenGames[game] !== "all";
     }).sort(function (a, b) {
-      return gameTitle(a).localeCompare(gameTitle(b));
+      return gameTitle(groupOf(a)).localeCompare(gameTitle(groupOf(b))) || modeIndex(a) - modeIndex(b);
     });
     if (!games.length) {
       showMessage(boards, played.length ? "Only games you've hidden have scores." : emptyText);
@@ -447,9 +618,29 @@
       });
     });
     var shown = {};
+    var stacks = {};
     boards.textContent = "";
     games.forEach(function (game, index) {
-      boards.appendChild(board(game, byGame[game], namesById, shown, index));
+      var node = board(game, byGame[game], namesById, shown, index);
+      if (!STACK_OF[game]) {
+        boards.appendChild(node);
+        return;
+      }
+      var group = groupOf(game);
+      if (!stacks[group]) {
+        stacks[group] = el("div", "stack");
+        stacks[group].dataset.group = group;
+        boards.appendChild(stacks[group]);
+      }
+      stacks[group].appendChild(node);
+    });
+    // A scoreboard stack has the modes someone has played that day.
+    Object.keys(stacks).forEach(function (group) {
+      var modes = games.filter(function (game) { return groupOf(game) === group; });
+      modeStack.layout(stacks[group], modes, stackTops[group], {
+        isDone: function (game) { return hasMine(byGame[game]); },
+        modeName: modeName,
+      });
     });
     shownOnBoard = shown;
   }
@@ -744,7 +935,7 @@
   }
 
   function showHideLevel(card, level) {
-    var title = gameTitle(card.dataset.game);
+    var title = fullTitle(card.dataset.game);
     card.dataset.hide = level;
     card.querySelector(".hide-level").textContent = HIDE_LABELS[level];
     var button = card.querySelector(".visibility");
@@ -760,6 +951,7 @@
     try {
       localStorage.setItem("hidden_games", JSON.stringify(hiddenGames));
     } catch (e) { /* only costs a flash on the next load */ }
+    layoutCardStacks();
     if (lastBoards) renderBoards(lastBoards.byGame, lastBoards.emptyText);
   }
 
@@ -797,6 +989,8 @@
       editButton.setAttribute("aria-pressed", String(editing));
       editButton.title = editing ? "Done choosing games" : "Choose which games you see";
       note.hidden = !editing;
+      // Hidden modes come back into their stacks while editing.
+      layoutCardStacks();
     });
     getJson("/api/hidden?token=" + encodeURIComponent(token))
       .then(function (body) {

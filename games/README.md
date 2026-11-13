@@ -207,6 +207,30 @@ the players would:
    win, a close loss and a bad loss, and make sure `score`, `won` and the
    tie-break sort them in that order.
 
+## Modes
+
+When a game has more than one mode with its own scoring (Costcodle's
+Classic, scored in guesses, and Checkout, scored in dollars off), each mode
+is its own game here: its own directory, subdomain, triggers, results,
+streak, Discord role and announcement. Scores on different scales never
+share a scoreboard. Point the extra mode at the game with `mode_of`, and
+name every mode, that game's included, with `mode`:
+
+```toml
+# games/costcodle/config.toml
+mode = "Classic"
+
+# games/costcodlecheckout/config.toml
+title = "Costcodle Checkout"         # its Discord role and announcements
+mode_of = "costcodle"
+mode = "Checkout"
+```
+
+The launcher then shows the modes as one stack of cards, under the main
+game's title, with a pill to switch between them; the scoreboard stacks the
+modes played that day the same way. A mode can't be a mode of a mode, and
+`python3 -m src.games` checks the names line up.
+
 ## Announcement
 
 When a result is saved, the bot posts it to the results channel (from
