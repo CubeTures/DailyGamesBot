@@ -14,7 +14,8 @@ CONFIG_FILE = "config.toml"
 VARS_FILE = "vars.js"
 FIELDS_FILE = "fields.js"
 ANNOUNCEMENT_FILE = "announcement.j2"
-GAME_FILES = (CONFIG_FILE, VARS_FILE, FIELDS_FILE, ANNOUNCEMENT_FILE)
+STARTED_FILE = "started.j2"
+GAME_FILES = (CONFIG_FILE, VARS_FILE, FIELDS_FILE, ANNOUNCEMENT_FILE, STARTED_FILE)
 
 
 class ConfigError(Exception):
@@ -84,13 +85,24 @@ def _check_capture_scripts(
         raise ConfigError(f"{where}: must include puzzle_id")
 
 
-def _check_announcement(game_dir: Path, template: str | None) -> None:
+def _check_template(game_dir: Path, file: str, template: str | None) -> None:
     if template is None:
         return
     try:
         announce.check_template(template)
     except ValueError as e:
-        raise ConfigError(f"{game_dir.name}/{ANNOUNCEMENT_FILE}: {e}") from None
+        raise ConfigError(f"{game_dir.name}/{file}: {e}") from None
+
+
+def _check_coop(game_dir: Path, config: GameConfig, started: str | None) -> None:
+    """Start triggers and started.j2 only make sense for a co-op game."""
+    if config.coop:
+        return
+    where = f"{game_dir.name}/{CONFIG_FILE}"
+    if any(t.report == "start" for t in config.triggers):
+        raise ConfigError(f'{where}: report = "start" needs coop = true')
+    if started is not None:
+        raise ConfigError(f"{game_dir.name}/: has {STARTED_FILE} but isn't coop")
 
 
 def load_game(game_dir: Path) -> Game:
@@ -102,7 +114,10 @@ def load_game(game_dir: Path) -> Game:
     _check_capture_scripts(game_dir, config, vars_js, fields_js)
 
     announcement_template = _read_optional(game_dir / ANNOUNCEMENT_FILE)
-    _check_announcement(game_dir, announcement_template)
+    _check_template(game_dir, ANNOUNCEMENT_FILE, announcement_template)
+    started_template = _read_optional(game_dir / STARTED_FILE)
+    _check_template(game_dir, STARTED_FILE, started_template)
+    _check_coop(game_dir, config, started_template)
 
     return Game(
         **dict(config),
@@ -110,6 +125,7 @@ def load_game(game_dir: Path) -> Game:
         fields_js=fields_js or "",
         icon_path=game_dir / config.icon if config.icon else None,
         announcement_template=announcement_template,
+        started_template=started_template,
     )
 
 

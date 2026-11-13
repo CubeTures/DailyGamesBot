@@ -1,6 +1,7 @@
 # Daily Games Bot
 
-Play daily web games (Wordle, Fermi, Minute Cryptic, Krillion...) through a
+Play daily web games (Wordle, Fermi, Minute Cryptic, Krillion, Cross with
+Friends...) through a
 local proxy that captures your result, and have a Discord bot post everyone's
 scores.
 
@@ -21,6 +22,8 @@ scores.
 - See everyone's scores ranked
 - History of scores for immortal bragging rights
 - Join on multiple servers
+- Co-op games (Cross with Friends): a link to join is posted when someone
+  starts one, and everyone in it is ranked by squares filled
 - Free and Open Source so anyone can add new games
 
 ## Adding games

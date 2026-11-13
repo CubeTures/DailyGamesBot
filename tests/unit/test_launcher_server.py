@@ -1,27 +1,10 @@
 import json
-import socket
 import urllib.error
 import urllib.request
-from collections.abc import Generator
 from datetime import date
-from pathlib import Path
 from typing import Any
 
-import pytest
-
-from src.launcher import build, server
 from src.store import guilds, hidden_games, players, results
-
-
-@pytest.fixture
-def launcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[str]:
-    """The launcher on a free port, writing its page under `tmp_path`."""
-    monkeypatch.setattr(build, "OUTPUT_PATH", tmp_path / "index.html")
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        port = s.getsockname()[1]
-    with server.serve_launcher(port):
-        yield f"http://127.0.0.1:{port}"
 
 
 def _get(url: str) -> tuple[int, Any]:

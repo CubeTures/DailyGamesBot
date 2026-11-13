@@ -45,6 +45,34 @@ CREATE TABLE IF NOT EXISTS announcements (
     guild_id    TEXT NOT NULL,     -- the server it was posted in
     PRIMARY KEY (result_id, guild_id)
 );
+-- Co-op games started (see starts.py): one row per shared game, from
+-- whoever reported it first.
+CREATE TABLE IF NOT EXISTS starts (
+    id          INTEGER PRIMARY KEY,
+    game        TEXT NOT NULL,
+    discord_id  TEXT NOT NULL,
+    puzzle_id   TEXT NOT NULL,
+    data        TEXT NOT NULL,  -- JSON object of the trigger's fields
+    url         TEXT,           -- the page it was started on
+    captured_at TEXT NOT NULL,
+    announced   INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (game, puzzle_id)
+);
+-- Who's who in each co-op shared game: the game's own ID for a player
+-- (e.g. Cross with Friends' dfac-id), recorded when they play in it through
+-- the proxy, so whoever reports the solve can credit everyone.
+CREATE TABLE IF NOT EXISTS coop_players (
+    game        TEXT NOT NULL,
+    puzzle_id   TEXT NOT NULL,
+    player_id   TEXT NOT NULL,
+    discord_id  TEXT NOT NULL,
+    PRIMARY KEY (game, puzzle_id, player_id)
+);
+CREATE TABLE IF NOT EXISTS start_announcements (
+    start_id    INTEGER NOT NULL,  -- starts.id
+    guild_id    TEXT NOT NULL,     -- the server it was posted in
+    PRIMARY KEY (start_id, guild_id)
+);
 CREATE TABLE IF NOT EXISTS subscriptions (
     discord_id  TEXT NOT NULL,
     game        TEXT NOT NULL,

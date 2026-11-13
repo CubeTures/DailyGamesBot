@@ -4,6 +4,8 @@ endpoints it reports to on the game's own local origin."""
 PATH_PREFIX = "/__dgb/"
 SCRIPT_PATH = PATH_PREFIX + "capture.js"
 RESULT_PATH = PATH_PREFIX + "result"
+# A co-op game's start triggers report here.
+START_PATH = PATH_PREFIX + "start"
 ENTER_PATH = PATH_PREFIX + "enter"
 
 # Holds the player's /play token, on the launcher's host and on each game's.

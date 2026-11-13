@@ -4,8 +4,10 @@
 //
 // Each trigger's `when` and `fields` is a function(req, res, event) that runs
 // the game's vars.js first. They're compiled into this scope so they can use
-// the helpers below (ls, ss, text, texts, exists, cookie, today). A solve
-// timer fills in time_secs for games that don't report one.
+// the helpers below (ls, ss, text, texts, exists, cookie, today, typed). A
+// solve timer fills in time_secs for games that don't report one. A trigger
+// with report "start" (co-op games) reports that the player has started a
+// shared game to START_ENDPOINT instead of a result.
 //
 // Debug from devtools: window.__dgb.status(), .dryRun(), .testNetwork(...)
 (function () {
@@ -15,6 +17,7 @@
   var GAME = __DGB_GAME__;
   var RESET = __DGB_RESET__;
   var RESULT_ENDPOINT = __DGB_RESULT_PATH__;
+  var START_ENDPOINT = __DGB_START_PATH__;
   var MAX_LOG_ENTRIES = 50;
   // Captured before wrapping, so reporting a result doesn't trip triggers.
   var originalFetch = window.fetch ? window.fetch.bind(window) : null;
@@ -44,11 +47,19 @@
 
   function today() { return isoDate(new Date()); }
 
+  // Whether the player has typed on this page since it loaded (not just
+  // seen others' moves come in), e.g. for a co-op game's start trigger.
+  var typedOnPage = false;
+  window.addEventListener("keydown", function (event) {
+    if (event.isTrusted) typedOnPage = true;
+  }, true);
+  function typed() { return typedOnPage; }
+
   var TRIGGERS = __DGB_TRIGGERS__;
 
   var state = {
     game: GAME,
-    sent: {},       // puzzle_id -> payload, so one page load reports once
+    sent: {},       // report:puzzle_id -> payload, so one page load reports each once
     errors: [],
     log: [],
   };
@@ -141,6 +152,7 @@
     }
     return {
       game: GAME,
+      report: trigger.report,
       trigger: trigger.name,
       puzzle_id: String(puzzleId),
       game_day: PAGE_DAY,
@@ -150,12 +162,13 @@
   }
 
   function report(payload) {
-    if (state.sent[payload.puzzle_id]) return;
-    state.sent[payload.puzzle_id] = payload;
+    var key = payload.report + ":" + payload.puzzle_id;
+    if (state.sent[key]) return;
+    state.sent[key] = payload;
     var entry = { at: new Date().toISOString(), payload: payload, status: "sending" };
     appendCapped(state.log, entry);
     var sending = originalFetch
-      ? originalFetch(RESULT_ENDPOINT, {
+      ? originalFetch(payload.report === "start" ? START_ENDPOINT : RESULT_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -167,7 +180,7 @@
       : Promise.reject(new Error("no fetch"));
     sending.catch(function (e) {
       entry.status = "error " + e;
-      delete state.sent[payload.puzzle_id]; // so a later check retries
+      delete state.sent[key]; // so a later check retries
     });
   }
 
@@ -264,7 +277,7 @@
       var method = (init && init.method) || (input && input.method) || "GET";
       var req = requestInfo(method, url, init && init.body);
       var pending = originalFetch(input, init);
-      if (req.url.indexOf(RESULT_ENDPOINT) === -1) {
+      if (req.url.indexOf(RESULT_ENDPOINT) === -1 && req.url.indexOf(START_ENDPOINT) === -1) {
         pending.then(function (response) {
           response.clone().text().then(function (body) {
             onNetworkResponse(req, responseInfo(response.status, body));

@@ -18,7 +18,7 @@ from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import Any, cast
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 from src import announce
 from src.games.registry import GAMES_BY_NAME
@@ -27,7 +27,7 @@ from src.launcher.build import (
     render_locked,
     write_launcher,
 )
-from src.proxy.capture import TOKEN_COOKIE, token_cookie
+from src.proxy.capture import ENTER_PATH, TOKEN_COOKIE, token_cookie
 from src.settings import LAUNCHER_PORT
 from src.store import guilds, hidden_games, players, results, subscriptions
 
@@ -44,7 +44,7 @@ def _get_results(params: dict[str, str]) -> Reply:
     # The page sends the viewer's local date; fall back to the server's.
     day = _parse_day(params.get("day")) or date.today()
     guild_id = params.get("guild") or None
-    shown = [_result_json(r) for r in results.on_day(day, discord_id, guild_id)]
+    shown = _results_json(results.on_day(day, discord_id, guild_id))
     if guild_id == results.ALL_GUILDS:
         primary = guilds.primary(discord_id)
         in_primary: set[str] = guilds.members(primary) if primary else set()
@@ -124,6 +124,9 @@ _POST_ROUTES: dict[str, Callable[[bytes], Reply]] = {
 
 
 _PAGE_PATHS = {"/", "/index.html"}
+# /join/<game>?to=PATH: a co-op game's "join them" link (see the bot's
+# announcer.join_url).
+_JOIN_PREFIX = "/join/"
 
 
 class _LauncherRequestHandler(BaseHTTPRequestHandler):
@@ -139,6 +142,8 @@ class _LauncherRequestHandler(BaseHTTPRequestHandler):
             self._send_json(*_answer(route, params))
         elif url.path in _PAGE_PATHS:
             self._send_page(params.get("token"))
+        elif url.path.startswith(_JOIN_PREFIX):
+            self._join(url.path.removeprefix(_JOIN_PREFIX), params.get("to", ""))
         else:
             self._send_json(*_error(404, "not found"))
 
@@ -165,6 +170,27 @@ class _LauncherRequestHandler(BaseHTTPRequestHandler):
             cookie = f"{TOKEN_COOKIE}=; Path=/; Max-Age=0" if cookie_token else None
             page = render_locked(expired=token is not None)
             self._send(401, "text/html; charset=utf-8", page.encode(), cookie)
+
+    def _join(self, game_name: str, to: str) -> None:
+        """Send a player with a working token cookie into a started game on
+        its subdomain, entering with their own token so their result is
+        captured; anyone else gets the page telling them to run /play."""
+        game = GAMES_BY_NAME.get(game_name)
+        token = self._cookie_token()
+        if game is None:
+            self._send_json(*_error(404, "not found"))
+        elif token is None or players.discord_id_for(token) is None:
+            self._send_page(None)
+        else:
+            location = (
+                f"{game.local_origin}{ENTER_PATH}?token={quote(token)}"
+                f"&to={quote(to, safe='')}"
+            )
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
     def _cookie_token(self) -> str | None:
         try:
@@ -205,6 +231,59 @@ def serve_launcher(port: int = LAUNCHER_PORT) -> Generator[None]:
         yield
     finally:
         server.shutdown()
+
+
+def _results_json(day_results: list[results.StoredResult]) -> list[dict[str, Any]]:
+    """The scoreboard's rows: one per result, except that a co-op game's
+    results of the day are one row per player, summed (see _coop_day_json),
+    in the place of their first."""
+    # Each row's results: one, or a player's day of a co-op game.
+    groups: dict[object, list[results.StoredResult]] = {}
+    for result in day_results:
+        game = GAMES_BY_NAME.get(result.game)
+        key = (result.game, result.discord_id) if game and game.coop else result.id
+        groups.setdefault(key, []).append(result)
+    by_puzzle: dict[tuple[str, str], list[results.StoredResult]] = {}
+    for result in day_results:
+        by_puzzle.setdefault((result.game, result.puzzle_id), []).append(result)
+    return [
+        _coop_day_json(group, by_puzzle)
+        if isinstance(key, tuple)
+        else _result_json(group[0])
+        for key, group in groups.items()
+    ]
+
+
+def _coop_day_json(
+    own: list[results.StoredResult],
+    by_puzzle: dict[tuple[str, str], list[results.StoredResult]],
+) -> dict[str, Any]:
+    """A player's day of a co-op game as one row: `score` and `time_secs`
+    summed over the shared games they finished, `puzzles` counting them,
+    and the announcement of each."""
+    game = GAMES_BY_NAME[own[0].game]
+    latest = own[-1]
+    row = _result_json(latest)
+    scores = [
+        r.data["score"] for r in own if isinstance(r.data.get("score"), int | float)
+    ]
+    times = [
+        r.data["time_secs"]
+        for r in own
+        if isinstance(r.data.get("time_secs"), int | float)
+    ]
+    row["data"] = {
+        "score": sum(scores) if scores else None,
+        "time_secs": sum(times) if times else None,
+        "puzzles": len(own),
+    }
+    row["announcement"] = "\n\n".join(
+        announce.render_coop(
+            game, by_puzzle[game.name, r.puzzle_id], game_mention=f"<@&{game.name}>"
+        )
+        for r in own
+    )
+    return row
 
 
 def _result_json(result: results.StoredResult) -> dict[str, Any]:

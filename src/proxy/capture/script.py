@@ -13,7 +13,7 @@ from src.games.models import (
     NetworkTrigger,
     Trigger,
 )
-from src.proxy.capture import RESULT_PATH, SCRIPT_PATH
+from src.proxy.capture import RESULT_PATH, SCRIPT_PATH, START_PATH
 
 _RUNTIME_JS = (Path(__file__).parent / "runtime.js").read_text()
 _GAME_DAY_JS = (Path(__file__).parents[2] / "games" / "game_day.js").read_text()
@@ -34,6 +34,7 @@ def _js_trigger(trigger: Trigger, game: Game) -> str:
     properties = {
         "name": json.dumps(trigger.name),
         "type": json.dumps(trigger.type),
+        "report": json.dumps(trigger.report),
         "when": _js_function(game.vars_js, when),
         "fields": _js_function(game.vars_js, fields),
     }
@@ -52,6 +53,7 @@ def build_script(game: Game) -> str:
         "__DGB_GAME__": json.dumps(game.name),
         "__DGB_RESET__": json.dumps(game.reset.js_config()),
         "__DGB_RESULT_PATH__": json.dumps(RESULT_PATH),
+        "__DGB_START_PATH__": json.dumps(START_PATH),
         "__DGB_GAME_DAY_JS__;": _GAME_DAY_JS,
         "__DGB_TRIGGERS__": f"[\n{triggers}\n]",
     }

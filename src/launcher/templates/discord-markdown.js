@@ -39,7 +39,7 @@ var discordMarkdown = (function () {
 
   // Only the subset announcements use: user and role mentions, shortcodes,
   // `code`, **bold**, __underline__, *italic*/_italic_, ~~strike~~,
-  // ||spoilers|| and backslash escapes. A spoiler is a button-like span
+  // ||spoilers||, [masked](https://links) and backslash escapes. A spoiler is a button-like span
   // that reveals its inner span when clicked (see app.js).
   function toHtml(text, nameForId, nameForRole) {
     // Escaped characters are set aside so no rule below matches them.
@@ -47,6 +47,13 @@ var discordMarkdown = (function () {
     text = text.replace(/\\([^\w\s])/g, function (_, c) {
       escaped.push(c);
       return "\uE000" + (escaped.length - 1) + "\uE001";
+    });
+    // Links too, so their URLs aren't read as markdown or shortcodes; their
+    // text still is.
+    var links = [];
+    text = text.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_, label, url) {
+      links.push(url);
+      return "\uE002" + (links.length - 1) + "\uE003" + label + "\uE004";
     });
     return escapeHtml(text)
       .replace(/&lt;@!?(\d+)&gt;/g, function (_, id) {
@@ -67,6 +74,9 @@ var discordMarkdown = (function () {
       .replace(/~~([^~\n]+)~~/g, "<s>$1</s>")
       .replace(/\|\|([\s\S]+?)\|\|/g,
         '<span class="spoiler" role="button" tabindex="0" title="Reveal spoiler"><span>$1</span></span>')
+      .replace(/\uE002(\d+)\uE003([^\uE004]*)\uE004/g, function (_, i, label) {
+        return '<a href="' + escapeHtml(links[+i]) + '" target="_blank" rel="noopener">' + label + "</a>";
+      })
       .replace(/\uE000(\d+)\uE001/g, function (_, i) { return escapeHtml(escaped[+i]); });
   }
 

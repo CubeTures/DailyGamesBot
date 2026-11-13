@@ -1,0 +1,28 @@
+#:schema ../schema.json
+
+name = "crosswithfriends"
+title = "Cross with Friends"
+description = "Solve crossword puzzles together with friends in real time."
+icon = "icon.png"
+origin = "https://www.crosswithfriends.com"
+landing_path = "/"
+# Co-op: players solve any puzzle together, as many as they like a day.
+# Each solved shared game is a result per player; see games/README.md.
+coop = true
+higher_score_wins = true             # squares filled
+
+# Every player's page reports the solve, with the shared game's final grid.
+[[triggers]]
+name = "record-solve"
+type = "network"
+url = "/api/record_solve/"
+method = "POST"
+when = "solved"
+
+# The player typed into a shared game that isn't solved yet: post a link
+# for others to join (once per game, by whoever's page reports it first).
+[[triggers]]
+name = "started"
+type = "page"
+report = "start"
+when = "started"

@@ -106,6 +106,15 @@ class _TriggerBase(_StrictModel):
     name: NonEmptyStr = Field(
         description="Unique within the game; stored with each result."
     )
+    report: Literal["result", "start"] = Field(
+        default="result",
+        description=(
+            '"result": the player has finished; fields.js is their result.'
+            ' "start" (co-op games only): the player has started a shared'
+            " game; the bot posts started.j2 with a link to join them, once"
+            " per puzzle_id."
+        ),
+    )
     when: JsExpr = Field(
         default="true",
         description=(
@@ -193,6 +202,16 @@ class GameConfig(_StrictModel):
             " lowest score (fewest guesses, mistakes) ranks first."
         ),
     )
+    coop: bool = Field(
+        default=False,
+        description=(
+            "Players solve together, as many puzzles a day as they like."
+            " Each player's result is one finished shared game (its"
+            " puzzle_id); the results of one are announced together, ranked"
+            " by the `players` field, and the scoreboard sums each player's"
+            " day. See games/README.md."
+        ),
+    )
     reset: Reset = Field(
         default_factory=Reset,
         description="When the daily puzzle changes. Default: the player's midnight.",
@@ -230,6 +249,7 @@ class Game(GameConfig):
     fields_js: str = ""
     icon_path: Path | None = None
     announcement_template: str | None = None  # None: announce.DEFAULT_TEMPLATE
+    started_template: str | None = None  # None: announce.DEFAULT_STARTED_TEMPLATE
 
     @property
     def local_origin(self) -> str:

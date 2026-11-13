@@ -82,6 +82,16 @@ def response(flow: http.HTTPFlow) -> None:
     _hooks[game.name].response(flow)
 
 
+def websocket_message(flow: http.HTTPFlow) -> None:
+    """Forget relayed WebSocket messages: mitmproxy keeps each connection's
+    whole history in memory, and a game's socket (Cross with Friends')
+    sends one for every move and a ping every few seconds for as long as
+    the page is open. The message just received is relayed from its own
+    reference, so dropping the older ones is safe."""
+    if flow.websocket is not None:
+        del flow.websocket.messages[:-1]
+
+
 def _hostname(host_header: str | None) -> str:
     return (urlsplit(f"//{host_header or ''}").hostname or "").lower()
 

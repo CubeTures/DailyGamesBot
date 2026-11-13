@@ -12,6 +12,16 @@
           "title": "Name",
           "type": "string"
         },
+        "report": {
+          "default": "result",
+          "description": "\"result\": the player has finished; fields.js is their result. \"start\" (co-op games only): the player has started a shared game; the bot posts started.j2 with a link to join them, once per puzzle_id.",
+          "enum": [
+            "result",
+            "start"
+          ],
+          "title": "Report",
+          "type": "string"
+        },
         "when": {
           "default": "true",
           "description": "Truthy means \"the player has finished, report it\". The game's vars.js is in scope.",
@@ -56,6 +66,16 @@
           "description": "Unique within the game; stored with each result.",
           "minLength": 1,
           "title": "Name",
+          "type": "string"
+        },
+        "report": {
+          "default": "result",
+          "description": "\"result\": the player has finished; fields.js is their result. \"start\" (co-op games only): the player has started a shared game; the bot posts started.j2 with a link to join them, once per puzzle_id.",
+          "enum": [
+            "result",
+            "start"
+          ],
+          "title": "Report",
           "type": "string"
         },
         "when": {
@@ -108,6 +128,16 @@
           "description": "Unique within the game; stored with each result.",
           "minLength": 1,
           "title": "Name",
+          "type": "string"
+        },
+        "report": {
+          "default": "result",
+          "description": "\"result\": the player has finished; fields.js is their result. \"start\" (co-op games only): the player has started a shared game; the bot posts started.j2 with a link to join them, once per puzzle_id.",
+          "enum": [
+            "result",
+            "start"
+          ],
+          "title": "Report",
           "type": "string"
         },
         "when": {
@@ -210,6 +240,12 @@
       "default": false,
       "description": "Rank the scoreboard by highest `score` first. By default the lowest score (fewest guesses, mistakes) ranks first.",
       "title": "Higher Score Wins",
+      "type": "boolean"
+    },
+    "coop": {
+      "default": false,
+      "description": "Players solve together, as many puzzles a day as they like. Each player's result is one finished shared game (its puzzle_id); the results of one are announced together, ranked by the `players` field, and the scoreboard sums each player's day. See games/README.md.",
+      "title": "Coop",
       "type": "boolean"
     },
     "reset": {

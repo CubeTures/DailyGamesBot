@@ -58,7 +58,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
   capture script and the launcher (its Python twin is `Reset.day_at`)
 - `src/store/`: the SQLite store (`data/results.db`, override with
   `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
-  `subscriptions.py`, `hidden_games.py`, `guilds.py` (servers players
+  `subscriptions.py`, `hidden_games.py`, `starts.py` (co-op games
+  started), `guilds.py` (servers players
   registered with, their primary one, server names); `db.py` connects, creates the
   tables and migrates old databases; `__main__.py` is the admin CLI
 - `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads and
@@ -176,6 +177,19 @@ needs full type annotations. Its config is `[tool.pyright]` in
   rest); player mentions don't ping, and results over 6 hours old when first
   seen are skipped. A channel ID names its server; if two are in the same
   server, the bot logs an error and uses the first.
+- **Co-op games.** A game with `coop = true` (Cross with Friends) is played
+  together, any number of times a day; `puzzle_id` is the shared game. A
+  trigger with `report = "start"` posts to `/__dgb/start` whenever a player
+  plays in one, recording the game's ID for them (`coop_players`); the
+  first is also a start (`starts` table). The first solve reported, from
+  anyone, is saved as a result for every recorded player with their own
+  score from the `players` roster (`_save_shared_game()` in
+  `capture/endpoints.py`); later reports are duplicates. The announcer
+  posts one message per shared game; the launcher's `/api/results` sums
+  each player's day into one row. The bot
+  posts it with `/join/<game>?to=PATH` on the launcher, which redirects the
+  clicker through the game's `/__dgb/enter` with their own token. Format in
+  `games/README.md`.
 - **Game roles.** On startup the bot creates a mentionable role named after
   each game's `title` in each results channel's server (reusing one that
   already has that name; needs Manage Roles). Announcements ping it. Role

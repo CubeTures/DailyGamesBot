@@ -31,6 +31,11 @@ def _listener_args() -> list[str]:
         # The addon picks the game by the Host the browser sent.
         "--set",
         "keep_host_header=true",
+        # A line per WebSocket message (a game's socket sends one per move
+        # and a ping every few seconds) floods the output, and printing to a
+        # slow terminal can hold up the proxy. HTTP requests are still shown.
+        "--set",
+        "dumper_filter=!~websocket",
     ]
 
 

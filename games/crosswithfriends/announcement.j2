@@ -1,0 +1,8 @@
+:sun_with_face: {{ players | length | plural("player") }} played **{{ game }}**{{ " " + (title | md) if title }}
+{{ players | sum(attribute="score") | plural("square") }}{{ " in %s" % (time_secs | duration) if time_secs }}
+{% if revealed %}
+:eyes: {{ revealed | plural("square") }} revealed
+{% endif %}
+{% for p in players %}
+{{ loop.index }}. {{ p.player }} {{ p.score | plural("square") }}{{ " :fire: %d" % p.streak if p.streak and p.streak > 1 }}
+{% endfor %}

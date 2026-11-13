@@ -102,6 +102,11 @@ def on_day(day: date, viewer_id: str, guild_id: str | None) -> list[StoredResult
     )
 
 
+def of_puzzle(game: str, puzzle_id: str) -> list[StoredResult]:
+    """Every player's result for one puzzle, e.g. a co-op game's shared game."""
+    return _select("r.game = ? AND r.puzzle_id = ?", (game, puzzle_id))
+
+
 def unannounced() -> list[StoredResult]:
     """Results not yet posted to Discord, oldest first."""
     return _select("r.announced = 0")

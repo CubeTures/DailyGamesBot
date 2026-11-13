@@ -17,6 +17,7 @@ from jinja2.sandbox import SandboxedEnvironment
 
 from src.games.models import Game
 from src.store.results import StoredResult
+from src.store.starts import StoredStart
 
 DISCORD_MAX_LENGTH = 2000
 
@@ -33,6 +34,21 @@ DEFAULT_TEMPLATE = """\
 {%- if max_score is not none %}/{{ max_score }}{% endif %}{% endif %}
 {%- if time_secs %} in {{ time_secs | duration }}{% endif %}
 {{ "\n" + share_text if share_text }}
+"""
+
+# A co-op game's shared game, for one without an announcement.j2.
+DEFAULT_COOP_TEMPLATE = """\
+:sun_with_face: {{ players | length | plural("player") }} played **{{ game }}**
+{{- " " + (title | md) if title }}
+{% for p in players %}
+{{ loop.index }}. {{ p.player }} {{ p.score }}
+{% endfor %}
+"""
+
+# A co-op game someone started, for one without a started.j2.
+DEFAULT_STARTED_TEMPLATE = """\
+:sun_with_face: {{ player }} started **{{ game }}**{{ " " + (title | md) if title }}
+Join them at {{ join_url }}
 """
 
 
@@ -149,6 +165,95 @@ def render(
     )
     text = _render_first_working([*templates, DEFAULT_TEMPLATE], context, game.title)
     return truncate(text or f"{player} finished **{game_name}**")
+
+
+def coop_players(game: Game, shared: list[StoredResult]) -> list[dict[str, Any]]:
+    """Everyone in a co-op game's shared game, ranked by score: the roster
+    in the results' `players` field (the fullest of them), each entry with
+    `player` added, a mention for those whose result was captured (matched
+    by their `player_id` field) and their escaped name for the rest, and
+    `streak` (as for a result; None for the rest)."""
+    captured = {
+        str(r.data["player_id"]): r
+        for r in shared
+        if r.data.get("player_id") is not None
+    }
+    rosters: list[list[Any]] = [
+        cast(list[Any], r.data["players"])
+        for r in shared
+        if isinstance(r.data.get("players"), list)
+    ]
+    roster = max(rosters, key=len) if rosters else []
+    ranked: list[dict[str, Any]] = []
+    for entry in roster:
+        if not isinstance(entry, dict):
+            continue
+        fields = cast(dict[str, Any], entry)
+        result = captured.get(str(fields.get("id")))
+        name = fields.get("name") or "Someone"
+        ranked.append(
+            {
+                **fields,
+                "player": mention(result.discord_id) if result else md(name),
+                "discord_id": result.discord_id if result else None,
+                "streak": result.streak if result else None,
+            }
+        )
+    sign = -1 if game.higher_score_wins else 1
+
+    def rank(p: dict[str, Any]) -> tuple[bool, float]:
+        """Scoreless last, then best score first."""
+        score = p.get("score")
+        if not isinstance(score, int | float):
+            return (True, 0.0)
+        return (False, sign * float(score))
+
+    return sorted(ranked, key=rank)
+
+
+def render_coop(
+    game: Game, shared: list[StoredResult], game_mention: str | None = None
+) -> str:
+    """The announcement of a co-op game's shared game, from every captured
+    result of it: the first one's fields, with `players` ranked (see
+    coop_players)."""
+    game_name = game_mention or game.title
+    first = shared[0]
+    context = {
+        **dict.fromkeys(STANDARD_FIELDS),
+        **first.data,
+        "game": game_name,
+        "puzzle_id": first.puzzle_id,
+        "players": coop_players(game, shared),
+        "fields": first.data,
+    }
+    templates = (
+        [game.announcement_template] if game.announcement_template is not None else []
+    )
+    text = _render_first_working(
+        [*templates, DEFAULT_COOP_TEMPLATE], context, game.title
+    )
+    return truncate(text or f"**{game_name}** was solved")
+
+
+def render_started(
+    game: Game, start: StoredStart, join_url: str, game_mention: str | None = None
+) -> str:
+    """The post that a player started a co-op game, with `join_url` to join."""
+    game_name = game_mention or game.title
+    context = {
+        **start.data,
+        "game": game_name,
+        "player": mention(start.discord_id),
+        "puzzle_id": start.puzzle_id,
+        "join_url": join_url,
+        "fields": start.data,
+    }
+    templates = [game.started_template] if game.started_template is not None else []
+    text = _render_first_working(
+        [*templates, DEFAULT_STARTED_TEMPLATE], context, game.title
+    )
+    return truncate(text or f"{mention(start.discord_id)} started **{game_name}**")
 
 
 def render_result(

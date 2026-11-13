@@ -73,3 +73,11 @@ def test_lets_enter_through_without_a_token_cookie() -> None:
         "wordle.localhost:8080", f"/__dgb/enter?token={token}&to=/x", None
     )
     assert flow.response is not None and flow.response.status_code == 302
+
+
+def test_websocket_history_is_dropped_but_the_latest_message_kept() -> None:
+    flow = tflow.twebsocketflow()
+    assert flow.websocket is not None and len(flow.websocket.messages) > 1
+    latest = flow.websocket.messages[-1]
+    addon.websocket_message(flow)
+    assert flow.websocket.messages == [latest]

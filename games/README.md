@@ -14,6 +14,7 @@ uv run python3 -m src.games
 | `vars.js`         | shared lookups, run before `when` and `fields.js` (optional) |
 | `fields.js`       | the result reported when a trigger fires (needed with triggers) |
 | `announcement.j2` | the Discord message for a result (optional)                  |
+| `started.j2`      | co-op games: the message when someone starts one (optional)  |
 | icon (e.g. `icon.png`) | the launcher icon named by `icon` (optional)            |
 
 The icon should be square and at least 128px; it's inlined into the
@@ -141,6 +142,8 @@ guard lookups with `?.` in `vars.js`. In scope:
 - `ls(key)` / `ss(key)` – local/sessionStorage value, JSON-parsed if possible
 - `text(sel)`, `texts(sel)`, `exists(sel)` – DOM helpers
 - `cookie(name)`, `today()` (local `YYYY-MM-DD`)
+- `typed()` – whether the player has typed on this page since it loaded
+  (e.g. a co-op start trigger, so others' moves coming in don't count)
 - anything on `window`
 
 `vars.js` can't declare `req`, `res` or `event`.
@@ -230,6 +233,38 @@ The launcher then shows the modes as one stack of cards, under the main
 game's title, with a pill to switch between them; the scoreboard stacks the
 modes played that day the same way. A mode can't be a mode of a mode, and
 `python3 -m src.games` checks the names line up.
+
+## Co-op games
+
+`coop = true` is for games played together and not daily, like Cross with
+Friends: players start a shared game of any puzzle, others join by its
+link, and they may finish several a day. Then:
+
+- **Who's who.** `fields.js` reports `player_id`, the game's own ID for
+  this browser's player, on every report. Each start report (below)
+  records it against the player's Discord ID for that shared game, so a
+  player who helps and then leaves is still credited.
+- **Results.** `puzzle_id` is the shared game. Whoever's page reports the
+  solve first, the proxy saves a result for every player recorded in it
+  (and the reporter), each with their own `player_id` and the `score` of
+  their entry in `players`, the whole roster as `[{id, name, score}, ...]`
+  (anyone who played outside the proxy included). Later reports of the
+  same shared game are duplicates.
+- **Announcement.** The bot posts one message per shared game in every
+  server any of its players is registered with. `announcement.j2` gets the first
+  result's fields plus `players`, ranked by `score` (`higher_score_wins`),
+  each with `player`: a mention for a player matched by `player_id`, else
+  their escaped `name`. See `crosswithfriends/announcement.j2`.
+- **Scoreboard.** Each player's results of the day are one row: `score`
+  and `time_secs` summed, `puzzles` counting them; clicking it shows each
+  game's announcement.
+- **Starts.** A trigger with `report = "start"` says the player is
+  playing a shared game, and records their `player_id`. The first report
+  of each `puzzle_id` (none if the game is already finished) is posted in the starter's servers with
+  `started.j2`, which gets the fields, `player` and `join_url`: a launcher
+  link (`/join/<game>?to=<page path>`) that enters whoever clicks it into
+  the same game with their own token. Starts over 30 minutes old when the
+  bot sees them aren't posted.
 
 ## Announcement
 
@@ -333,7 +368,8 @@ See `bracketcity/announcement.j2` for a game with every part.
   launcher only knows the shortcodes in the `SHORTCODES` map in
   `src/launcher/templates/discord-markdown.js`; any other shows as typed, so add it there
   when a template needs it.
-- Stick to the markdown the launcher renders too: `**bold**`, `*italic*`,
+- Stick to the markdown the launcher renders too: `[text](https://url)`,
+  `**bold**`, `*italic*`,
   `__underline__`, `~~strike~~`, `` `code` ``, `||spoiler||` and `\`
   escapes.
 
