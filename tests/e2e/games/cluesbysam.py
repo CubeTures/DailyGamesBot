@@ -5,6 +5,7 @@ state.hint.reveals lists the cards identifiable right now. There's no losing,
 so the driver takes a hint at every step and gets the first card wrong once.
 """
 
+import math
 from typing import Any
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -84,12 +85,15 @@ def play(player: Player, _solution: Solution) -> Expected:
                 _guess(player, index, not criminals[index])
             _guess(player, index, criminals[index])
     width = 4
+    # The game's own solve time, which its results screen shows rounded up.
+    complete_ms: int = _state(player)["completeTime"]
     return {
         "puzzle_id": game_day(player.game).isoformat(),
         "score": 1 + hints,
         "mistakes": 1,
         "hints": hints,
         "double_hints": 0,
+        "time_secs": math.ceil(complete_ms / 1000),
         "rows": where(
             f"{len(criminals) // width} rows of {width}, not all green",
             lambda rows: (

@@ -22,6 +22,14 @@
         - When they get back attempt to fetch their token for them?
             - Probably not possible
 
+## Ideas
+
+- `/report @game-tag <share-text>` command to report broken games
+	- Sends capture of network / localStorage to admin view
+	- Logs in leaderboard as "manual" to maintain streak
+- session syncing
+	- Sync cookies and localStorage between devices per user
+
 ## Games
 
 - https://squaredle.app/

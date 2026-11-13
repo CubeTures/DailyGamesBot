@@ -8,7 +8,9 @@ export default {
   hints: countOf("hint"),
   // A second hint on the same clue, which also reveals the card to pick.
   double_hints: countOf("second-hint"),
-  time_secs: Math.round(st.completeTime / 1000),
+  // The game's own solve time (from its first guess), rounded up as its
+  // "Solved in MM:SS" shows it.
+  time_secs: Math.ceil(st.completeTime / 1000),
   difficulty: difficulty,
   rows: rows,
 };
