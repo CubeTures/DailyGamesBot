@@ -186,7 +186,8 @@ needs full type annotations. Its config is `[tool.pyright]` in
   score from the `players` roster (`_save_shared_game()` in
   `capture/endpoints.py`); later reports are duplicates. The announcer
   posts one message per shared game; the launcher's `/api/results` sums
-  each player's day into one row. The bot
+  each player's day into one row, and its card has a "Co-op" pill in its
+  footer. The bot
   posts it with `/join/<game>?to=PATH` on the launcher, which redirects the
   clicker through the game's `/__dgb/enter` with their own token. Format in
   `games/README.md`.

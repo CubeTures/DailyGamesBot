@@ -104,6 +104,7 @@ def _card(game: Game) -> dict[str, Any]:
         # Through /__dgb/enter, which app.js tags with the player's ID.
         "url": f"{game.local_origin}{ENTER_PATH}?to={quote(game.landing_path)}",
         "reset_timezone": game.reset.zone_name,
+        "coop": game.coop,
     }
 
 

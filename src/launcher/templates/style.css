@@ -144,7 +144,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   border-color: color-mix(in oklab, var(--tint, var(--border-strong)) 18%, var(--border-strong));
 }
 .card .card-foot { border-top-color: color-mix(in oklab, var(--tint, var(--border)) 10%, var(--border)); }
-.card[style*="--tint"] :is(.reset, .streak) {
+.card[style*="--tint"] :is(.coop, .reset, .streak) {
   background: color-mix(in oklab, var(--tint) var(--tint-pill-amount), var(--tint-pill-base));
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
@@ -241,8 +241,9 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
    player's own, gets its next puzzle, on the player's clock. .streak shows
    the viewer's streak in the game (app.js sets data-streak on the card):
    fire-colored once today's is played ("live"), like .reset while it ended
-   yesterday and can still be kept going ("pending"). */
-.reset, .streak {
+   yesterday and can still be kept going ("pending"). .coop marks a game
+   played together (config coop = true). */
+.coop, .reset, .streak {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -261,7 +262,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
   color: var(--fire);
 }
 .card.streak-up .streak { animation: streak-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
-:is(.reset, .streak) svg {
+:is(.coop, .reset, .streak) svg {
   width: 12px;
   height: 12px;
   fill: none;
