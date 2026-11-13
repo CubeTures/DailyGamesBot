@@ -8,3 +8,8 @@ origin = "https://costcodle.com"
 landing_path = "/"
 mode_of = "costcodle"
 mode = "Checkout"
+
+[[triggers]]
+name = "local-state"
+type = "page"
+when = "finished"

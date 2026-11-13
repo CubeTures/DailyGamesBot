@@ -1,0 +1,11 @@
+:sun_with_face: {{ player }} played **{{ game }}** #{{ puzzle_number }}{{ " :fire: %d" % streak if streak > 1 }}
+{% if total_cents == 0 %}
+Perfect{{ " in %s" % (time_secs | duration) if time_secs }}
+{% else %}
+${{ "{:,.2f}".format(total_cents / 100) }} off{{ " in %s" % (time_secs | duration) if time_secs }}
+{% endif %}
+:medal: {{ rating }}
+{{ rows | join("") }}
+{% for item in items %}
+{{ "||" if loop.first }}{{ loop.index }}. {{ item.name | md }} · ${{ "{:,.2f}".format(item.off_cents / 100) }} off{{ "||" if loop.last }}
+{% endfor %}
