@@ -73,6 +73,14 @@ CREATE TABLE IF NOT EXISTS start_announcements (
     guild_id    TEXT NOT NULL,     -- the server it was posted in
     PRIMARY KEY (start_id, guild_id)
 );
+-- The servers a player invites others from when they start each co-op
+-- game (see invites.py).
+CREATE TABLE IF NOT EXISTS coop_invites (
+    discord_id  TEXT NOT NULL,
+    game        TEXT NOT NULL,
+    guilds      TEXT NOT NULL,  -- JSON array of guild IDs
+    PRIMARY KEY (discord_id, game)
+);
 CREATE TABLE IF NOT EXISTS subscriptions (
     discord_id  TEXT NOT NULL,
     game        TEXT NOT NULL,

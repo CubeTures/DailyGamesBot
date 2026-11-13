@@ -653,6 +653,50 @@ dialog[style*="--tint"] .message {
 .message .spoiler:not(.revealed) > span { visibility: hidden; }
 .message .spoiler.revealed { background: var(--border); cursor: auto; }
 
+/* A co-op game's prompt for the servers to invite others from. */
+.invite[hidden] { display: none; }
+.invite .servers {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+.invite .server {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+dialog[style*="--tint"] .invite .server {
+  background: color-mix(in oklab, var(--tint) var(--tint-pill-amount), var(--tint-pill-base));
+}
+.invite .server:hover { background: var(--border); }
+.invite .server span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite .server input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.invite .server:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.invite-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.invite-foot .note { margin: 0; }
+.play-btn {
+  margin-left: auto;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.play-btn::after { content: " \2192"; }
+.play-btn:hover { filter: brightness(1.1); }
+.play-btn:active { transform: scale(0.97); }
+.play-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .empty {
   animation: fade-in 0.25s ease both;
   padding: 32px 20px;

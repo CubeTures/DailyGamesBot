@@ -20,7 +20,7 @@ from src.games import loader
 from src.games.models import Game
 from src.games.registry import GAMES_BY_NAME
 from src.proxy.capture.endpoints import handle_capture_request
-from src.store import guilds, players, results, starts
+from src.store import guilds, invites, players, results, starts
 
 CWF = GAMES_BY_NAME["crosswithfriends"]
 WORDLE = GAMES_BY_NAME["wordle"]
@@ -156,14 +156,22 @@ def test_coop_announcement_ranks_everyone_in_the_shared_game() -> None:
     _save("1", "a", puzzle_id="g0", game_day=DAY - timedelta(days=1))
     _save("1", "a")
     _save("2", "b")
-    text = announce.render_coop(CWF, results.of_puzzle(CWF.name, "g1"))
+    shared = results.of_puzzle(CWF.name, "g1")
+    text = announce.render_coop(CWF, shared, members=None)
     assert text.splitlines() == [
         ":sun_with_face: 3 players played **Cross with Friends** NY Times Mini",
         "32 squares in 0:33",
-        "1. <@1> 18 squares :fire: 2",
+        "1) <@1> 18 squares :fire: 2",
         # Not captured through the proxy: their name from the site, escaped.
-        "2. Not \\*Proxied\\* 9 squares",
-        "3. <@2> 5 squares",
+        "2) Not \\*Proxied\\* 9 squares",
+        "3) <@2> 5 squares",
+    ]
+    # Only who the reader knows: no sign of anyone else, ranks included.
+    text = announce.render_coop(CWF, shared, members={"2"})
+    assert text.splitlines() == [
+        ":sun_with_face: 1 player played **Cross with Friends** NY Times Mini",
+        "5 squares in 0:33",
+        "1) <@2> 5 squares",
     ]
 
 
@@ -176,6 +184,38 @@ def test_scoreboard_sums_a_players_coop_day(launcher: str) -> None:
     [row] = body
     assert row["data"] == {"score": 22, "time_secs": 93, "puzzles": 2}
     assert row["announcement"].count(":sun_with_face:") == 2
+
+
+def test_scoreboard_ranks_only_players_the_viewer_knows(launcher: str) -> None:
+    guilds.register("1", "10")
+    guilds.register("2", "10")
+    guilds.register("2", "20")
+    guilds.register("3", "20")
+    _save("1", "a")
+    _save("2", "b")
+    _save("3", "c")
+
+    def ranks(discord_id: str, guild_id: str) -> list[str]:
+        token = players.token_for(discord_id)
+        url = f"{launcher}/api/results?day={DAY}&token={token}&guild={guild_id}"
+        rows = _get(url)[1]
+        [row] = [r for r in rows if r["discord_id"] == discord_id]
+        lines = row["announcement"].splitlines()
+        return [line for line in lines if line[:1].isdigit()][1:]
+
+    # Everyone they share any server with, whichever server is picked.
+    everyone = ["1) <@1> 18 squares", "2) <@3> 9 squares", "3) <@2> 5 squares"]
+    assert ranks("2", "10") == everyone
+    assert ranks("2", "all") == everyone
+    # Names of everyone mentioned, even those not on the board picked.
+    players.set_name("3", "Blair")
+    token = players.token_for("2")
+    rows = _get(f"{launcher}/api/results?day={DAY}&token={token}&guild=10")[1]
+    [row] = [r for r in rows if r["discord_id"] == "2"]
+    assert row["names"] == {"3": "Blair"}
+    # 1 and 3 share no server: neither learns the other played.
+    assert ranks("1", "10") == ["1) <@1> 18 squares", "2) <@2> 5 squares"]
+    assert ranks("3", "20") == ["1) <@3> 9 squares", "2) <@2> 5 squares"]
 
 
 def test_join_link_enters_the_game_with_the_clickers_token(launcher: str) -> None:
@@ -227,7 +267,7 @@ def test_bot_posts_a_shared_game_once(
     run()
     assert len(channels[10].sent) == 1
     assert len(channels[20].sent) == 1
-    assert "1. <@1> 18 squares" in channels[10].sent[0]
+    assert "1) <@1> 18 squares" in channels[10].sent[0]
     assert results.unannounced() == []
 
 
@@ -246,6 +286,95 @@ def test_bot_posts_starts_with_a_join_link(monkeypatch: pytest.MonkeyPatch) -> N
         "?to=%2Fbeta%2Fgame%2Fg1)!"
     ]
     assert starts.unannounced() == []
+
+
+def test_bot_posts_starts_only_in_the_servers_picked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def no_role(*_: Any) -> None:
+        return None
+
+    monkeypatch.setattr(announcer, "game_role", no_role)
+    for guild_id in ("10", "20", "30"):
+        guilds.register("1", guild_id)
+    invites.save("1", CWF.name, ["20", "30"])
+    invites.save("1", "other", [])
+    _post_start(CWF, "g1", "1")
+    channels = {10: _Channel(10), 20: _Channel(20), 30: _Channel(30)}
+    asyncio.run(announcer.announce_pending_results(cast(ResultsChannels, channels)))
+    assert [len(channels[g].sent) for g in (10, 20, 30)] == [0, 1, 1]
+
+    # Inviting nobody posts nowhere, and the start is done with.
+    invites.save("1", CWF.name, [])
+    _post_start(CWF, "g2", "1")
+    asyncio.run(announcer.announce_pending_results(cast(ResultsChannels, channels)))
+    assert [len(channels[g].sent) for g in (10, 20, 30)] == [0, 1, 1]
+    assert starts.unannounced() == []
+
+
+def test_bot_ranks_only_each_servers_players(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def no_role(*_: Any) -> None:
+        return None
+
+    monkeypatch.setattr(announcer, "game_role", no_role)
+    guilds.register("1", "10")
+    guilds.register("1", "20")
+    guilds.register("2", "10")
+    guilds.register("2", "30")
+    # Inviting server 10 only changes where the start is posted.
+    invites.save("1", CWF.name, ["10"])
+    _post_start(CWF, "g1", "1")
+    channels = {10: _Channel(10), 20: _Channel(20), 30: _Channel(30)}
+    run = lambda: asyncio.run(  # noqa: E731
+        announcer.announce_pending_results(cast(ResultsChannels, channels))
+    )
+    run()
+    channels[10].sent.clear()
+    _save("1", "a")
+    _save("2", "b")
+    run()
+
+    def ranks(guild_id: int) -> list[str]:
+        (text,) = channels[guild_id].sent
+        return [line for line in text.splitlines() if line[:1].isdigit()][1:]
+
+    # Never the player outside the proxy, who's in no server.
+    assert ranks(10) == ["1) <@1> 18 squares", "2) <@2> 5 squares"]
+    assert ranks(20) == ["1) <@1> 18 squares"]
+    assert ranks(30) == ["1) <@2> 5 squares"]
+    assert channels[30].sent[0].startswith(":sun_with_face: 1 player played")
+
+
+def test_invites_api(launcher: str) -> None:
+    token = players.token_for("1")
+    guilds.register("1", "10")
+    guilds.register("1", "20")
+    url = f"{launcher}/api/invites"
+    pick = {"token": token, "game": CWF.name, "guilds": ["20", "99"]}
+    assert _get(f"{url}?token={token}") == (200, {"games": {}})
+    assert _post_json(url, {**pick, "game": WORDLE.name})[0] == 400
+    assert _post_json(url, {**pick, "guilds": "20"})[0] == 400
+    assert _post_json(url, {**pick, "guilds": [20]})[0] == 400
+    assert _post_json(url, {**pick, "token": "x"})[0] == 401
+    # Servers they aren't registered with are dropped.
+    assert _post_json(url, pick) == (200, {"ok": True})
+    assert _get(f"{url}?token={token}") == (200, {"games": {CWF.name: ["20"]}})
+    assert _post_json(url, {**pick, "guilds": []}) == (200, {"ok": True})
+    assert invites.pick("1", CWF.name) == []
+    assert invites.pick("2", CWF.name) is None
+
+
+def _post_json(url: str, body: object) -> tuple[int, Any]:
+    request = urllib.request.Request(
+        url, json.dumps(body).encode(), {"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as e:
+        return e.code, json.load(e)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

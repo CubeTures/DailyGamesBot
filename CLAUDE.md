@@ -59,7 +59,7 @@ needs full type annotations. Its config is `[tool.pyright]` in
 - `src/store/`: the SQLite store (`data/results.db`, override with
   `DGB_DB_PATH`), one module per table: `results.py`, `players.py`,
   `subscriptions.py`, `hidden_games.py`, `starts.py` (co-op games
-  started), `guilds.py` (servers players
+  started), `invites.py` (servers a co-op start is posted in), `guilds.py` (servers players
   registered with, their primary one, server names); `db.py` connects, creates the
   tables and migrates old databases; `__main__.py` is the admin CLI
 - `src/proxy/`: mitmdump launcher (`mitmdump.py`), the addon it loads and
@@ -189,7 +189,18 @@ needs full type annotations. Its config is `[tool.pyright]` in
   each player's day into one row, and its card has a "Co-op" pill in its
   footer. The bot
   posts it with `/join/<game>?to=PATH` on the launcher, which redirects the
-  clicker through the game's `/__dgb/enter` with their own token. Format in
+  clicker through the game's `/__dgb/enter` with their own token. With
+  `DISCORD_RESULTS_CHANNEL_IDS` set, opening a co-op card (plain click)
+  first shows checkboxes of the player's servers; the pick is saved per
+  game in `coop_invites` via `GET`/`POST /api/invites`, and starts are
+  posted only in those servers (all of them if they've never picked, none
+  for an empty pick). Invites only decide where the start is posted, never
+  who a result shows: a finished game's post in a server ranks only the
+  players registered with it, and the launcher's announcement only the
+  viewer and those sharing any server with them (`members` in
+  `announce.render_coop()`, required so nothing leaks by default). Anyone
+  else, players outside the proxy included, is left out of the count,
+  total and ranks. Format in
   `games/README.md`.
 - **Game roles.** On startup the bot creates a mentionable role named after
   each game's `title` in each results channel's server (reusing one that

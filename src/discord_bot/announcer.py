@@ -2,10 +2,13 @@
 player is registered with.
 
 A co-op game's results are posted together, one message per shared game
-(puzzle_id) in each server any of its players is registered with. They're
+(puzzle_id) in each server any of its players is registered with, ranking
+only the players registered with that server: no one there learns that
+anyone else played. They're
 all saved at once, from the first solve reported (see capture/endpoints.py).
 Its starts are posted in the
-starter's servers with a link for others to join them.
+starter's servers with a link for others to join them: the ones they picked
+for the game in the launcher's prompt, else all of them.
 """
 
 import asyncio
@@ -22,7 +25,7 @@ from src.discord_bot.roles import game_role
 from src.games.models import Game
 from src.games.registry import GAMES_BY_NAME
 from src.settings import LAUNCHER_URL
-from src.store import guilds, results, starts
+from src.store import guilds, invites, results, starts
 
 # Results older than this when the bot first sees them (e.g. saved while it
 # was down) are marked announced without being posted.
@@ -33,8 +36,9 @@ MAX_START_AGE = timedelta(minutes=30)
 log = logging.getLogger(__name__)
 
 
-# Renders a message given the game role's mention (None without a role).
-Render = Callable[[str | None], str]
+# Renders a message for a server, given the game role's mention there (None
+# without a role) and the server's ID.
+Render = Callable[[str | None, str], str]
 
 
 async def announce_pending_results(channels: ResultsChannels) -> None:
@@ -59,7 +63,7 @@ async def _announce(
     """Post the result in each of its player's servers it hasn't been posted
     in yet; False if one failed and it should be retried."""
 
-    def render(game_mention: str | None) -> str:
+    def render(game_mention: str | None, _guild_id: str) -> str:
         return announce.render_result(game, result, game_mention=game_mention)
 
     return await _post_in_servers(
@@ -85,8 +89,14 @@ async def _announce_shared_game(
     for result in shared:
         done |= await asyncio.to_thread(results.announced_in, result.id)
 
-    def render(game_mention: str | None) -> str:
-        return announce.render_coop(game, shared, game_mention=game_mention)
+    members: dict[str, set[str]] = {}
+    for guild_id in await _servers_of([r.discord_id for r in shared]):
+        members[guild_id] = await asyncio.to_thread(guilds.members, guild_id)
+
+    def render(game_mention: str | None, guild_id: str) -> str:
+        return announce.render_coop(
+            game, shared, game_mention=game_mention, members=members[guild_id]
+        )
 
     async def mark_done(guild_id: str) -> None:
         for result in shared:
@@ -118,6 +128,7 @@ async def _announce_pending_starts(channels: ResultsChannels) -> None:
 
         def render(
             game_mention: str | None,
+            _guild_id: str,
             game: Game = game,
             start: starts.StoredStart = start,
         ) -> str:
@@ -129,7 +140,7 @@ async def _announce_pending_starts(channels: ResultsChannels) -> None:
             channels,
             game,
             render,
-            servers=await _servers_of([start.discord_id]),
+            servers=await _invited_servers(start),
             done=await asyncio.to_thread(starts.announced_in, start.id),
             mark_done=lambda guild_id, start=start: asyncio.to_thread(
                 starts.mark_announced_in, start.id, guild_id
@@ -146,6 +157,13 @@ def join_url(start: starts.StoredStart) -> str:
     url = urlsplit(start.url or "")
     path = url.path + (f"?{url.query}" if url.query else "")
     return f"{LAUNCHER_URL}/join/{start.game}?to={quote(path or '/', safe='')}"
+
+
+async def _invited_servers(start: starts.StoredStart) -> list[str]:
+    """The starter's servers they invite others from for the game."""
+    servers = await _servers_of([start.discord_id])
+    picked = await asyncio.to_thread(invites.pick, start.discord_id, start.game)
+    return servers if picked is None else [s for s in servers if s in picked]
 
 
 async def _servers_of(discord_ids: list[str]) -> list[str]:
@@ -196,10 +214,11 @@ async def _message(
 
     The role's mention stands in for the game's title; a template that
     doesn't show the title gets the mention added on a line of its own."""
+    guild_id = str(channel.guild.id)
     role = await game_role(channel.guild, game)
     if role is None:
-        return render(None), discord.AllowedMentions.none()
-    text = render(role.mention)
+        return render(None, guild_id), discord.AllowedMentions.none()
+    text = render(role.mention, guild_id)
     if role.mention not in text:
         ping = f"\n-# {role.mention}"
         text = announce.truncate(text, announce.DISCORD_MAX_LENGTH - len(ping)) + ping

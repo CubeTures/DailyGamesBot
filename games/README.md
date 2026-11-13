@@ -253,8 +253,12 @@ link, and they may finish several a day. Then:
 - **Announcement.** The bot posts one message per shared game in every
   server any of its players is registered with. `announcement.j2` gets the first
   result's fields plus `players`, ranked by `score` (`higher_score_wins`),
-  each with `player`: a mention for a player matched by `player_id`, else
-  their escaped `name`. See `crosswithfriends/announcement.j2`.
+  each with `rank` (from 1) and `player`, their mention. Only players its
+  reader knows are in it: in a server's post, those registered with that
+  server; on the launcher, everyone sharing any server with the viewer.
+  Anyone else, including players outside the proxy, is left out entirely
+  (count, total and ranks too), so base every line on `players`. See
+  `crosswithfriends/announcement.j2`.
 - **Scoreboard.** Each player's results of the day are one row: `score`
   and `time_secs` summed, `puzzles` counting them; clicking it shows each
   game's announcement.

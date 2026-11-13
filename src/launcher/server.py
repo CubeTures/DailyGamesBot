@@ -1,6 +1,6 @@
 """Serves the launcher page and its JSON API: the player's servers, the
-results its scoreboard reads, their streaks, the role subscriptions its bells toggle, and the games each player has
-hidden.
+results its scoreboard reads, their streaks, the role subscriptions its bells toggle, the games each player has
+hidden, and the servers they invite others from to their co-op games.
 
 Players are identified by the token from their /play link, which the store
 maps to their Discord ID (see store/players.py). The page is only sent for a
@@ -29,7 +29,14 @@ from src.launcher.build import (
 )
 from src.proxy.capture import ENTER_PATH, TOKEN_COOKIE, token_cookie
 from src.settings import LAUNCHER_PORT
-from src.store import guilds, hidden_games, players, results, subscriptions
+from src.store import (
+    guilds,
+    hidden_games,
+    invites,
+    players,
+    results,
+    subscriptions,
+)
 
 Reply = tuple[int, Any]
 
@@ -44,7 +51,9 @@ def _get_results(params: dict[str, str]) -> Reply:
     # The page sends the viewer's local date; fall back to the server's.
     day = _parse_day(params.get("day")) or date.today()
     guild_id = params.get("guild") or None
-    shown = _results_json(results.on_day(day, discord_id, guild_id))
+    shown = _results_json(
+        results.on_day(day, discord_id, guild_id), _known_players(discord_id)
+    )
     if guild_id == results.ALL_GUILDS:
         primary = guilds.primary(discord_id)
         in_primary: set[str] = guilds.members(primary) if primary else set()
@@ -91,6 +100,14 @@ def _get_hidden(params: dict[str, str]) -> Reply:
     return 200, {"games": hidden_games.levels(discord_id)}
 
 
+def _get_invites(params: dict[str, str]) -> Reply:
+    """GET /api/invites?token=TOKEN: {"games": {game: [guild ID]}}, the
+    servers they picked to invite others from for each co-op game they've
+    picked for. A game not listed invites from all their servers."""
+    discord_id = _player(params.get("token"))
+    return 200, {"games": invites.picks(discord_id)}
+
+
 def _post_subscription(body: bytes) -> Reply:
     """POST /api/subscriptions {"token", "game", "subscribed"}."""
     discord_id, game, subscribed = _player_game_value(body, "subscribed")
@@ -110,16 +127,32 @@ def _post_hidden(body: bytes) -> Reply:
     return 200, {"ok": True}
 
 
+def _post_invites(body: bytes) -> Reply:
+    """POST /api/invites {"token", "game", "guilds": [guild ID]}, for a co-op
+    game; servers they aren't registered with are dropped."""
+    discord_id, game, raw = _player_game_value(body, "guilds")
+    if not GAMES_BY_NAME[game].coop:
+        return _error(400, "not a co-op game")
+    items = cast(list[Any], raw) if isinstance(raw, list) else None
+    if items is None or not all(isinstance(item, str) for item in items):
+        return _error(400, "guilds must be a list of server IDs")
+    registered = {g.id for g in guilds.of_player(discord_id)}
+    invites.save(discord_id, game, [g for g in items if g in registered])
+    return 200, {"ok": True}
+
+
 _GET_ROUTES: dict[str, Callable[[dict[str, str]], Reply]] = {
     "/api/me": _get_me,
     "/api/results": _get_results,
     "/api/streaks": _get_streaks,
     "/api/subscriptions": _get_subscriptions,
     "/api/hidden": _get_hidden,
+    "/api/invites": _get_invites,
 }
 _POST_ROUTES: dict[str, Callable[[bytes], Reply]] = {
     "/api/subscriptions": _post_subscription,
     "/api/hidden": _post_hidden,
+    "/api/invites": _post_invites,
 }
 
 
@@ -233,7 +266,18 @@ def serve_launcher(port: int = LAUNCHER_PORT) -> Generator[None]:
         server.shutdown()
 
 
-def _results_json(day_results: list[results.StoredResult]) -> list[dict[str, Any]]:
+def _known_players(discord_id: str) -> set[str]:
+    """The viewer and everyone sharing a server with them: the only players
+    a co-op game's announcement shows them."""
+    known = {discord_id}
+    for guild in guilds.of_player(discord_id):
+        known |= guilds.members(guild.id)
+    return known
+
+
+def _results_json(
+    day_results: list[results.StoredResult], known: set[str]
+) -> list[dict[str, Any]]:
     """The scoreboard's rows: one per result, except that a co-op game's
     results of the day are one row per player, summed (see _coop_day_json),
     in the place of their first."""
@@ -243,24 +287,20 @@ def _results_json(day_results: list[results.StoredResult]) -> list[dict[str, Any
         game = GAMES_BY_NAME.get(result.game)
         key = (result.game, result.discord_id) if game and game.coop else result.id
         groups.setdefault(key, []).append(result)
-    by_puzzle: dict[tuple[str, str], list[results.StoredResult]] = {}
-    for result in day_results:
-        by_puzzle.setdefault((result.game, result.puzzle_id), []).append(result)
     return [
-        _coop_day_json(group, by_puzzle)
+        _coop_day_json(group, known)
         if isinstance(key, tuple)
         else _result_json(group[0])
         for key, group in groups.items()
     ]
 
 
-def _coop_day_json(
-    own: list[results.StoredResult],
-    by_puzzle: dict[tuple[str, str], list[results.StoredResult]],
-) -> dict[str, Any]:
+def _coop_day_json(own: list[results.StoredResult], known: set[str]) -> dict[str, Any]:
     """A player's day of a co-op game as one row: `score` and `time_secs`
     summed over the shared games they finished, `puzzles` counting them,
-    and the announcement of each."""
+    and the announcement of each, ranking only the players the viewer
+    knows (see _known_players), with `names` of those it mentions: they may
+    have no row on the scoreboard shown to take a name from."""
     game = GAMES_BY_NAME[own[0].game]
     latest = own[-1]
     row = _result_json(latest)
@@ -277,12 +317,19 @@ def _coop_day_json(
         "time_secs": sum(times) if times else None,
         "puzzles": len(own),
     }
+    shared = [results.of_puzzle(game.name, r.puzzle_id) for r in own]
     row["announcement"] = "\n\n".join(
         announce.render_coop(
-            game, by_puzzle[game.name, r.puzzle_id], game_mention=f"<@&{game.name}>"
+            game, results_, game_mention=f"<@&{game.name}>", members=known
         )
-        for r in own
+        for results_ in shared
     )
+    row["names"] = {
+        r.discord_id: r.player_name
+        for results_ in shared
+        for r in results_
+        if r.discord_id in known and r.player_name
+    }
     return row
 
 

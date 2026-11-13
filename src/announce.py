@@ -10,6 +10,7 @@ Preview one against made-up fields with:
 import logging
 import re
 from collections import Counter
+from collections.abc import Collection
 from typing import Any, cast
 
 from jinja2 import TemplateError
@@ -41,7 +42,7 @@ DEFAULT_COOP_TEMPLATE = """\
 :sun_with_face: {{ players | length | plural("player") }} played **{{ game }}**
 {{- " " + (title | md) if title }}
 {% for p in players %}
-{{ loop.index }}. {{ p.player }} {{ p.score }}
+{{ p.rank }}) {{ p.player }} {{ p.score }}
 {% endfor %}
 """
 
@@ -167,12 +168,17 @@ def render(
     return truncate(text or f"{player} finished **{game_name}**")
 
 
-def coop_players(game: Game, shared: list[StoredResult]) -> list[dict[str, Any]]:
-    """Everyone in a co-op game's shared game, ranked by score: the roster
+def coop_players(
+    game: Game, shared: list[StoredResult], members: Collection[str] | None
+) -> list[dict[str, Any]]:
+    """The players of a co-op game's shared game, ranked by score: the roster
     in the results' `players` field (the fullest of them), each entry with
     `player` added, a mention for those whose result was captured (matched
-    by their `player_id` field) and their escaped name for the rest, and
-    `streak` (as for a result; None for the rest)."""
+    by their `player_id` field) and their escaped name for the rest,
+    `streak` (as for a result; None for the rest) and `rank`, from 1.
+
+    With `members` (Discord IDs), only those of them who played: no one
+    else, not even a gap in the ranks, gives away that they played."""
     captured = {
         str(r.data["player_id"]): r
         for r in shared
@@ -190,6 +196,8 @@ def coop_players(game: Game, shared: list[StoredResult]) -> list[dict[str, Any]]
             continue
         fields = cast(dict[str, Any], entry)
         result = captured.get(str(fields.get("id")))
+        if members is not None and (result is None or result.discord_id not in members):
+            continue
         name = fields.get("name") or "Someone"
         ranked.append(
             {
@@ -208,15 +216,23 @@ def coop_players(game: Game, shared: list[StoredResult]) -> list[dict[str, Any]]
             return (True, 0.0)
         return (False, sign * float(score))
 
-    return sorted(ranked, key=rank)
+    ranked.sort(key=rank)
+    for place, p in enumerate(ranked, 1):
+        p["rank"] = place
+    return ranked
 
 
 def render_coop(
-    game: Game, shared: list[StoredResult], game_mention: str | None = None
+    game: Game,
+    shared: list[StoredResult],
+    *,
+    members: Collection[str] | None,
+    game_mention: str | None = None,
 ) -> str:
     """The announcement of a co-op game's shared game, from every captured
     result of it: the first one's fields, with `players` ranked (see
-    coop_players)."""
+    coop_players): only those in `members`, the Discord IDs of everyone
+    its reader knows (None for everyone)."""
     game_name = game_mention or game.title
     first = shared[0]
     context = {
@@ -224,7 +240,7 @@ def render_coop(
         **first.data,
         "game": game_name,
         "puzzle_id": first.puzzle_id,
-        "players": coop_players(game, shared),
+        "players": coop_players(game, shared, members),
         "fields": first.data,
     }
     templates = (

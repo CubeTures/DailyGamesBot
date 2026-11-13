@@ -84,18 +84,20 @@ def unannounced() -> list[StoredStart]:
             "SELECT id, game, discord_id, puzzle_id, data, url, captured_at"
             " FROM starts WHERE announced = 0 ORDER BY captured_at"
         ).fetchall()
-    return [
-        StoredStart(
-            id=id_,
-            game=game,
-            discord_id=discord_id,
-            puzzle_id=puzzle_id,
-            data=json.loads(data),
-            url=url,
-            captured_at=datetime.fromisoformat(captured_at),
-        )
-        for id_, game, discord_id, puzzle_id, data, url, captured_at in rows
-    ]
+    return [_start(row) for row in rows]
+
+
+def _start(row: tuple[Any, ...]) -> StoredStart:
+    id_, game, discord_id, puzzle_id, data, url, captured_at = row
+    return StoredStart(
+        id=id_,
+        game=game,
+        discord_id=discord_id,
+        puzzle_id=puzzle_id,
+        data=json.loads(data),
+        url=url,
+        captured_at=datetime.fromisoformat(captured_at),
+    )
 
 
 def mark_announced(start_id: int) -> None:

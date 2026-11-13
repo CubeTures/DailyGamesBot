@@ -23,7 +23,8 @@ scores.
 - History of scores for immortal bragging rights
 - Join on multiple servers
 - Co-op games (Cross with Friends): a link to join is posted when someone
-  starts one, and everyone in it is ranked by squares filled
+  starts one, in the servers they pick before playing, and everyone in it
+  is ranked by squares filled
 - Free and Open Source so anyone can add new games
 
 ## Adding games

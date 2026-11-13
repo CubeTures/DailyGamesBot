@@ -4,5 +4,5 @@
 :eyes: {{ revealed | plural("square") }} revealed
 {% endif %}
 {% for p in players %}
-{{ loop.index }}. {{ p.player }} {{ p.score | plural("square") }}{{ " :fire: %d" % p.streak if p.streak and p.streak > 1 }}
+{{ p.rank }}) {{ p.player }} {{ p.score | plural("square") }}{{ " :fire: %d" % p.streak if p.streak and p.streak > 1 }}
 {% endfor %}

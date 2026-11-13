@@ -217,6 +217,7 @@
   var backButton = dialog.querySelector(".back");
   var message = dialog.querySelector(".message");
   var fullBoard = dialog.querySelector(".ranks");
+  var inviteForm = dialog.querySelector(".invite");
   var dialogBack = null;
 
   // Plays the closing animation (instant under reduced motion), then closes.
@@ -252,9 +253,10 @@
   message.addEventListener("click", revealSpoiler);
   message.addEventListener("keydown", revealSpoiler);
 
-  // The dialog shows either an announcement or a game's full scoreboard;
-  // `back`, if given, is what its back button returns to.
-  function showDialog(game, title, showList, back) {
+  // The dialog shows an announcement ("message"), a game's full scoreboard
+  // ("list") or a co-op game's invite prompt ("invite"); `back`, if given,
+  // is what its back button returns to.
+  function showDialog(game, title, view, back) {
     var oldIcon = dialogHead.querySelector(".icon");
     if (oldIcon) oldIcon.remove();
     dialogHead.insertBefore(smallIcon(game), dialogTitle);
@@ -263,18 +265,23 @@
     else dialog.style.removeProperty("--tint");
     dialogBack = back || null;
     backButton.hidden = !back;
-    message.hidden = showList;
-    fullBoard.hidden = !showList;
+    message.hidden = view !== "message";
+    fullBoard.hidden = view !== "list";
+    inviteForm.hidden = view !== "invite";
     dialog.classList.remove("closing");
     if (!dialog.open) dialog.showModal();
     dialogBody.scrollTop = 0;
   }
 
+  // A co-op game's announcement carries the `names` of the players it
+  // mentions, who may have no row on the scoreboard shown.
   function showAnnouncement(result, namesById, back) {
-    message.innerHTML = discordMarkdown.toHtml(
-      result.announcement, function (id) { return playerName(id, namesById[id]); }, gameTitle);
+    var names = result.names || {};
+    message.innerHTML = discordMarkdown.toHtml(result.announcement, function (id) {
+      return playerName(id, namesById[id] || names[id]);
+    }, gameTitle);
     showDialog(result.game,
-      fullTitle(result.game) + " · " + playerName(result.discord_id, result.name), false, back);
+      fullTitle(result.game) + " · " + playerName(result.discord_id, result.name), "message", back);
   }
 
   // Scrolls to `focusId`'s row and focuses it (coming back from their
@@ -289,7 +296,7 @@
       if (result.discord_id === (focusId || discordId)) target = item;
       fullBoard.appendChild(item);
     });
-    showDialog(game, fullTitle(game) + " · " + playerCount(ranked.length), true);
+    showDialog(game, fullTitle(game) + " · " + playerCount(ranked.length), "list");
     if (target) {
       target.scrollIntoView({ block: "center" });
       var row = target.querySelector(".row");
@@ -918,6 +925,69 @@
       }).catch(function () {});
   }
 
+  // Opening a co-op game's card first asks which of the viewer's servers
+  // the bot should post a link to join them in when they start a game. The
+  // pick is saved per game (no pick yet means all of them) and checked
+  // again the next time.
+  var inviteServers = inviteForm.querySelector(".servers");
+  var invitePlay = inviteForm.querySelector(".play-btn");
+  var invitePicks = {};
+  var inviteGame = null;
+
+  function invitedIds() {
+    return Array.prototype.filter.call(inviteServers.querySelectorAll("input"), function (box) {
+      return box.checked;
+    }).map(function (box) { return box.value; });
+  }
+
+  function showInvite(game, href) {
+    var picked = invitePicks[game];
+    inviteGame = game;
+    inviteServers.textContent = "";
+    guilds.forEach(function (g) {
+      var label = el("label", "server");
+      var box = el("input");
+      box.type = "checkbox";
+      box.value = g.id;
+      box.checked = !picked || picked.indexOf(g.id) !== -1;
+      label.appendChild(box);
+      label.appendChild(el("span", "", g.name || "Server " + g.id));
+      inviteServers.appendChild(label);
+    });
+    invitePlay.href = href;
+    showDialog(game, fullTitle(game), "invite");
+    invitePlay.focus();
+  }
+
+  function setUpInvites() {
+    var links = document.querySelectorAll(".card[data-invite] a.card-link");
+    if (!links.length || !discordId || !guilds.length) return;
+    inviteForm.addEventListener("submit", function (e) { e.preventDefault(); });
+    // A real link into the game, so opening it is never blocked as a popup.
+    invitePlay.addEventListener("click", function () {
+      var game = inviteGame;
+      var before = invitePicks[game];
+      invitePicks[game] = invitedIds();
+      postJson("/api/invites", { token: token, game: game, guilds: invitePicks[game] })
+        .catch(function () { invitePicks[game] = before; });
+      closeDialog();
+    });
+    // Asks only once the saved picks are in, so it never shows stale ones.
+    getJson("/api/invites?token=" + encodeURIComponent(token))
+      .then(function (body) { invitePicks = body.games || {}; })
+      .catch(function () {})
+      .then(function () {
+        links.forEach(function (link) {
+          link.addEventListener("click", function (e) {
+            // A new-tab or middle click goes straight in, with the saved pick.
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            showInvite(link.closest(".card").dataset.game, link.href);
+          });
+        });
+      });
+  }
+
   // The pencil beside "Games" lets players choose which games they see.
   // While editing, every card shows, and a click on one cycles it through
   // shown, card hidden, and card and scoreboard hidden. The choice is saved
@@ -1076,6 +1146,7 @@
     setUpGuilds(me);
     setUpPings();
     setUpHiding();
+    setUpInvites();
     setViewDay(dayFromHash(), true);
     if (viewDay) refreshToday();
     setInterval(refreshToday, REFRESH_MS);

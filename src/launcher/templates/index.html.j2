@@ -32,7 +32,8 @@
         <div class="stack" data-group="{{ stack[0].name }}">
 {%- endif %}
 {%- for game in stack %}
-        <div class="card" data-game="{{ game.name }}" data-hide="shown">
+        <div class="card" data-game="{{ game.name }}" data-hide="shown"
+             {%- if game.coop and roles_enabled %} data-invite{% endif %}>
           <div class="card-top">
             {%- if game.icon %}
             <img class="icon" src="{{ game.icon }}" alt="">
@@ -122,6 +123,14 @@
     <div class="dialog-body">
       <div class="message"></div>
       <ol class="ranks" hidden></ol>
+      <form class="invite" hidden>
+        <p class="note">Which servers should receive an invite to join you?</p>
+        <fieldset class="servers" aria-label="Servers to invite"></fieldset>
+        <div class="invite-foot">
+          <span class="note">Remembered for next time.</span>
+          <a class="play-btn" target="_blank" rel="noopener">Play</a>
+        </div>
+      </form>
     </div>
   </dialog>
 <script id="game-titles" type="application/json">{{ game_titles | tojson }}</script>
