@@ -9,6 +9,7 @@ is only missed when its 25s clock runs out. So:
 """
 
 import re
+import time
 from typing import Any
 
 from playwright.sync_api import Response
@@ -17,6 +18,8 @@ from tests.e2e.expect import where
 from tests.e2e.harness import Driver, Expected, Player, Solution
 
 ROUNDS = 7
+# How long into a round's 25s to keep trying answers.
+ANSWER_SECS = 17
 
 # Candidate answers by prompt keyword (a regex searched in the prompt).
 BANK: dict[str, list[str]] = {
@@ -141,8 +144,11 @@ def _answer(player: Player, prompt: str) -> dict[str, Any] | None:
     accepted /api/submit response, if any."""
     page = player.page
     box = page.get_by_role("textbox", name="Your answer")
+    # Stop well before the 25s clock: an answer the server accepts just as
+    # it runs out still counts as a miss in the game.
+    deadline = time.monotonic() + ANSWER_SECS
     for candidate in _candidates(prompt):
-        if not box.is_visible():
+        if time.monotonic() > deadline or not box.is_visible():
             return None
         try:
             with page.expect_response(_is_submit, timeout=8000) as info:

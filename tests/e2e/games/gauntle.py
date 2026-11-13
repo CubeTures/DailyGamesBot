@@ -54,7 +54,9 @@ def _turn_dials(page: Page) -> None:
         page.mouse.move(knob["x"], knob["y"])
         page.mouse.down()
         page.mouse.move(cx + radius, cy - 5, steps=10)
-        page.mouse.move(cx, cy - radius, steps=10)
+        # End at about half past four, not 12 o'clock: a round can start with
+        # the arm at 12, and a 0° wedge leaves "Lock in" disabled.
+        page.mouse.move(cx + radius * 0.7, cy + radius * 0.7, steps=10)
         page.mouse.up()
         page.get_by_role("button", name="Lock in").click()
         page.wait_for_timeout(2500)
