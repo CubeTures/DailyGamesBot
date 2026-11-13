@@ -1,7 +1,9 @@
-"""Minute Cryptic: the answer is in the game's own mc-puzzle state as soon as
-today's puzzle has started (one letter typed)."""
+"""Minute Cryptic: one clue, solved letter by letter. The surest way to the
+end needs no answer: take one hint, then reveal every letter (the game's
+"gave_up" ending). Par and the help on offer come from the game's own
+mc-puzzle state afterwards."""
 
-from playwright.sync_api import Locator
+from typing import Any
 
 from tests.e2e.harness import Driver, Expected, Player, Solution
 
@@ -22,31 +24,6 @@ def _start(player: Player) -> None:
     answer.wait_for()
 
 
-def _cell(player: Player, index: int) -> Locator:
-    """The answer's index-th letter cell, across words: cells are labelled
-    "Letter 1 of 9, ..." or, for answers of several words, "Word 2, letter
-    1 of 2, ..."."""
-    answer = player.page.get_by_role("group", name="Puzzle answer")
-    return answer.locator('[aria-label*="letter " i][aria-label*=" of "]').nth(index)
-
-
-def _key(player: Player, letter: str) -> None:
-    player.page.locator(f'[data-skbtn="{letter.upper()}"]').click()
-
-
-def learn(player: Player) -> Solution:
-    player.open()
-    _start(player)
-    _key(player, "A")
-    puzzle = player.page.evaluate("JSON.parse(localStorage.getItem('mc-puzzle'))")
-    return {
-        "date": puzzle["date"],
-        "answer": puzzle["answer"],
-        "par": (puzzle.get("parDetails") or {}).get("averagePar") or puzzle["par"],
-        "help_available": len(puzzle["hints"]) + len(puzzle["puzzlePieces"]),
-    }
-
-
 def _help(player: Player, kind: str) -> None:
     """Take one hint: "show fodder", "show definition" or "show letter"."""
     page = player.page
@@ -60,65 +37,34 @@ def _help(player: Player, kind: str) -> None:
     page.wait_for_timeout(500)
 
 
-def _close_help(player: Player) -> None:
-    close = player.page.get_by_role("dialog").get_by_role("button", name="Close")
-    if close.is_visible():
-        close.click()
-
-
-def _type_answer(player: Player, answer: str) -> None:
-    """Fill every cell not already revealed, then check."""
-    letters = [c for c in answer if c.isalpha()]
-    for i, letter in enumerate(letters):
-        cell = _cell(player, i)
-        if "revealed" in (cell.get_attribute("aria-label") or ""):
-            continue
-        cell.click()
-        _key(player, letter)
-    # The game times the solve itself (to the second); make it nonzero.
-    player.page.wait_for_timeout(1500)
-    player.page.get_by_role("button", name="check").click()
-
-
-def _expected(solution: Solution, hints: int, letters: int, won: bool) -> Expected:
-    par = solution["par"]
+def play(player: Player, _solution: Solution) -> Expected:
+    _start(player)
+    page = player.page
+    # The answer's letter cells: "Letter 1 of 9, ..." or, for answers of
+    # several words, "Word 2, letter 1 of 2, ...".
+    letters = (
+        page.get_by_role("group", name="Puzzle answer")
+        .locator('[aria-label*="letter " i][aria-label*=" of "]')
+        .count()
+    )
+    assert letters, "no letter cells"
+    _help(player, "show fodder")
+    for _ in range(letters):
+        _help(player, "show letter")
+    puzzle: dict[str, Any] = page.evaluate(
+        "JSON.parse(localStorage.getItem('mc-puzzle'))"
+    )
+    details: dict[str, Any] = puzzle.get("parDetails") or {}
+    par: int = details.get("averagePar") or puzzle["par"]
     return {
-        "puzzle_id": solution["date"],
-        "won": won,
-        "score": hints + letters - par,
+        "puzzle_id": puzzle["date"],
+        "won": False,
+        "score": 1 + letters - par,
         "par": par,
-        "hints": hints,
+        "hints": 1,
         "letters_revealed": letters,
-        "help_available": solution["help_available"],
+        "help_available": len(puzzle["hints"]) + len(puzzle["puzzlePieces"]),
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    _start(player)
-    _type_answer(player, solution["answer"])
-    return _expected(solution, hints=0, letters=0, won=True)
-
-
-def lose(player: Player, solution: Solution) -> Expected:
-    """Reveal every letter: the game's "gave_up" ending."""
-    _start(player)
-    letters = sum(c.isalpha() for c in solution["answer"])
-    for _ in range(letters):
-        _help(player, "show letter")
-    return _expected(solution, hints=0, letters=letters, won=False)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    _start(player)
-    _help(player, "show fodder")
-    _help(player, "show letter")
-    _close_help(player)
-    _type_answer(player, solution["answer"])
-    return _expected(solution, hints=1, letters=1, won=True)
-
-
-DRIVER = Driver(
-    name="minutecryptic",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed},
-)
+DRIVER = Driver(name="minutecryptic", play=play)

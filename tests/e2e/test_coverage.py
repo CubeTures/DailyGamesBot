@@ -16,13 +16,3 @@ def test_every_captured_game_has_a_driver() -> None:
 def test_drivers_name_real_games() -> None:
     unknown = sorted(DRIVERS.keys() - GAMES_BY_NAME.keys())
     assert not unknown, f"drivers for games not in games/: {unknown}"
-
-
-def test_every_driver_has_a_scenario() -> None:
-    assert all(d.scenarios for d in DRIVERS.values())
-
-
-def test_known_failures_name_scenarios() -> None:
-    for name, driver in DRIVERS.items():
-        unknown = driver.known_failures.keys() - driver.scenarios.keys()
-        assert not unknown, f"{name}: known_failures for no scenario: {unknown}"

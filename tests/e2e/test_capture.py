@@ -1,10 +1,8 @@
-"""Plays every game on its real site, through the proxy, once per outcome
-(win / lose / mixed, where the game has them), and checks the result the
-capture script saved.
+"""Plays every game once on its real site, through the proxy, and checks the
+result the capture script saved.
 
     uv run pytest -m live                       # everything
     uv run pytest -m live -k wordle --headed    # one game, watching
-    uv run pytest -m live -k "chess and lose"
 
 A failure prints the fields that didn't match and saves a trace, screenshot
 and __dgb.status() under tests/e2e/.artifacts/ (see conftest.py).
@@ -25,11 +23,7 @@ from tests.e2e.conftest import PlayerFactory
 from tests.e2e.games import DRIVERS
 from tests.e2e.harness import CaptureFailed, Driver, Player, Row
 
-CASES = [
-    pytest.param(name, scenario, id=f"{name}-{scenario}")
-    for name, driver in sorted(DRIVERS.items())
-    for scenario in driver.scenarios
-]
+CASES = [pytest.param(name, id=name) for name in sorted(DRIVERS)]
 
 
 def _skip_near_reset(game: Game) -> None:
@@ -104,19 +98,19 @@ def _check_row(player: Player, row: Row, expected: dict[str, Any]) -> None:
 
 
 @pytest.mark.live
-@pytest.mark.parametrize(("name", "scenario"), CASES)
+@pytest.mark.parametrize("name", CASES)
 def test_capture(
-    name: str, scenario: str, players: PlayerFactory, request: pytest.FixtureRequest
+    name: str, players: PlayerFactory, request: pytest.FixtureRequest
 ) -> None:
     driver = DRIVERS[name]
     game = GAMES_BY_NAME[name]
-    if reason := driver.known_failures.get(scenario):
-        request.applymarker(pytest.mark.xfail(reason=reason, strict=True))
+    if driver.known_failure:
+        request.applymarker(pytest.mark.xfail(reason=driver.known_failure, strict=True))
     _skip_near_reset(game)
     solution = _solution(driver, game, players)
 
-    player = players(name, scenario)
+    player = players(name, "play")
     player.open()
-    expected = driver.scenarios[scenario](player, solution)
+    expected = driver.play(player, solution)
     row = player.wait_for_result()
     _check_row(player, row, expected)

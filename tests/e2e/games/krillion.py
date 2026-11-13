@@ -1,11 +1,10 @@
 """Krillion: answers are free text, scored by the server, and there's no
 answer list to learn. A nonsense answer is just rejected ("no echo"); a round
-is only missed when its 25s clock runs out. So:
-
-- "misses" lets every round time out (fully deterministic, ~3.5 minutes);
-- "answered" and "mixed" try answers from a small bank, picked by keywords in
-  the prompt, until one is accepted. Which ones land varies by day, so the
-  expected fields come from the server's own /api/submit responses.
+is only missed when its 25s clock runs out. So each round tries answers from
+a small bank, picked by keywords in the prompt, until one is accepted, and a
+round where none is just times out. Which ones land varies by day (most days
+some do and some don't), so the expected fields come from the server's own
+/api/submit responses.
 """
 
 import re
@@ -222,22 +221,8 @@ def _expected(player: Player, accepted: list[dict[str, Any] | None]) -> Expected
     }
 
 
-def misses(player: Player, solution: Solution) -> Expected:
-    """There's no losing; missing every round scores 0."""
-    return _expected(player, _dive(player, set()))
+def play(player: Player, _solution: Solution) -> Expected:
+    return _expected(player, _dive(player, set(range(ROUNDS))))
 
 
-def answered(player: Player, solution: Solution) -> Expected:
-    accepted = _dive(player, set(range(ROUNDS)))
-    return _expected(player, accepted)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    accepted = _dive(player, {0, 2, 4, 6})
-    return _expected(player, accepted)
-
-
-DRIVER = Driver(
-    name="krillion",
-    scenarios={"answered": answered, "misses": misses, "mixed": mixed},
-)
+DRIVER = Driver(name="krillion", play=play)

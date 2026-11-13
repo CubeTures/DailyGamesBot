@@ -87,9 +87,9 @@ def _wrong(board: chess.Board, right: chess.Move) -> chess.Move:
     raise AssertionError("no wrong move available")
 
 
-def _play(player: Player, solution: Solution, *, mistakes: int, finish: bool) -> None:
+def _play(player: Player, solution: Solution, *, mistakes: int) -> None:
     """Make `mistakes` wrong moves (each retried) on the first move, then play
-    the solution if `finish`."""
+    the solution."""
     page = player.page
     board = chess.Board(solution["fen"])
     # The board loads White-side-up and only flips for a Black puzzle once
@@ -115,40 +115,21 @@ def _play(player: Player, solution: Solution, *, mistakes: int, finish: bool) ->
         if retry.is_visible():
             retry.click()
             page.wait_for_timeout(800)
-    if not finish:
-        return
     for n, move in enumerate(moves):
         if n % 2 == 0:  # the player's; the site plays the rest
             _move(player, move, board.turn)
         board.push(move)
 
 
-def _expected(solution: Solution, mistakes: int) -> Expected:
+def play(player: Player, solution: Solution) -> Expected:
+    """One wrong move (a heart lost, then Retry), then the solution."""
+    _play(player, solution, mistakes=1)
     return {
         "puzzle_id": solution["date"],
-        "won": mistakes < HEARTS,
-        "score": mistakes,
+        "won": True,
+        "score": 1,
         "max_score": HEARTS,
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    _play(player, solution, mistakes=0, finish=True)
-    return _expected(solution, 0)
-
-
-def lose(player: Player, solution: Solution) -> Expected:
-    _play(player, solution, mistakes=HEARTS, finish=False)
-    return _expected(solution, HEARTS)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    _play(player, solution, mistakes=2, finish=True)
-    return _expected(solution, 2)
-
-
-DRIVER = Driver(
-    name="chess",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed},
-)
+DRIVER = Driver(name="chess", learn=learn, play=play)

@@ -1,129 +1,64 @@
-"""Fermi: learn() guesses 1 three times and works each answer out from how
-far off the results screen says that was (the answer shown on the reveal is
-rounded: 1.2 shows as "1"). Guesses are whole numbers, so even the closest
-scenario can be off by a bit. There's no losing: scenarios run from spot on
-to far off."""
+"""Fermi: three questions, each answered with a number. There's no losing, so
+the driver guesses 1 every time and needs no answers. The result is checked
+against the results screen and for adding up: the score is the geometric mean
+of the three factors (each capped at 1,000×), as shown rounded."""
 
 import math
 import re
+from typing import Any
 
-from playwright.sync_api import Locator
-
-from tests.e2e.expect import approx, length, where
+from tests.e2e.expect import ALL, length, where
 from tests.e2e.harness import Driver, Expected, Player, Solution
 
-
-def _start(player: Player) -> None:
-    player.page.get_by_role("button", name="Play Today's →").click()
+QUESTIONS = 3
 
 
-def _guess(player: Player, n: int, guess: int) -> None:
-    """Answer question n (0-2) with `guess`."""
+def _guess(player: Player, n: int) -> None:
+    """Answer question n (0-2) with 1."""
     page = player.page
     if n:
         page.get_by_role("button", name=f"Question {n + 1} →").click()
-    page.get_by_role("textbox", name="your guess").fill(str(guess))
+    page.get_by_role("textbox", name="your guess").fill("1")
     page.get_by_role("button", name=re.compile("Lock it in")).click()
     page.locator(".score-card.target .score-num").wait_for()
 
 
-def _play(player: Player, guesses: list[int]) -> None:
-    _start(player)
-    for n, g in enumerate(guesses):
-        _guess(player, n, g)
-    player.page.get_by_role("button", name="See results →").click()
+def _adds_up(fields: dict[str, Any]) -> bool:
+    factors = fields["factors"]
+    score = math.prod(min(f, 1000) for f in factors) ** (1 / QUESTIONS)
+    return abs(fields["score"] - score) <= score * 0.02 + 0.01
 
 
-def _answer_from(factor: Locator) -> float:
-    """The answer to a guess of 1, from its row on the results screen:
-    "< 1.20×" (too low) means it's 1.2, "> 4.00×" (too high) 0.25."""
-    value = float(re.sub(r"[^\d.]", "", factor.inner_text()))
-    side = factor.locator("[aria-label]").first
-    label = side.get_attribute("aria-label") if side.count() else ""
-    return 1 / value if "too high" in (label or "") else value
-
-
-def learn(player: Player) -> Solution:
-    player.open()
+def play(player: Player, _solution: Solution) -> Expected:
     page = player.page
-    _play(player, [1, 1, 1])
-    factors = page.locator(".q-row .q-factor")
-    factors.nth(2).wait_for()
+    page.get_by_role("button", name="Play Today's →").click()
+    for n in range(QUESTIONS):
+        _guess(player, n)
+    page.get_by_role("button", name="See results →").click()
+    page.locator(".q-row .q-factor").nth(QUESTIONS - 1).wait_for()
     # Read here, not on the start screen: that can show yesterday's number
     # for a moment.
     number = int(page.get_by_text(re.compile(r"^No\. \d+$")).first.inner_text()[4:])
     return {
-        "number": number,
-        "answers": [_answer_from(factors.nth(n)) for n in range(3)],
-    }
-
-
-def _factor(guess: float, answer: float) -> float:
-    return max(guess / answer, answer / guess)
-
-
-def _whole(x: float) -> int:
-    return max(1, round(x))
-
-
-def _expected(solution: Solution, guesses: list[int]) -> Expected:
-    answers = solution["answers"]
-    factors = [_factor(g, a) for g, a in zip(guesses, answers, strict=True)]
-    # The day's score: the geometric mean of the factors, each capped at 1,000×.
-    score = math.prod(min(f, 1000) for f in factors) ** (1 / 3)
-    sides = [
-        "exact" if f < 1.005 else "high" if g > a else "low"
-        for f, g, a in zip(factors, guesses, answers, strict=True)
-    ]
-    return {
-        "puzzle_id": str(solution["number"]),
-        "puzzle_number": solution["number"],
-        # Shown rounded (to 3 significant figures or so).
-        "score": approx(score, score * 0.02 + 0.01),
+        "puzzle_id": str(number),
+        "puzzle_number": number,
         "factors": where(
-            f"≈ {[round(f, 2) for f in factors]}",
-            lambda got: (
-                length(3)(got)
-                and all(
-                    abs(g - f) <= f * 0.02 + 0.01
-                    for g, f in zip(got, factors, strict=True)
-                )
-            ),
+            f"{QUESTIONS} factors ≥ 1",
+            lambda got: length(QUESTIONS)(got) and all(f >= 1 for f in got),
         ),
         "sides": where(
-            f"{sides} (an exact guess may show either side)",
+            f"{QUESTIONS} of high/low/exact",
             lambda got: (
-                length(3)(got)
-                and all(w == "exact" or g == w for g, w in zip(got, sides, strict=True))
+                length(QUESTIONS)(got)
+                and all(s in ("high", "low", "exact") for s in got)
             ),
         ),
-        "share_text": where("the share text", lambda t: t.startswith("Fermi · No.")),
+        "share_text": where(
+            f"the share text for No. {number}",
+            lambda t: t.startswith(f"Fermi · No. {number:03d}"),
+        ),
+        ALL: where("score the geometric mean of the factors", _adds_up),
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    """Each answer, to the nearest whole number."""
-    guesses = [_whole(a) for a in solution["answers"]]
-    _play(player, guesses)
-    return _expected(solution, guesses)
-
-
-def far_off(player: Player, solution: Solution) -> Expected:
-    """Guess 1 every time (the learn run's guesses)."""
-    guesses = [1, 1, 1]
-    _play(player, guesses)
-    return _expected(solution, guesses)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    a = solution["answers"]
-    guesses = [_whole(a[0]), _whole(a[1] * 10), _whole(a[2] / 10)]
-    _play(player, guesses)
-    return _expected(solution, guesses)
-
-
-DRIVER = Driver(
-    name="fermi",
-    learn=learn,
-    scenarios={"win": win, "far_off": far_off, "mixed": mixed},
-)
+DRIVER = Driver(name="fermi", play=play)

@@ -1,9 +1,13 @@
 """Gauntle: a run of eleven mini-games against one clock. Every run ends in a
-total time (failing or skipping a game only adds a penalty), so the one
-scenario plays the cheapest full run: skip every game that has a Skip button
-(it unlocks after 45s and then asks for a confirming click, so a run takes
-about eight minutes) and make one throwaway move in the two that don't
-(Ratiole's cut, Angle's three dials)."""
+total time (failing or skipping a game only adds a penalty), so the driver
+plays the cheapest full run: skip every game that has a Skip button and make
+one throwaway move in the two that don't (Ratiole's cut, Angle's three dials).
+
+Skip unlocks 45s into a game. Rather than wait, the driver runs the page on
+Playwright's fake clock (which otherwise keeps real time, so animations and
+drags still work) and jumps it past that. The server takes the page's own
+times (`clientRawTimeMs`), so the run still ends normally, a skip penalty per
+game included."""
 
 import re
 from datetime import date
@@ -15,6 +19,8 @@ from tests.e2e.harness import Driver, Expected, Player, Solution
 from tests.e2e.solutions import game_day
 
 GAMES = 11
+# How long a game's Skip button stays locked, and a little more.
+SKIP_LOCKED_MS = 46_000
 
 
 def _cut(page: Page) -> None:
@@ -64,6 +70,9 @@ def _turn_dials(page: Page) -> None:
 
 def skip_all(player: Player, _solution: Solution) -> Expected:
     page = player.page
+    # The fake clock has to be in place before the page's scripts run.
+    page.clock.install()
+    page.reload(wait_until="domcontentloaded")
     # A "Heads up!" notice about changed games can come before the run.
     player.dismiss(page.get_by_role("dialog").get_by_role("button", name="Start run"))
     page.get_by_role("button", name="Run the Gauntlet").click()
@@ -81,7 +90,8 @@ def skip_all(player: Player, _solution: Solution) -> Expected:
         n = int(found[1])
         if skip.count():
             # It counts down "Skip (45s)", disabled, until it unlocks.
-            page.locator("button:enabled", has_text="Skip").wait_for(timeout=90000)
+            page.clock.fast_forward(SKIP_LOCKED_MS)
+            page.locator("button:enabled", has_text="Skip").wait_for(timeout=10000)
             skip.click()
             # The first click only arms it: it turns into "Confirm skip".
             page.get_by_role("button", name="Confirm skip").click(timeout=10000)
@@ -114,4 +124,4 @@ def skip_all(player: Player, _solution: Solution) -> Expected:
     }
 
 
-DRIVER = Driver(name="gauntle", scenarios={"skip_all": skip_all})
+DRIVER = Driver(name="gauntle", play=skip_all)

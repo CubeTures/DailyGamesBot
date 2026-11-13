@@ -99,4 +99,4 @@ def finish(player: Player, solution: Solution) -> Expected:
     }
 
 
-DRIVER = Driver(name="farflung", scenarios={"finish": finish})
+DRIVER = Driver(name="farflung", play=finish)

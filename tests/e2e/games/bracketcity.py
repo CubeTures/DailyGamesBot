@@ -1,6 +1,6 @@
-"""Bracket City: there's no answer list anywhere, so learn() reveals every
-clue (peek, then reveal) and reads each answer off the puzzle text: the
-clue's "[expression]" is replaced by its answer in the game's displayState.
+"""Bracket City: there's no losing and no answer list anywhere, so the driver
+makes one wrong guess and then reveals every clue (peek, then reveal), the
+surest way to the end.
 
 The game runs in an iframe of The Atlantic's page, where the site's sticky
 header covers it, so this plays the iframe's own page. That's the frame that
@@ -8,7 +8,6 @@ reports (see vars.js); the outer page only adds a second, silent copy of the
 capture script.
 """
 
-import re
 from collections.abc import Iterator
 from contextlib import suppress
 from datetime import date
@@ -25,8 +24,19 @@ STATE = """() => JSON.parse(localStorage.getItem(
 
 EMBED_PATH = "/games-embed/bracket-city/"
 
-# Wrong guesses; each costs 2 points.
-WRONG = ["zzz", "qzx", "xqj", "jjjj"]
+# A wrong guess; it costs 2 points.
+WRONG = "qzxj"
+
+# The game's ranks and the score each needs.
+RANKS = [
+    ("Kingmaker", 100),
+    ("Power Broker", 90),
+    ("Mayor", 80),
+    ("Chief of Police", 65),
+    ("Council Member", 45),
+    ("Resident", 20),
+    ("Commuter", 10),
+]
 
 # A clue that hasn't gone after this many tries means the driver is stuck.
 MAX_STEPS = 60
@@ -65,24 +75,6 @@ def _active_clue(game: Page) -> str | None:
     return clue.get_attribute("data-expression", timeout=3000) if clue.count() else None
 
 
-def _text(state: dict[str, object]) -> str:
-    html = state.get("displayState") or state["initialPuzzle"]
-    return re.sub(r"<[^>]+>", "", str(html))
-
-
-def _replaced(before: str, after: str, expression: str) -> str:
-    """What `[expression]` in `before` became in `after`."""
-    target = f"[{expression}]"
-    start = before.index(target)
-    suffix = before[start + len(target) :]
-    assert after.startswith(before[:start]) and after.endswith(suffix)
-    return after[start : len(after) - len(suffix)]
-
-
-def _state(player: Player) -> dict[str, object]:
-    return player.page.evaluate(STATE)
-
-
 def _clues(game: Page) -> Iterator[str]:
     """Each active clue in turn, until there are none left."""
     last = None
@@ -96,108 +88,51 @@ def _clues(game: Page) -> Iterator[str]:
     raise AssertionError(f"still clues left after {MAX_STEPS}")
 
 
-def _reveal_all(player: Player) -> dict[str, str]:
-    """Peek and reveal every clue, innermost first; returns each answer."""
-    game = _start(player)
-    answers: dict[str, str] = {}
-    for expression in _clues(game):
-        # Peek (which also saves the state the first time), then reveal.
-        _click_clue(player, game, expression)
-        before = _text(_state(player))
-        _click_clue(player, game, expression)
-        answers[expression] = _replaced(before, _text(_state(player)), expression)
-    return answers
-
-
 def _css(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def learn(player: Player) -> Solution:
-    player.open(EMBED_PATH)
-    answers = _reveal_all(player)
-    assert answers, "revealed nothing"
-    return {"date": game_day(player.game).isoformat(), "answers": answers}
-
-
-def _type(player: Player, game: Page, text: str) -> None:
+def _wrong_guess(player: Player, game: Page) -> None:
+    """Type a wrong answer. The first keystroke starts the puzzle (saving its
+    state) and re-renders, clearing the box, so get that out of the way
+    first."""
     box = game.get_by_role("textbox", name="Answer")
     box.focus()
-    player.page.keyboard.type(text, delay=30)
+    player.page.keyboard.press("a")
+    player.page.wait_for_function(f"({STATE})()?.progress === 'inProgress'")
+    box.fill("")
+    box.focus()
+    player.page.keyboard.type(WRONG, delay=30)
     # The Enter key doesn't submit here; the on-page button does.
     game.get_by_role("button", name="[enter]").click()
     player.page.wait_for_timeout(600)
 
 
-def _solve(
-    player: Player, solution: Solution, *, wrong: int = 0, peeks: int = 0
-) -> None:
-    """Type each active clue's answer; first `wrong` wrong guesses, and peek at
-    the first `peeks` clues before answering them."""
+def play(player: Player, _solution: Solution) -> Expected:
     game = _start(player)
-    # The first keystroke starts the puzzle (saving its state) and re-renders,
-    # clearing the box; get that out of the way before typing for real.
-    game.get_by_role("textbox", name="Answer").focus()
-    player.page.keyboard.press("a")
-    player.page.wait_for_function(f"({STATE})()?.progress === 'inProgress'")
-    game.get_by_role("textbox", name="Answer").fill("")
-    answers = {a.lower() for a in solution["answers"].values()}
-    for guess in [w for w in WRONG if w not in answers][:wrong]:
-        _type(player, game, guess)
+    _wrong_guess(player, game)
+    clues = 0
     for expression in _clues(game):
-        if peeks:
-            peeks -= 1
-            _click_clue(player, game, expression)
-        _type(player, game, solution["answers"][expression])
-
-
-def _expected(
-    solution: Solution, score: float, rank: object, **counts: int
-) -> Expected:
-    number = (date.fromisoformat(solution["date"]) - date(2025, 4, 8)).days + 1
+        # Peek at its first letter, then reveal it.
+        _click_clue(player, game, expression)
+        _click_clue(player, game, expression)
+        clues += 1
+    day = game_day(player.game)
+    score = max(0, 100 - 2 - 20 * clues)
     return {
-        "puzzle_id": solution["date"],
-        "puzzle_number": number,
+        "puzzle_id": day.isoformat(),
+        "puzzle_number": (day - date(2025, 4, 8)).days + 1,
+        # 100, less 2 for the wrong guess and 5 + 15 per clue, floored at 0.
         "score": score,
         "max_score": 100,
-        "rank": rank,
+        "rank": next((r for r, low in RANKS if score >= low), "Tourist"),
         "hard_mode": False,
-        **counts,
+        "wrong_guesses": 1,
+        "peeks": clues,
+        "reveals": clues,
+        "keystrokes": where("a number > 0", lambda k: k > 0),
+        "min_keystrokes": where("a number > 0", lambda k: k > 0),
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    _solve(player, solution)
-    return _expected(
-        solution,
-        100,
-        where(
-            "Puppet Master (or Kingmaker if keystrokes were over the minimum)",
-            lambda r: r in ("Puppet Master", "Kingmaker"),
-        ),
-        wrong_guesses=0,
-        peeks=0,
-        reveals=0,
-    )
-
-
-def reveal_all(player: Player, solution: Solution) -> Expected:
-    """There's no losing; revealing everything is the worst result."""
-    _reveal_all(player)
-    clues = len(solution["answers"])
-    return _expected(
-        solution, 0, "Tourist", wrong_guesses=0, peeks=clues, reveals=clues
-    )
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    _solve(player, solution, wrong=2, peeks=1)
-    # 100, minus 2 per wrong guess and 5 per peek.
-    return _expected(solution, 91, "Power Broker", wrong_guesses=2, peeks=1, reveals=0)
-
-
-DRIVER = Driver(
-    name="bracketcity",
-    learn=learn,
-    scenarios={"win": win, "reveal_all": reveal_all, "mixed": mixed},
-)
+DRIVER = Driver(name="bracketcity", play=play)

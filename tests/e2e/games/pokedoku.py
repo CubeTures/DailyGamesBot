@@ -1,10 +1,12 @@
 """PokeDoku: everything is server-side, keyed on a session cookie, so each
 fresh browser context gets a fresh grid. The API's /puzzle/stats/<id> lists
 the answers players gave for every cell (with `invalid` set on wrong ones),
-which is where learn() finds a valid, distinct Pokémon per cell.
+which is where the driver finds a valid Pokémon for the first cell.
 
-Each guess's response says whether it was right, so a scenario also checks
-the server agreed with what it meant to do before checking the capture.
+The one path guesses the first cell right and the second wrong, then gives
+up, so the capture sees a guess's response, a named Pokémon, empty cells and
+the give-up. Each guess's response says whether it was right, so the driver
+also checks the server agreed with what it meant to do.
 """
 
 from typing import Any
@@ -16,7 +18,7 @@ from tests.e2e.harness import Driver, Expected, Player, Solution
 
 API = "/__host/api.pokedoku.com/api"
 
-# Guesses for "wrong" cells; any that's valid for the cell is skipped.
+# Guesses for the wrong cell; any that's valid for it is skipped.
 WRONG = [
     "magikarp",
     "caterpie",
@@ -61,9 +63,7 @@ def _start(player: Player) -> None:
     page.wait_for_function(f"({CELLS})() !== null")
 
 
-def learn(player: Player) -> Solution:
-    player.open()
-    _start(player)
+def _learn(player: Player) -> Solution:
     puzzle = _get(player, "/puzzle/current")
     pokemon = {p["id"]: p for p in _get(player, "/pokemon/all") if not p.get("hidden")}
     stats = _get(player, f"/puzzle/stats/{puzzle['id']}")["answerStats"]
@@ -75,18 +75,15 @@ def learn(player: Player) -> Solution:
             key=lambda a: -a["aggCount"],
         )
         valid[cell] = [pokemon[a["pokemonId"]]["name"] for a in ranked]
-    # One distinct pick per cell; plain names (no forms) search cleanly.
-    picks: list[str] = []
-    for cell in range(9):
-        options = [n for n in valid[cell] if n not in picks]
-        plain = [n for n in options if "-" not in n]
-        assert options, f"no known valid answer for cell {cell + 1}"
-        picks.append((plain or options)[0])
+    # Plain names (no forms) search cleanly.
+    options = valid[0]
+    assert options, "no known valid answer for cell 1"
+    plain = [n for n in options if "-" not in n]
     return {
         "date": puzzle["date"],
         "id": puzzle["id"],
-        "picks": picks,
-        "valid": {str(c): v for c, v in valid.items()},
+        "pick": (plain or options)[0],
+        "wrong": next(w for w in WRONG if w not in valid[1]),
     }
 
 
@@ -111,71 +108,31 @@ def _guess(player: Player, cell: int, name: str) -> bool:
     return bool(info.value.json()["result"])
 
 
-def _play(player: Player, solution: Solution, right: set[int]) -> list[str | None]:
-    """Guess every cell once: right for cells in `right`, else a Pokémon that
-    doesn't fit. Returns the grid as the capture should report it."""
+def play(player: Player, _solution: Solution) -> Expected:
+    page = player.page
     _start(player)
-    used: set[str] = set()
-    grid: list[str | None] = []
-    for cell in range(9):
-        if cell in right:
-            name = solution["picks"][cell]
-        else:
-            name = next(
-                w
-                for w in WRONG
-                if w not in used and w not in solution["valid"][str(cell)]
-            )
-        used.add(name)
+    solution = _learn(player)
+    guesses = [(0, solution["pick"], True), (1, solution["wrong"], False)]
+    for cell, name, right in guesses:
         ok = _guess(player, cell, name)
-        assert ok == (cell in right), (
+        assert ok == right, (
             f"driver problem, not capture: guessing {name} in cell {cell + 1} was"
             f" {'right' if ok else 'wrong'}, meant to be the opposite"
         )
-        grid.append(name if ok else None)
-    return grid
-
-
-def _expected(solution: Solution, grid: list[str | None]) -> Expected:
-    correct = sum(c is not None for c in grid)
-    empty = 9 - correct
+    page.get_by_role("button", name="Give up").first.click()
+    page.get_by_role("alertdialog").get_by_role("button", name="Run").click()
     return {
         "puzzle_id": solution["date"],
         "puzzle_number": solution["id"],
-        # 100 per empty cell, plus each correct cell's pick rate (%).
-        "score": 900
-        if correct == 0
-        else between(100 * empty, 100 * empty + 100 * correct),
+        # 100 per empty cell, plus the right cell's pick rate (%).
+        "score": between(800, 900),
         "uniqueness_percentile": NOT_NONE,
-        "correct": correct,
+        "correct": 1,
         "max_correct": 9,
-        "attempts": 9,
-        "cells": grid,
+        # Giving up sets it to 9.
+        "attempts": ANY_POSITIVE,
+        "cells": [solution["pick"], *[None] * 8],
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    return _expected(solution, _play(player, solution, set(range(9))))
-
-
-def lose(player: Player, solution: Solution) -> Expected:
-    return _expected(solution, _play(player, solution, set()))
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    return _expected(solution, _play(player, solution, {0, 4, 8}))
-
-
-def give_up(player: Player, solution: Solution) -> Expected:
-    page = player.page
-    _start(player)
-    page.get_by_role("button", name="Give up").first.click()
-    page.get_by_role("alertdialog").get_by_role("button", name="Run").click()
-    return _expected(solution, [None] * 9) | {"attempts": ANY_POSITIVE}
-
-
-DRIVER = Driver(
-    name="pokedoku",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed, "give_up": give_up},
-)
+DRIVER = Driver(name="pokedoku", play=play)

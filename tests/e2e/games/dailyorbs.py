@@ -9,7 +9,8 @@ it. Winning plays two puzzles to three orbs each, in any of these formats
 - categorization: put each item in one of a few categories
 
 The fifth, long-list (one textbox, answers checked against a word list), is
-rare and never needed. Losing gives up on all four, which works in any format.
+rare and never needed. The one path wins with a mistake in the first puzzle,
+so the capture sees orbs, a lost heart and the win.
 """
 
 import datetime as dt
@@ -244,14 +245,6 @@ def _can_miss(puzzle: Puzzle) -> bool:
     return True
 
 
-def _give_up(player: Player, puzzle: Puzzle) -> None:
-    page = player.page
-    _open(player, puzzle)
-    page.get_by_role("button", name="Reveal Answers").filter(visible=True).click()
-    page.get_by_role("button", name="Reveal", exact=True).filter(visible=True).click()
-    page.wait_for_timeout(600)
-
-
 def _number(date: str) -> int:
     """2026-04-17, the first Daily Orbs, is #1."""
     return (dt.date.fromisoformat(date) - FIRST_DAY).days + 1
@@ -296,34 +289,9 @@ def _win(player: Player, solution: Solution, wrong: int) -> Expected:
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    return _win(player, solution, wrong=0)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
+def play(player: Player, solution: Solution) -> Expected:
     """A win with one mistake first."""
     return _win(player, solution, wrong=1)
 
 
-def lose(player: Player, solution: Solution) -> Expected:
-    """Give up on every puzzle: all four closed with no orbs."""
-    for puzzle in solution["puzzles"]:
-        _give_up(player, puzzle)
-    return {
-        "puzzle_id": solution["date"],
-        "puzzle_number": _number(solution["date"]),
-        "won": False,
-        "orbs": 0,
-        "score": 0,
-        "max_score": 6,
-        "hearts_lost": 0,
-        "row": "",
-        "puzzles": _puzzles(solution, {}),
-    }
-
-
-DRIVER = Driver(
-    name="dailyorbs",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed},
-)
+DRIVER = Driver(name="dailyorbs", learn=learn, play=play)

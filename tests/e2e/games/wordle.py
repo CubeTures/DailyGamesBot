@@ -4,8 +4,8 @@ from tests.e2e.expect import length, where
 from tests.e2e.harness import Driver, Expected, Player, Solution
 from tests.e2e.solutions import game_day
 
-# Valid guesses; whichever aren't today's answer are the wrong ones.
-WORDS = ["crane", "pilot", "mound", "shaky", "fizzy", "blond", "vivid", "jumpy"]
+# Valid guesses; the first that isn't today's answer is the wrong one.
+WORDS = ["crane", "pilot"]
 
 GREEN_ROW = ":green_square:" * 5
 
@@ -39,64 +39,27 @@ def _guess(player: Player, word: str) -> None:
     page.wait_for_timeout(2500)
 
 
-def _wrong(solution: Solution, n: int) -> list[str]:
-    return [w for w in WORDS if w != solution["answer"]][:n]
-
-
-def _play(player: Player, solution: Solution, guesses: list[str]) -> None:
+def play(player: Player, solution: Solution) -> Expected:
+    """A wrong word, then the answer: a win with a row that isn't all green."""
+    guesses = [next(w for w in WORDS if w != solution["answer"]), solution["answer"]]
     _start(player)
     for word in guesses:
         _guess(player, word)
-
-
-def win(player: Player, solution: Solution) -> Expected:
-    _play(player, solution, [solution["answer"]])
     return {
         "puzzle_id": solution["print_date"],
         "won": True,
-        "attempts": 1,
-        "score": 1,
+        "attempts": 2,
+        "score": 2,
         "max_score": 6,
-        "rows": [GREEN_ROW],
-        "guesses": [solution["answer"]],
+        "rows": where(
+            "2 rows, only the last all green",
+            lambda rows: (
+                length(2)(rows) and rows[0] != GREEN_ROW and rows[1] == GREEN_ROW
+            ),
+        ),
+        "guesses": guesses,
         "hard_mode": False,
     }
 
 
-def lose(player: Player, solution: Solution) -> Expected:
-    wrong = _wrong(solution, 6)
-    _play(player, solution, wrong)
-    return {
-        "puzzle_id": solution["print_date"],
-        "won": False,
-        "attempts": 6,
-        "score": None,
-        "rows": where(
-            "6 rows, none all green",
-            lambda rows: len(rows) == 6 and GREEN_ROW not in rows,
-        ),
-        "guesses": wrong,
-    }
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    guesses = [*_wrong(solution, 2), solution["answer"]]
-    _play(player, solution, guesses)
-    return {
-        "puzzle_id": solution["print_date"],
-        "won": True,
-        "attempts": 3,
-        "score": 3,
-        "rows": where(
-            "3 rows, the last all green",
-            lambda rows: length(3)(rows) and rows[-1] == GREEN_ROW,
-        ),
-        "guesses": guesses,
-    }
-
-
-DRIVER = Driver(
-    name="wordle",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed},
-)
+DRIVER = Driver(name="wordle", learn=learn, play=play)

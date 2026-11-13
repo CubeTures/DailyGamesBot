@@ -1,17 +1,9 @@
-"""Costcodle: the price comes from the site's own games.json, read off the
-page once it has loaded today's product. This is the Classic mode; the
+"""Costcodle: the price is a page global (productPrice) once the page has
+loaded today's product. This is the Classic mode; the
 five-product Checkout mode the page opens on is costcodlecheckout.py."""
 
 from tests.e2e.expect import where
 from tests.e2e.harness import Driver, Expected, Player, Solution
-
-
-def learn(player: Player) -> Solution:
-    page = player.open()
-    page.wait_for_function("typeof productPrice === 'number'")
-    return page.evaluate(
-        "({game_number: getGameNumber(), price: productPrice, name: productName})"
-    )
 
 
 def _row(guess: float, price: float) -> str:
@@ -23,8 +15,9 @@ def _row(guess: float, price: float) -> str:
     return arrow + (":yellow_square:" if abs(percent) <= 25 else ":red_square:")
 
 
-def _play(player: Player, solution: Solution, factors: list[float]) -> list[str]:
-    """Guess price × each factor; returns the guesses as the game stores them."""
+def play(player: Player, _solution: Solution) -> Expected:
+    """Half the price, then the price (read off the page): a win with a row
+    that isn't a check."""
     page = player.page
     # The page opens on its Checkout mode, under a notice announcing it; the
     # Classic game (the one captured) is the other tab, also reached by
@@ -33,7 +26,10 @@ def _play(player: Player, solution: Solution, factors: list[float]) -> list[str]
     page.goto(player.url("/?mode=classic"), wait_until="domcontentloaded")
     page.wait_for_function("document.body.dataset.gameMode === 'classic'")
     page.wait_for_function("typeof productPrice === 'number'")
-    guesses = [f"{solution['price'] * f:.2f}" for f in factors]
+    solution = page.evaluate(
+        "({game_number: getGameNumber(), price: productPrice, name: productName})"
+    )
+    guesses = [f"{solution['price'] * f:.2f}" for f in (0.5, 1)]
     # A one-guess win otherwise lands within half a second of the page load,
     # and the capture's timer rightly reports time_secs 0.
     page.wait_for_timeout(1500)
@@ -41,16 +37,12 @@ def _play(player: Player, solution: Solution, factors: list[float]) -> list[str]
         page.locator("#guess-input").fill(guess)
         page.locator("#guess-button").click()
         page.wait_for_timeout(800)
-    return guesses
-
-
-def _expected(solution: Solution, guesses: list[str], won: bool) -> Expected:
     return {
         "puzzle_id": str(solution["game_number"]),
         "puzzle_number": solution["game_number"],
-        "won": won,
-        "attempts": len(guesses),
-        "score": len(guesses) if won else None,
+        "won": True,
+        "attempts": 2,
+        "score": 2,
         "max_score": 6,
         "guesses": guesses,
         "rows": [_row(float(g), solution["price"]) for g in guesses],
@@ -60,23 +52,4 @@ def _expected(solution: Solution, guesses: list[str], won: bool) -> Expected:
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    return _expected(solution, _play(player, solution, [1]), won=True)
-
-
-def lose(player: Player, solution: Solution) -> Expected:
-    # Far and near, both directions.
-    guesses = _play(player, solution, [3, 0.3, 2, 0.5, 1.2, 0.85])
-    return _expected(solution, guesses, won=False)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    guesses = _play(player, solution, [0.5, 1.15, 1.02])
-    return _expected(solution, guesses, won=True)
-
-
-DRIVER = Driver(
-    name="costcodle",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed},
-)
+DRIVER = Driver(name="costcodle", play=play)

@@ -29,7 +29,7 @@ import discord
 
 from src.settings import REPO_ROOT
 
-# When the tests run each day. Live scenarios are skipped within 10 minutes
+# When the tests run each day. Live tests are skipped within 10 minutes
 # of their game's reset, so it's away from midnight in the US.
 RUN_AT = time(hour=12, tzinfo=UTC)
 # The live tests' proxy and launcher, kept off the running ones' ports.

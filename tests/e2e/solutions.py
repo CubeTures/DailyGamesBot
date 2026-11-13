@@ -1,8 +1,8 @@
 """Each game's solution, learned once per game day and cached on disk.
 
-Puzzles change daily, so drivers learn the day's answers (from the game's own
-API, or by revealing everything in a throwaway play) and the other scenarios
-replay them. The cache is keyed on the game day, so it goes stale by itself.
+Puzzles change daily, so drivers whose play needs the day's answers learn
+them from the game's own API, once per game day: a rerun reuses them. The
+cache is keyed on the game day, so it goes stale by itself.
 Delete tests/e2e/.solutions/ to force a re-learn.
 """
 

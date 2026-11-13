@@ -1,7 +1,7 @@
 """Blossom: Merriam-Webster's Phaser game on a canvas, so it's played with
 the keyboard. The game caches today's puzzle, every valid word included, in
-localStorage, so learn() reads it from there. There's no losing: every game
-is 12 words, so the scenarios are the best words and the worst.
+localStorage, so the driver reads it from there. There's no losing: every
+game is 12 words, so it plays the 12 shortest (the fewest keys to type).
 """
 
 import json
@@ -39,8 +39,7 @@ def _loaded(player: Player) -> None:
     )
 
 
-def learn(player: Player) -> Solution:
-    player.open()
+def _learn(player: Player) -> Solution:
     _loaded(player)
     puzzle = player.page.evaluate(
         f"JSON.parse(localStorage.getItem('{KEY}')).puzzleCache[{TODAY}]"
@@ -130,23 +129,11 @@ def _expected(solution: Solution, words: list[str]) -> Expected:
     }
 
 
-def best(player: Player, solution: Solution) -> Expected:
-    """The 12 longest words, pangrams first."""
-    words = sorted(solution["words"], key=lambda w: (not _is_pangram(w), -len(w)))
-    words = words[:12]
-    _play(player, words)
-    return _expected(solution, words)
-
-
-def worst(player: Player, solution: Solution) -> Expected:
-    """The 12 shortest words."""
+def play(player: Player, _solution: Solution) -> Expected:
+    solution = _learn(player)
     words = sorted(solution["words"], key=len)[:12]
     _play(player, words)
     return _expected(solution, words)
 
 
-DRIVER = Driver(
-    name="blossom",
-    learn=learn,
-    scenarios={"best": best, "worst": worst},
-)
+DRIVER = Driver(name="blossom", play=play)

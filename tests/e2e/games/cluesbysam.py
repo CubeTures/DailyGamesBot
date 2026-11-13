@@ -1,13 +1,15 @@
 """Clues by Sam: who's a criminal is in the cards' React props, but the game
 only accepts a verdict once it's deducible (otherwise it's an error), so the
-order matters too. learn() gets that order from the game's own hint: after
-"Show hint", state.hint.reveals lists the cards identifiable right now.
+order matters too. The game's own hint gives it: after "Show hint",
+state.hint.reveals lists the cards identifiable right now. There's no losing,
+so the driver takes a hint at every step and gets the first card wrong once.
 """
 
 from typing import Any
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from tests.e2e.expect import where
 from tests.e2e.harness import Driver, Expected, Player, Solution
 from tests.e2e.solutions import game_day
 
@@ -64,78 +66,39 @@ def _hint(player: Player) -> list[int]:
     return [i for i in hint["reveals"] if i not in flipped]
 
 
-def learn(player: Player) -> Solution:
-    player.open()
+def play(player: Player, _solution: Solution) -> Expected:
     _start(player)
     criminals: list[bool] = player.page.evaluate(CRIMINALS)
     assert None not in criminals, "couldn't read the cards' verdicts"
-    steps: list[list[int]] = []
+    hints = 0
+    wrong = 1
     for _ in range(len(criminals)):
         if _state(player).get("completeTime"):
             break
         step = _hint(player)
+        hints += 1
         assert step, "the hint names no card to identify"
-        for index in step:
-            _guess(player, index, criminals[index])
-        steps.append(step)
-    return {
-        "date": game_day(player.game).isoformat(),
-        "criminals": criminals,
-        # Cards to identify, a hint's worth at a time; each is deducible once
-        # the ones before it are flipped.
-        "steps": steps,
-    }
-
-
-def _play(
-    player: Player, solution: Solution, *, wrong: int = 0, hints: int = 0
-) -> None:
-    """Identify every card in the learned order, getting the first `wrong`
-    cards wrong once first, and pressing "Show hint" before the last `hints`
-    steps."""
-    criminals = solution["criminals"]
-    steps = solution["steps"]
-    _start(player)
-    for n, step in enumerate(steps):
-        if n >= len(steps) - hints:
-            _hint(player)
         for index in step:
             if wrong:
                 wrong -= 1
                 _guess(player, index, not criminals[index])
             _guess(player, index, criminals[index])
-
-
-def _expected(solution: Solution, mistakes: int, hints: int) -> Expected:
+    width = 4
     return {
-        "puzzle_id": solution["date"],
-        "score": mistakes + hints,
-        "mistakes": mistakes,
+        "puzzle_id": game_day(player.game).isoformat(),
+        "score": 1 + hints,
+        "mistakes": 1,
         "hints": hints,
         "double_hints": 0,
+        "rows": where(
+            f"{len(criminals) // width} rows of {width}, not all green",
+            lambda rows: (
+                len(rows) == len(criminals) // width
+                and all(r.count(":") == 2 * width for r in rows)
+                and any(r != ":green_square:" * width for r in rows)
+            ),
+        ),
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    _play(player, solution)
-    return _expected(solution, 0, 0) | {
-        "rows": [":green_square:" * 4] * (len(solution["criminals"]) // 4)
-    }
-
-
-def hinted(player: Player, solution: Solution) -> Expected:
-    """There's no losing; a hint at every step is the other end."""
-    _play(player, solution, hints=len(solution["steps"]))
-    return _expected(solution, 0, len(solution["steps"]))
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    _play(player, solution, wrong=2, hints=1)
-    return _expected(solution, 2, 1)
-
-
-DRIVER = Driver(
-    name="cluesbysam",
-    learn=learn,
-    scenarios={"win": win, "hinted": hinted, "mixed": mixed},
-)
+DRIVER = Driver(name="cluesbysam", play=play)

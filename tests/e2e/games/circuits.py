@@ -7,9 +7,11 @@ comma, with each box to fill marked "* ANSWER":
     SHRINK >, * WRAP >V, * DRESS >V, FOR SUCCESS
     ...
 
-There's no losing: every game ends with the board solved, and scenarios run
-from no mistakes to a wrong submit in every box. The board is in an iframe
-and takes typed letters into the selected box; Enter submits.
+There's no losing: every game ends with the board solved. The driver reads
+the board from that response as the page starts the game, makes one wrong
+submit in the first box and uses a Bolt on the last (so every count the
+capture keeps is nonzero), and fills the rest. The board is in an iframe and
+takes typed letters into the selected box; Enter submits.
 """
 
 import re
@@ -22,8 +24,8 @@ from tests.e2e.expect import between
 from tests.e2e.harness import Driver, Expected, Player, Solution
 from tests.e2e.solutions import game_day
 
-# Wrong submits; whichever aren't the box's answer.
-WRONG = ["TRAFFIC", "BANANA", "PURPLE", "MOUNTAIN", "WHISKER", "LANTERN"]
+# A wrong submit: the first that isn't the box's answer.
+WRONG = ["TRAFFIC", "BANANA"]
 
 # A box cell: "* SLIP >V" is a box (answer SLIP) with arrows out right and down.
 BOX = re.compile(r"^\*\s*(.+?)(?:\s+[>V]+)?$")
@@ -32,10 +34,13 @@ BOX = re.compile(r"^\*\s*(.+?)(?:\s+[>V]+)?$")
 BOLT_CHARGE_SECS = 180
 
 
-def learn(player: Player) -> Solution:
-    player.open()
+def _start(player: Player) -> tuple[FrameLocator, Solution]:
+    """Start today's game; the board, and the puzzle the page was sent."""
+    # The page first draws from its own cache ("offline relay data") and
+    # only sends this query once that's done, which through the proxy can
+    # take over 30s.
     with player.page.expect_response(
-        lambda r: "PlayGameScreenQuery" in r.url
+        lambda r: "PlayGameScreenQuery" in r.url, timeout=90_000
     ) as response:
         player.page.get_by_role("link", name="Play Today's Circuits").click()
     puzzle = response.value.json()["data"]["startOrFindGameplay"]["gamePlayed"][
@@ -49,7 +54,9 @@ def learn(player: Player) -> Solution:
             if match := BOX.match(cell.strip()):
                 boxes.append({"answer": match[1], "tile": f"{col}-{row}"})
     assert boxes, f"no boxes in the puzzle: {puzzle['puzzle']!r}"
-    return {
+    board = player.page.frame_locator("iframe[src*='runtime.html']")
+    board.locator("[data-drop-tile-id]").first.wait_for()
+    return board, {
         "date_key": game_day(player.game).isoformat(),
         "number": puzzle["seriesNumber"],
         "title": puzzle["dailyTitle"],
@@ -65,13 +72,6 @@ def _wait(
     while not test():
         assert time.monotonic() < deadline, f"timed out waiting for {what}"
         player.page.wait_for_timeout(200)
-
-
-def _start(player: Player) -> FrameLocator:
-    player.page.get_by_role("link", name="Play Today's Circuits").click()
-    board = player.page.frame_locator("iframe[src*='runtime.html']")
-    board.locator("[data-drop-tile-id]").first.wait_for()
-    return board
 
 
 def _select(player: Player, board: FrameLocator, tile: str) -> Locator:
@@ -124,54 +124,29 @@ def _solve(
     box.wait_for(state="detached")
 
 
-def _wrong_words(answer: str, n: int) -> list[str]:
-    return [w for w in WRONG if w != answer][:n]
-
-
-def _play(
-    player: Player, solution: Solution, wrong: list[int], bolts: list[int]
-) -> Expected:
-    """Fill every box in order, after `wrong[i]` wrong submits in box i,
-    using `bolts[i]` (0 or 1) Bolts on it."""
-    board = _start(player)
-    for box, n_wrong, bolt in zip(solution["boxes"], wrong, bolts, strict=True):
-        for word in _wrong_words(box["answer"], n_wrong):
+def play(player: Player, _solution: Solution) -> Expected:
+    board, solution = _start(player)
+    boxes = solution["boxes"]
+    n = len(boxes)
+    wrong = [1] + [0] * (n - 1)
+    bolts = [0] * (n - 1) + [1]
+    for box, n_wrong, bolt in zip(boxes, wrong, bolts, strict=True):
+        if n_wrong:
+            word = next(w for w in WRONG if w != box["answer"])
             _wrong(player, board, box["tile"], word)
         _solve(player, board, box["tile"], box["answer"], bool(bolt))
-    n = len(solution["boxes"])
     return {
         "puzzle_id": solution["date_key"],
         "puzzle_number": solution["number"],
         "date": solution["title"],
         "score": between(1, solution["cap"]),
         "boxes": n,
-        "submits": n + sum(wrong),
-        "wrong": sum(wrong),
-        "bolts": sum(bolts),
+        "submits": n + 1,
+        "wrong": 1,
+        "bolts": 1,
         "box_wrong": wrong,
         "box_bolts": bolts,
     }
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    n = len(solution["boxes"])
-    return _play(player, solution, [0] * n, [0] * n)
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
-    """Two wrong submits in the first box, and a Bolt on the last."""
-    n = len(solution["boxes"])
-    return _play(player, solution, [2] + [0] * (n - 1), [0] * (n - 1) + [1])
-
-
-def misses(player: Player, solution: Solution) -> Expected:
-    """A wrong submit in every box."""
-    n = len(solution["boxes"])
-    return _play(player, solution, [1] * n, [0] * n)
-
-
-DRIVER = Driver(
-    name="circuits",
-    learn=learn,
-    scenarios={"win": win, "mixed": mixed, "misses": misses},
-)
+DRIVER = Driver(name="circuits", play=play)

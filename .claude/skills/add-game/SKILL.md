@@ -298,8 +298,9 @@ All of these must pass. Iterate on the config (steps 7 and 8) until they do.
 ## 10. Clean up and report
 
 - Stop the proxy (step 8) and call `browser_close`.
-- Add a live-test driver, `tests/e2e/games/<name>.py`, with a scenario per
-  outcome the game has (see "Adding a game" in `tests/README.md`), and run it
+- Add a live-test driver, `tests/e2e/games/<name>.py`, with one `play` that
+  reaches the end of the game the surest way while every field the capture
+  reports gets real data (see "Adding a game" in `tests/README.md`), and run it
   with `uv run pytest -m live -k <name>`. A new game fails `uv run pytest`
   until it has one.
 - Delete `$SCRATCH/add-game.db` and `.playwright-mcp/add-game/`.

@@ -1,7 +1,9 @@
-"""Matching a captured result's fields against what a scenario expects.
+"""Matching a captured result's fields against what a driver expects.
 
 An expected value is either a plain value (compared with ==) or a Check,
-which carries a description so a failure says what was wanted.
+which carries a description so a failure says what was wanted. A Check under
+the key ALL is given every field, for checks across fields (a total is the
+sum of its parts).
 """
 
 import json
@@ -48,6 +50,9 @@ def between(low: float, high: float) -> Check:
     )
 
 
+# The key for a Check of all the fields together.
+ALL = "*"
+
 ANY_POSITIVE = Check("a number > 0", lambda v: isinstance(v, int | float) and v > 0)
 NOT_NONE = Check("not null", lambda v: v is not None)
 
@@ -56,6 +61,10 @@ def mismatches(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
     """One line per expected field that doesn't match."""
     lines: list[str] = []
     for key, want in expected.items():
+        if key == ALL:
+            if not want(actual):
+                lines.append(f"  fields together: expected {want.description}")
+            continue
         missing = key not in actual
         got = actual.get(key)
         ok = want(got) if isinstance(want, Check) else (not missing and got == want)

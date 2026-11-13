@@ -1,7 +1,9 @@
 """Tightrope: Britannica's daily trivia, nine multiple-choice questions on a
 15-second timer each; three wrong and you fall. The game's own quiz API
 (through the proxy) gives every question with its correct answer, so learn()
-reads it from there.
+reads it from there. The one path gets two wrong and the rest right: a win,
+so the capture sees wrong answers, time bonuses, the rank and the difficulty
+bonus.
 
 Britannica sits behind Cloudflare, which starts challenging the browser (a
 "security verification" page, or a 403 on the quiz API) after many plays in
@@ -124,20 +126,8 @@ def _run(player: Player, solution: Solution, right: list[bool]) -> Expected:
     return _expected(solution, right)
 
 
-def win(player: Player, solution: Solution) -> Expected:
-    return _run(player, solution, [True] * 9)
-
-
-def lose(player: Player, solution: Solution) -> Expected:
-    return _run(player, solution, [True, False, False, False])
-
-
-def mixed(player: Player, solution: Solution) -> Expected:
+def play(player: Player, solution: Solution) -> Expected:
     return _run(player, solution, [False, True, True, False, *[True] * 5])
 
 
-DRIVER = Driver(
-    name="tightrope",
-    learn=learn,
-    scenarios={"win": win, "lose": lose, "mixed": mixed},
-)
+DRIVER = Driver(name="tightrope", learn=learn, play=play)

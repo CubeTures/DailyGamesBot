@@ -154,18 +154,18 @@ def _click_away(locator: Locator) -> None:
         locator.first.click(timeout=3000)
 
 
-# A scenario plays the game to one outcome and returns the fields the saved
-# result should have.
-Scenario = Callable[[Player, Solution], Expected]
+# Plays the game to its end, the surest way that still feeds every field the
+# capture reports, and returns the fields the saved result should have.
+Play = Callable[[Player, Solution], Expected]
 
 
 @dataclass(frozen=True)
 class Driver:
     name: str  # games/<name>
-    scenarios: dict[str, Scenario]
-    # Finds the day's solution, playing in its own context if it has to.
-    # None for games whose scenarios need no solution.
+    play: Play
+    # Finds the day's solution from the game's own API, in its own context.
+    # None for games whose play() needs none, or reads it in its own page.
     learn: Callable[[Player], Solution] | None = None
-    # Scenarios that fail because of a known capture bug: scenario -> why.
-    # They run as strict xfails, so fixing the bug flags them to move back.
-    known_failures: dict[str, str] = field(default_factory=lambda: {})
+    # Why the test fails, if it's a known capture bug. It runs as a strict
+    # xfail, so fixing the bug flags this to be removed.
+    known_failure: str | None = None

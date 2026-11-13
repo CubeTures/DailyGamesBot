@@ -1,8 +1,9 @@
 """TimeGuessr: five photos, each guessed by a pin on the map and a year. The
 daily's photos, with their years, are in localStorage tg_progress_daily as
-soon as it opens, so learn() reads them there. There's no losing; scenarios
-set the year exactly or far off and drop the pin wherever the map's centre is,
-so only the year part of each round's score is known."""
+soon as it opens, so the driver reads them there. There's no losing; it sets
+the first round's year exactly and the rest far off, and drops the pin
+wherever the map's centre is, so only the year part of each round's score is
+known."""
 
 import re
 from typing import Any
@@ -21,13 +22,8 @@ def _progress(player: Player) -> dict[str, Any] | None:
     )
 
 
-def _open(player: Player) -> None:
-    player.open()
+def _learn(player: Player) -> Solution:
     player.page.get_by_role("slider").wait_for()
-
-
-def learn(player: Player) -> Solution:
-    _open(player)
     progress = _progress(player)
     assert progress, "no tg_progress_daily"
     # playArray ends with a {scoringVersion} entry that isn't a photo.
@@ -53,7 +49,6 @@ def _guess(player: Player, year: int) -> None:
 
 
 def _play(player: Player, years: list[int]) -> None:
-    _open(player)
     page = player.page
     for n, year in enumerate(years):
         if n:
@@ -108,25 +103,20 @@ def _expected(solution: Solution, guesses: list[int]) -> Expected:
     }
 
 
-def exact_years(player: Player, solution: Solution) -> Expected:
-    guesses = solution["years"]
-    _play(player, guesses)
-    return _expected(solution, guesses)
-
-
-def far_off(player: Player, solution: Solution) -> Expected:
-    """Each year at whichever end of the slider is further from it, which is
-    always over 20 years off (no year green)."""
+def play(player: Player, _solution: Solution) -> Expected:
+    """The first year exact; the rest at whichever end of the slider is
+    further from it, which is always over 20 years off (no year green)."""
+    solution = _learn(player)
+    years = solution["years"]
     guesses = [
-        FIRST_YEAR if y - FIRST_YEAR > LAST_YEAR - y else LAST_YEAR
-        for y in solution["years"]
+        years[0],
+        *[
+            FIRST_YEAR if y - FIRST_YEAR > LAST_YEAR - y else LAST_YEAR
+            for y in years[1:]
+        ],
     ]
     _play(player, guesses)
     return _expected(solution, guesses)
 
 
-DRIVER = Driver(
-    name="timeguessr",
-    learn=learn,
-    scenarios={"exact_years": exact_years, "far_off": far_off},
-)
+DRIVER = Driver(name="timeguessr", play=play)
